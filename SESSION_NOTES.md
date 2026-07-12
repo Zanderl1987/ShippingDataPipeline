@@ -106,33 +106,61 @@ Add shipping, import/export, and trade data to the financial data pipeline. Focu
 
 ---
 
-## Proposed Pipeline Architecture
+## Pipeline Architecture (Implemented)
 
 ```
 RAW INGESTION LAYER
-├── ImportYeti API ────────→ US BoL (shipment-level)
-├── OEC BoL ───────────────→ US BoL (bulk historical)
-├── UN Comtrade API ───────→ Global bilateral HS6
-├── WTO TTD ───────────────→ Tariff actions
-├── Global Fishing Watch ──→ AIS vessel presence
-├── Marine Cadastre ───────→ US AIS bulk data
-├── Baltic Exchange ───────→ Freight rate indices
-└── US ITC DataWeb ────────→ HTS10 reference data
+├── ImportYeti API ────────→ US BoL (shipment-level)           ingestion/importyeti.py
+├── UN Comtrade API ───────→ Global bilateral HS6               ingestion/comtrade.py
+├── Global Fishing Watch ──→ AIS vessel presence                ingestion/global_fishing_watch.py
+├── US ITC / Comtrade ────→ HTS code reference                  ingestion/us_itc.py
+├── Marine Cadastre ───────→ US AIS bulk data                   ingestion/marine_cadastre.py
+├── Baltic Exchange ───────→ Freight rate indices               ingestion/freight_rates.py
+└── WTO TTD ───────────────→ Tariff actions                     ingestion/wto.py
 
-NORMALIZATION LAYER
-├── HS code standardization (HS6 crosswalk)
-├── Company name entity resolution
-├── Port code normalization (UN/LOCODE)
-├── Currency conversion (CIF/FOB/USD)
-└── Unit normalization (TEU, kg, CBM)
-
-STORAGE LAYER
-├── Parquet files (partitioned by country/year)
-├── DuckDB query layer
-├── Company/entity dimension table
-├── HS code reference table (HTS10)
-└── Port/location dimension table
+STORAGE LAYER (DuckDB)
+├── bills_of_lading       — Shipment-level BoL data
+├── trade_flows           — Bilateral trade flows
+├── vessel_presence       — AIS vessel positions
+├── freight_rates         — Shipping indices (BDI, CFI, etc.)
+├── tariff_rates          — Tariff rates
+├── hs_reference          — HS/HTS code reference
+└── port_reference        — Port locations
 ```
+
+### Files Created (2026-07-11)
+
+| File | Purpose |
+|------|---------|
+| `config.py` | API keys, paths, rate limits |
+| `run_ingest.py` | CLI entry point |
+| `requirements.txt` | Dependencies |
+| `.env.example` | API key template |
+| `.gitignore` | Excludes `.env`, `*.duckdb`, `data/raw/` |
+| `ingestion/importyeti.py` | ImportYeti API — company search, BoL queries |
+| `ingestion/comtrade.py` | UN Comtrade API — bilateral trade flows, HS codes |
+| `ingestion/global_fishing_watch.py` | GFW — vessel presence, port traffic, vessel tracks |
+| `ingestion/us_itc.py` | US ITC — HS code reference (uses Comtrade fallback, ITC site is Angular SPA) |
+| `ingestion/marine_cadastre.py` | US CGMIX/PSIX — vessel traffic, vessel tracks |
+| `ingestion/freight_rates.py` | Baltic Exchange — BDI, Capesize, Panamax, Supramax, CFI |
+| `ingestion/wto.py` | WTO — tariff rates, trade profiles |
+| `storage/duckdb_storage.py` | DuckDB storage layer — 7 tables, insert/query |
+| `README.md` | Project documentation |
+| `SESSION_NOTES.md` | This file |
+
+### CLI Usage
+
+```bash
+python run_ingest.py --list-sources
+python run_ingest.py --all
+python run_ingest.py --source importyeti --query "Apple Inc"
+python run_ingest.py --source gfw --query "33.7,-118.2"
+```
+
+### GitHub Repo
+
+- **URL**: https://github.com/Zanderl1987/ShippingDataPipeline (private)
+- **Initial commit**: 2026-07-11, 18 files, 1695 lines
 
 ---
 
@@ -148,9 +176,17 @@ STORAGE LAYER
 
 ## Next Steps
 
-- [ ] Prototype ImportYeti API ingest
-- [ ] Prototype UN Comtrade API ingest
-- [ ] Prototype Global Fishing Watch AIS ingest
-- [ ] Set up storage layer (Parquet + DuckDB)
-- [ ] Build HS code crosswalk/reference table
+- [x] Set up storage layer (DuckDB) — DONE 2026-07-11
+- [x] Prototype ImportYeti API ingest — DONE 2026-07-11
+- [x] Prototype UN Comtrade API ingest — DONE 2026-07-11
+- [x] Prototype Global Fishing Watch AIS ingest — DONE 2026-07-11
+- [x] Write freight rate ingestion (Baltic Exchange) — DONE 2026-07-11
+- [x] Write WTO tariff ingestion — DONE 2026-07-11
+- [x] Write Marine Cadastre AIS ingestion — DONE 2026-07-11
+- [ ] Populate `.env` with API keys (ImportYeti, Comtrade, GFW)
+- [ ] Run full `--all` ingestion and verify data in DuckDB
+- [ ] Build HS code crosswalk/reference table from Comtrade data
 - [ ] Evaluate CBP FOIA request for raw ACE manifests
+- [ ] Add entity resolution pipeline (company name dedup)
+- [ ] Add HS code imputation classifier (BoL text → HS6)
+- [ ] Add non-US customs data sources (India, China, Brazil)
