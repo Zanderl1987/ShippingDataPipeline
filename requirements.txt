@@ -1,0 +1,10 @@
+duckdb>=0.10.0
+pyarrow>=14.0.0
+pandas>=2.0.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+comtradr>=0.2.0
+geopandas>=0.14.0
+shapely>=2.0.0
+tqdm>=4.65.0
+schedule>=1.2.0
