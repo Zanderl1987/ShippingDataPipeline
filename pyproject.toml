@@ -1,0 +1,41 @@
+[project]
+name = "shipping-data-pipeline"
+version = "0.1.0"
+description = "Data pipeline for collecting and analyzing public shipping data"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.0",
+    "python-dotenv>=1.0",
+    "requests>=2.31",
+    "polars>=1.0",
+    "pyarrow>=17.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+    "pytest-cov>=6.0",
+    "ruff>=0.15",
+    "mypy>=2.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
+disallow_any_unimported = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
