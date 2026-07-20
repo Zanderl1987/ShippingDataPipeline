@@ -18,17 +18,28 @@ A modular, automated data pipeline that collects publicly available shipping dat
 
 ---
 
-## Data Sources (Phase 1 will vet each)
+## Data Sources
 
-| Source | Data Type | Access Method | License / Restriction |
-|--------|-----------|---------------|----------------------|
-| **AIS Vessel Positions** (MarineTraffic, VesselFinder, AIS streams) | Real-time vessel positions, MMSI, speed, course | HTTP API / WebSocket | Varies — some free tiers exist |
-| **Port Call Data** (PortWatch / UNCTAD) | Port arrivals, departures, wait times | HTTP API / CSV | Mostly free for research |
-| **Freight Rate Indices** (Baltic Exchange, Freightos, Drewry) | Container & bulk spot rates | HTTP API / Scrape | Some free indices, some paid |
-| **Vessel Registry** (IMO / Equasis) | Vessel metadata: type, DWT, flag, year built | CSV / API | Public |
-| **Trade Flow Data** (UN Comtrade, WITS) | Import/export volumes by HS code | API / Bulk CSV | Free with registration |
+Full vetted catalog with ToS, rate limits, auth model, and backfill depth for each source:
+→ **[`staging/DATA_SOURCES.md`](DATA_SOURCES.md)**
 
-*Note: Each source will be vetted for ToS, rate limits, and backfill depth before integration (see data-source-vetting process).*
+### Phase 1 Priority Sources
+
+| # | Source | Why First |
+|---|--------|-----------|
+| 1 | **Axiomancer Overwatch** — Free, no-auth AIS positions | Zero setup; instant dev feedback |
+| 2 | **OpenAIS** — Free, no-auth, **historical from 2021** | Track reconstruction without waiting |
+| 3 | **Seafarer Index** — Free, CC BY 4.0 vessel + port registry | Enrichment layer for all other sources |
+| 4 | **Open-Meteo** — Free, no-auth weather/wave data | Ancillary for route/delay analysis |
+
+### Phase 2 (Registration-based free tiers)
+
+| # | Source | Why Here |
+|---|--------|----------|
+| 5 | **Global Fishing Watch** — Free token, 2012+ AIS + events | Rich historical data, event detection |
+| 6 | **VesselAPI** — Free tier, port events + vessel lookup | Port call + vessel in one API |
+| 7 | **UN Comtrade** — Free API key, global trade flows | Trade volume analysis |
+| 8 | **ShipLookup API** — Free 1K credits/month | Vessel registry lookup |
 
 ---
 
@@ -149,11 +160,11 @@ ShippingDataPipeline/
 
 ## Immediate Next Steps
 
-1. Finalize this plan
+1. ✓ Data sources vetted — see [`staging/DATA_SOURCES.md`](DATA_SOURCES.md)
 2. Set up Python project scaffold (`pyproject.toml`, source tree, test tree)
 3. Build the storage layer (DuckDB + Parquet)
-4. Vett candidate data sources and pick the first one
-5. Implement the first collector
+4. Implement first collector (Axiomancer Overwatch — no auth, instant AIS)
+5. Build curation layer for dedup + validation
 
 ---
 
