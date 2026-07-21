@@ -11,6 +11,9 @@ dependencies = [
     "pyarrow>=17.0",
 ]
 
+[project.scripts]
+sdp = "src.analytics.reports:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=9.0",

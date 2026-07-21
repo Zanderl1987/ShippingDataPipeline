@@ -77,73 +77,80 @@ Full vetted catalog with ToS, rate limits, auth model, and backfill depth for ea
 
 ```
 ShippingDataPipeline/
-├── staging/                  # Planning & reference docs (this folder)
+├── staging/                  # Planning & reference docs
+│   ├── PLAN.md
+│   ├── DATA_SOURCES.md
+│   └── SESSION_NOTES.md
 ├── src/
 │   ├── __init__.py
 │   ├── config.py             # Central config (API keys, paths, schedules)
 │   ├── collectors/           # One module per data source
 │   │   ├── __init__.py
-│   │   ├── ais.py
-│   │   ├── ports.py
-│   │   ├── freight.py
-│   │   └── registry.py
+│   │   ├── axiomancer.py     # Axiomancer Overwatch (AIS positions)
+│   │   ├── seafarer_index.py # Seafarer Index (ships, ports)
+│   │   └── open_meteo.py     # Open-Meteo (marine + weather)
 │   ├── storage/              # DuckDB schema, Parquet IO, partitioning
 │   │   ├── __init__.py
-│   │   ├── schema.py
-│   │   ├── reader.py
-│   │   └── writer.py
-│   ├── curation/             # Dedup, validation, enrichment
-│   │   ├── __init__.py
-│   │   ├── dedup.py
-│   │   ├── validate.py
-│   │   └── enrich.py
-│   └── analytics/            # Analysis & reporting modules
-│       ├── __init__.py
-│       ├── routes.py
-│       ├── congestion.py
-│       ├── trade_flow.py
-│       └── reports.py
+│   │   ├── schema.py         # Table schemas (ais_positions, vessels, ports, marine_weather, weather)
+│   │   ├── reader.py         # Query + read dataset functions
+│   │   └── writer.py         # Write raw + curated data
+    │   ├── curation/             # Dedup, validation, enrichment (Phase 2)
+    │   │   └── __init__.py
+    │   └── analytics/            # Analysis & reporting modules (Phase 3)
+    │       ├── __init__.py
+    │       ├── routes.py         # Vessel tracks, route segments, active vessels
+    │       ├── congestion.py     # Port activity, congestion estimation, dwell times
+    │       ├── trade_flow.py     # Port pair analysis, destination summaries
+    │       └── reports.py        # CLI entry point (`sdp` command)
 ├── tests/
+│   ├── test_config.py
+│   ├── test_storage.py
 │   ├── collectors/
-│   ├── curation/
+│   │   ├── test_axiomancer.py
+│   │   ├── test_seafarer_index.py
+│   │   └── test_open_meteo.py
 │   └── analytics/
+│       ├── test_routes.py
+│       ├── test_congestion.py
+│       └── test_trade_flow.py
 ├── notebooks/                # Exploration & analysis notebooks
+│   └── .gitkeep
 ├── data/                     # Local data (gitignored)
 ├── storage/                  # DuckDB database & partitioned Parquet
 ├── .env.example
 ├── .gitignore
-├── Makefile (or tasks.ps1)
 ├── pyproject.toml
-├── requirements.txt
-└── README.md
+└── uv.lock
 ```
 
 ---
 
 ## Phased Build Plan
 
-### Phase 1 — Foundation (this session)
-- [ ] Set up project scaffold (folders, config, `.gitignore`, `pyproject.toml`)
-- [ ] Implement core storage layer (DuckDB schema, Parquet writer/reader)
-- [ ] Implement `config.py` with env-based settings
-- [ ] Write initial tests for storage layer
-- [ ] Set up `ruff`/`mypy`/`pytest` toolchain
+### Phase 1 — Foundation ✓ COMPLETE
+- [x] Set up project scaffold (folders, config, `.gitignore`, `pyproject.toml`)
+- [x] Implement core storage layer (DuckDB schema, Parquet writer/reader)
+- [x] Implement `config.py` with env-based settings
+- [x] Write initial tests for storage layer
+- [x] Set up `ruff`/`mypy`/`pytest` toolchain
 
-### Phase 2 — Data Sources
-- [ ] Vet & integrate first data source (likely AIS or port data)
-- [ ] Build collector with incremental fetch
+### Phase 2 — Data Sources (in progress)
+- [x] Vet & integrate first data source — **Axiomancer Overwatch** (free, no auth, AIS positions)
+- [x] Vet & integrate **Seafarer Index** (vessel + port registry)
+- [x] Vet & integrate **Open-Meteo** (marine + weather data)
+- [ ] Vet & integrate **OpenAIS** (self-hosted only, deferred)
 - [ ] Add source tracking (checkpoints, timestamps)
 - [ ] Write curation layer (dedup + validation)
 - [ ] Integration tests for collector-to-storage flow
 
-### Phase 3 — Analytics
-- [ ] Build route mapping from AIS position sequences
-- [ ] Build port congestion metrics (wait times, throughput)
-- [ ] Build trade flow summaries (port-to-port volumes)
-- [ ] Add CLI reporting (`python -m src report`)
-- [ ] Unit tests for each analytic
+### Phase 3 — Analytics ✓ COMPLETE
+- [x] Build route mapping from AIS position sequences
+- [x] Build port congestion metrics (wait times, throughput)
+- [x] Build trade flow summaries (port-to-port volumes)
+- [x] Add CLI reporting (`sdp` command)
+- [x] Unit tests for each analytic
 
-### Phase 4 — Automation & Polish
+### Phase 4 — Automation & Polish (in progress)
 - [ ] GitHub Actions workflow for scheduled collection
 - [ ] Notification on failures / data gaps
 - [ ] Optional: lightweight dashboard (Streamlit or static HTML)
@@ -161,10 +168,16 @@ ShippingDataPipeline/
 ## Immediate Next Steps
 
 1. ✓ Data sources vetted — see [`staging/DATA_SOURCES.md`](DATA_SOURCES.md)
-2. Set up Python project scaffold (`pyproject.toml`, source tree, test tree)
-3. Build the storage layer (DuckDB + Parquet)
-4. Implement first collector (Axiomancer Overwatch — no auth, instant AIS)
-5. Build curation layer for dedup + validation
+2. ✓ Set up Python project scaffold (`pyproject.toml`, source tree, test tree)
+3. ✓ Build the storage layer (DuckDB + Parquet)
+4. ✓ Implement first collector (Axiomancer Overwatch — no auth, instant AIS)
+5. ✓ Implement second collector (Seafarer Index — vessel + port registry)
+6. ✓ Implement Open-Meteo collector (marine + weather data)
+7. ✓ Build analytics modules (routes, congestion, trade_flow)
+8. ✓ Add CLI reporting (`sdp` command)
+9. Build curation layer for dedup + validation
+10. Add source tracking (checkpoints, timestamps)
+11. GitHub Actions workflow for scheduled collection
 
 ---
 

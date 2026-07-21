@@ -122,10 +122,77 @@ CREATE TABLE IF NOT EXISTS freight_rates (
 """,
 )
 
+PORTS = TableSchema(
+    name="ports",
+    partition_cols=[],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS ports (
+    unlocode        VARCHAR PRIMARY KEY,
+    port_name       VARCHAR,
+    country         VARCHAR,
+    country_code    VARCHAR,
+    latitude        DOUBLE,
+    longitude       DOUBLE,
+    timezone        VARCHAR,
+    region          VARCHAR,
+    source          VARCHAR,
+    ingested_at     TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+MARINE_WEATHER = TableSchema(
+    name="marine_weather",
+    partition_cols=["partition_date", "source"],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS marine_weather (
+    timestamp               TIMESTAMP,
+    latitude                DOUBLE,
+    longitude               DOUBLE,
+    wave_height             DOUBLE,
+    wave_direction          DOUBLE,
+    wave_period             DOUBLE,
+    swell_wave_height       DOUBLE,
+    swell_wave_direction    DOUBLE,
+    swell_wave_period       DOUBLE,
+    ocean_current_velocity  DOUBLE,
+    ocean_current_direction DOUBLE,
+    sea_surface_temperature DOUBLE,
+    source                  VARCHAR,
+    partition_date          DATE,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+WEATHER = TableSchema(
+    name="weather",
+    partition_cols=["partition_date", "source"],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS weather (
+    timestamp       TIMESTAMP,
+    latitude        DOUBLE,
+    longitude       DOUBLE,
+    wind_speed_10m  DOUBLE,
+    wind_direction_10m DOUBLE,
+    wind_gusts_10m  DOUBLE,
+    pressure_msl    DOUBLE,
+    temperature_2m  DOUBLE,
+    precipitation   DOUBLE,
+    source          VARCHAR,
+    partition_date  DATE,
+    ingested_at     TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 ALL_TABLES: list[TableSchema] = [
     AIS_POSITIONS,
     VESSELS,
     PORT_CALLS,
+    PORTS,
+    MARINE_WEATHER,
+    WEATHER,
     TRADE_FLOW,
     FREIGHT_RATES,
 ]
