@@ -39,8 +39,15 @@ def write_raw(
             pl.col("partition_date").cast(pl.Date)
         )
 
-    insert_cols = [c for c in df.columns if c != "ingested_at"]
+    table_columns = _get_table_columns(conn, table_name)
+    insert_cols = [c for c in df.columns if c != "ingested_at" and c in table_columns]
     col_list = ", ".join(insert_cols)
+
+    if not insert_cols:
+        conn.close()
+        return 0
+
+    df = df.select(insert_cols)
 
     if partition_cols:
         base = settings.storage_dir / "parquet" / "raw" / source
@@ -91,3 +98,11 @@ def _find_table(name: str) -> TableSchema | None:
         if t.name == name:
             return t
     return None
+
+
+def _get_table_columns(conn: duckdb.DuckDBPyConnection, table_name: str) -> set[str]:
+    result = conn.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = ?",
+        [table_name],
+    ).fetchall()
+    return {row[0] for row in result}

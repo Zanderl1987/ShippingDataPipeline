@@ -168,6 +168,12 @@ def _parse_vessel_search(data: dict[str, Any]) -> pl.DataFrame:
     if "mmsi" in df.columns:
         df = df.with_columns(pl.col("mmsi").cast(pl.Int64, strict=False))
 
+    today = date.today()
+    df = df.with_columns(
+        pl.lit(today).alias("partition_date"),
+        pl.lit(SOURCE).alias("source"),
+    )
+
     return df
 
 

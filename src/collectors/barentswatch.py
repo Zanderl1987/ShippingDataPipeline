@@ -126,7 +126,7 @@ def _parse_positions(data: dict[str, Any]) -> pl.DataFrame:
     df = pl.DataFrame(records)
 
     for col in ["timestamp", "eta"]:
-        if col in df.columns:
+        if col in df.columns and df[col].dtype == pl.String:
             df = df.with_columns(
                 pl.col(col)
                 .str.to_datetime("%Y-%m-%dT%H:%M:%SZ", strict=False)

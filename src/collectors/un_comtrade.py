@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Any
 
 import polars as pl
@@ -125,6 +126,12 @@ def _parse_trade_data(data: dict[str, Any]) -> pl.DataFrame:
     for col in ["trade_value_usd", "net_weight_kg", "gross_weight_kg"]:
         if col in df.columns:
             df = df.with_columns(pl.col(col).cast(pl.Float64, strict=False))
+
+    today = date.today()
+    df = df.with_columns(
+        pl.lit(today).alias("partition_date"),
+        pl.lit(SOURCE).alias("source"),
+    )
 
     return df
 
