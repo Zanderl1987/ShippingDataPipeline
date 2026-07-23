@@ -23,6 +23,10 @@
   - `tests/collectors/test_aisstream.py` — 8 tests
 - Modified files:
   - `src/storage/schema.py` — Added `chokepoint_status` table schema
+  - `staging/DATA_SOURCES.md` — Added Eagle Intelligence entry, NO-GO list
+  - `staging/PLAN.md` — Marked Phase 2 complete with new collectors
+- Commits:
+  - `8b2084b` — Add Eagle Intelligence & AISStream collectors, chokepoint risk table, 21 new tests
 
 ### Source vetting results
 | Source | Verdict | Reason |
@@ -105,7 +109,7 @@
    - Fix: Added `dtype == pl.String` check before datetime parsing
 
 ### Next steps
-1. Set up API keys in `.env` for live testing
+1. ~~Set up API keys in `.env` for live testing~~ — Partially done (Eagle Intelligence needs no key)
 2. GitHub Actions workflow for scheduled collection
 3. Data quality monitoring (row counts, null rates, staleness)
 4. Documentation (module-level docstrings, README usage guide)
