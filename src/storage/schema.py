@@ -203,6 +203,27 @@ CREATE TABLE IF NOT EXISTS source_tracking (
 """,
 )
 
+CHOKEPOINT_STATUS = TableSchema(
+    name="chokepoint_status",
+    partition_cols=["partition_date", "source"],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS chokepoint_status (
+    chokepoint_id           VARCHAR,
+    chokepoint_name         VARCHAR,
+    status                  VARCHAR,
+    signals_last_24h        INTEGER,
+    high_alerts_last_24h    INTEGER,
+    signals_last_7d         INTEGER,
+    latest_high_headline    VARCHAR,
+    crisis_day              INTEGER,
+    situation_url           VARCHAR,
+    source                  VARCHAR,
+    partition_date          DATE,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 ALL_TABLES: list[TableSchema] = [
     AIS_POSITIONS,
     VESSELS,
@@ -212,5 +233,6 @@ ALL_TABLES: list[TableSchema] = [
     WEATHER,
     TRADE_FLOW,
     FREIGHT_RATES,
+    CHOKEPOINT_STATUS,
     SOURCE_TRACKING,
 ]

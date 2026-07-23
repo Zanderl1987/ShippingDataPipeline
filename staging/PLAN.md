@@ -170,6 +170,8 @@ ShippingDataPipeline/
 - [x] Vet & integrate **ShipLookup API** (free 1K credits/month, vessel registry)
 - [x] Vet & integrate **BarentsWatch** (Norwegian waters AIS, open data)
 - [x] Vet & integrate **NOAA MarineCadastre** (US waters historical AIS, bulk download)
+- [x] Vet & integrate **Eagle Intelligence** (free chokepoint risk data, no auth)
+- [x] Vet & integrate **AISStream** (free real-time AIS WebSocket stream)
 - [x] Integration tests for collector-to-storage flow
 
 ### Phase 3 — Analytics ✓ COMPLETE

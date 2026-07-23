@@ -1,5 +1,63 @@
 # Session Notes
 
+## 2026-07-23 — Session 8
+
+### Starting state
+- 101 tests pass, `ruff check .` clean, `mypy src/` clean
+- Phase 2 complete (9 collectors + integration tests)
+- Data sources vetted: Axiomancer, SeafarerIndex, Open-Meteo, GFW, VesselAPI, UN Comtrade, ShipLookup, BarentsWatch, NOAA MarineCadastre
+
+### Session plan
+- [x] Vet new free shipping data sources
+- [x] Build collectors for viable sources
+- [x] Update DATA_SOURCES.md, PLAN.md, SESSION_NOTES.md
+
+### Session results
+- **122 tests total** (101 existing + 21 new), all passing
+- `ruff check .` clean
+- `mypy src/` clean
+- New files:
+  - `src/collectors/eagle_intelligence.py` — Eagle Intelligence chokepoint risk collector
+  - `src/collectors/aisstream.py` — AISStream real-time WebSocket AIS collector
+  - `tests/collectors/test_eagle_intelligence.py` — 13 tests
+  - `tests/collectors/test_aisstream.py` — 8 tests
+- Modified files:
+  - `src/storage/schema.py` — Added `chokepoint_status` table schema
+
+### Source vetting results
+| Source | Verdict | Reason |
+|--------|---------|--------|
+| **Eagle Intelligence** | **GO** | Free, no auth, JSON API, 6 chokepoints, CC BY 4.0 |
+| **AISStream.io** | **GO** | Free with registration, WebSocket AIS stream |
+| HormuzMonitor.com | NO-GO | 401 without valid key, unclear free tier |
+| emissions.dev | NO-GO | 401 without valid key, needs registration |
+| Sinay.ai | NO-GO | 401 without key |
+| FreightPulse | NO-GO | Returns HTML landing page, API may not be live |
+
+### Eagle Intelligence details
+- **API**: `https://eagleintelmari.com/api/chokepoint-status` (all 6), `/api/hormuz-status` (Hormuz)
+- **Auth**: None required (attribution: CC BY 4.0)
+- **Rate limit**: 1 req/min fair use
+- **Data**: Status tier (SEVERE/ELEVATED/MONITORING), signal counts (24h/7d), HIGH-severity headlines, crisis-day counters
+- **Chokepoints**: Hormuz, Suez, Bab el-Mandeb, Panama, Malacca, Bosphorus
+- **Storage**: `chokepoint_status` table (partitioned by date + source)
+
+### AISStream details
+- **API**: WebSocket at `wss://stream.aisstream.io/v0/stream`
+- **Auth**: API key (free registration via GitHub)
+- **Data**: Real-time AIS position reports, vessel static data (name, IMO, callsign, dimensions)
+- **Coverage**: Global terrestrial AIS (coastal + port areas)
+- **Collection**: Bounding box subscription, optional MMSI filter, configurable duration
+- **Storage**: Positions → `ais_positions` table, vessels → `vessels` table
+
+### Next steps
+1. Register for AISStream API key (free, via GitHub)
+2. Register for remaining APIs (emissions.dev, Sinay) if needed
+3. Set up API keys in `.env` for live testing
+4. GitHub Actions workflow for scheduled collection
+
+---
+
 ## 2026-07-23 — Session 7
 
 ### Starting state

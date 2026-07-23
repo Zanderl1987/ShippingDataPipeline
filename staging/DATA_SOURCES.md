@@ -347,7 +347,24 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 
 ---
 
-## 7. Aggregated / Derived Datasets
+## 7. Maritime Risk & Chokepoints
+
+### 7.1 Eagle Intelligence `eagleintelmari.com`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Live risk status for 6 maritime chokepoints — Hormuz, Suez, Bab el-Mandeb, Panama, Malacca, Bosphorus. Status tiers (SEVERE/ELEVATED/MONITORING), signal counts, HIGH-severity headlines, crisis-day counters. |
+| **Access** | **Free** — no auth required |
+| **Auth** | None (attribution required: CC BY 4.0) |
+| **Rate Limit** | 1 req/min fair use |
+| **Endpoints** | `/api/chokepoint-status` (all 6), `/api/hormuz-status` (Hormuz only), `/alerts.xml` (RSS HIGH alerts) |
+| **Depth** | Real-time only (no historical API) |
+| **Docs** | https://eagleintelmari.com/developers |
+| **Verdict** | **GO** — Zero-friction risk data. Adds geopolitical risk layer to analytics. |
+
+---
+
+## 8. Aggregated / Derived Datasets
 
 ### 7.1 Neptune AIS (Python Library) `github.com/xang1234/neptune`
 
@@ -393,10 +410,11 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 
 | Priority | Source | Why here |
 |----------|--------|----------|
-| 13 | **FBX / Baltic Exchange** | Freight rate data for market analysis. Depends on trial/scrape outcome. |
-| 14 | **SCFI** | Weekly Shanghai container rates. Public, free, low frequency. |
-| 15 | **Port of Barcelona** | Open port operations API — reference model for port data. |
-| 16 | **Singapore OCEANS-X** | Transshipment hub data. Register to evaluate. |
+| 13 | **Eagle Intelligence** | Free chokepoint risk data. No auth, JSON API, 6 chokepoints. |
+| 14 | **FBX / Baltic Exchange** | Freight rate data for market analysis. Depends on trial/scrape outcome. |
+| 15 | **SCFI** | Weekly Shanghai container rates. Public, free, low frequency. |
+| 16 | **Port of Barcelona** | Open port operations API — reference model for port data. |
+| 17 | **Singapore OCEANS-X** | Transshipment hub data. Register to evaluate. |
 
 ---
 
@@ -408,6 +426,10 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 | HVCC Hamburg | B2B contract required. Not viable for Phase 1-3. |
 | VT Explorer | Paid credit model. Defer. |
 | MarineTraffic APIs (free) | Most endpoints behind paid tier. Free tier too restrictive. |
+| HormuzMonitor.com | 401 without valid key, unclear free tier access. |
+| Sinay.ai | 401 without API key, registration required. |
+| FreightPulse | Returns HTML landing page, API may not be live. |
+| emissions.dev | 401 without valid key, needs registration. |
 
 ---
 
