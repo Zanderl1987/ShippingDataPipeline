@@ -1,5 +1,59 @@
 # Session Notes
 
+## 2026-07-23 — Session 7
+
+### Starting state
+- All 90 tests pass (`pytest -v`)
+- `ruff check .` clean
+- `mypy src/` clean
+- Phases 1-3 complete (storage, 9 collectors, curation, analytics, CLI)
+
+### Session plan
+- [x] Create integration tests for collector-to-storage flow
+- [x] Update DATA_SOURCES.md with probe results
+- [x] Commit and push changes
+
+### Session results
+- **101 tests total** (90 existing + 11 new), all passing
+- `ruff check .` clean
+- `mypy src/` clean
+- New files:
+  - `tests/test_integration.py` — 11 integration tests
+- Modified files:
+  - `src/storage/writer.py` — Added `_get_table_columns()` helper, `write_raw()` now filters DataFrame columns to match table schema
+  - `src/collectors/global_fishing_watch.py` — Added `source` and `partition_date` columns to `_parse_vessel_search`
+  - `src/collectors/shiplookup.py` — Added `source` and `partition_date` columns to `_parse_ship_search` and `_parse_ship_detail`
+  - `src/collectors/un_comtrade.py` — Added `source` and `partition_date` columns to `_parse_trade_data`
+  - `src/collectors/barentswatch.py` — Fixed `str.to_datetime` crash on null `eta` column
+  - `staging/DATA_SOURCES.md` — Updated source details with collector implementations
+  - `staging/PLAN.md` — Updated Phase 2 completion status
+  - `staging/SESSION_NOTES.md` — Updated Session 6 notes
+
+### Integration tests coverage
+- Axiomancer → `ais_positions` (global snapshot + port positions)
+- VesselAPI → `port_calls` (port events)
+- GFW → `vessels` + events
+- ShipLookup → `vessels` (search + detail)
+- UN Comtrade → `trade_flow`
+- BarentsWatch → `ais_positions`
+- Source tracking (success + error recording)
+
+### Bugs found and fixed during integration testing
+1. **`write_raw()` schema mismatch** — Parsers produced extra columns (e.g., `vessel_type`) not in table schemas, causing `BinderException`
+   - Fix: Added `_get_table_columns()` helper, `write_raw()` now only inserts columns that exist in the target table
+2. **Missing `source`/`partition_date` columns** — GFW, ShipLookup, UN Comtrade parsers didn't add these required columns
+   - Fix: Added `source` and `partition_date` to all parsers that write to tables
+3. **Null `eta` column crash** — BarentsWatch `_parse_positions` called `str.to_datetime` on null column
+   - Fix: Added `dtype == pl.String` check before datetime parsing
+
+### Next steps
+1. Set up API keys in `.env` for live testing
+2. GitHub Actions workflow for scheduled collection
+3. Data quality monitoring (row counts, null rates, staleness)
+4. Documentation (module-level docstrings, README usage guide)
+
+---
+
 ## 2026-07-22 — Session 6
 
 ### Starting state
@@ -68,9 +122,9 @@
 - Unused imports in new collector files — fixed with `ruff --fix`
 
 ### Next steps
-1. Update `staging/DATA_SOURCES.md` with probe results
-2. Commit and push changes
-3. Consider integration tests for collector-to-storage flow
+1. ~~Update `staging/DATA_SOURCES.md` with probe results~~ ✓ (Session 7)
+2. ~~Commit and push changes~~ ✓ (Session 6 + 7)
+3. ~~Consider integration tests for collector-to-storage flow~~ ✓ (Session 7)
 4. Set up API keys in `.env` for live testing
 
 ---

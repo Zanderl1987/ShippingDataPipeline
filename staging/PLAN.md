@@ -157,7 +157,7 @@ ShippingDataPipeline/
 - [x] Write initial tests for storage layer
 - [x] Set up `ruff`/`mypy`/`pytest` toolchain
 
-### Phase 2 — Data Sources (in progress)
+### Phase 2 — Data Sources ✓ COMPLETE
 - [x] Vet & integrate first data source — **Axiomancer Overwatch** (free, no auth, AIS positions)
 - [x] Vet & integrate **Seafarer Index** (vessel + port registry)
 - [x] Vet & integrate **Open-Meteo** (marine + weather data)
@@ -170,7 +170,7 @@ ShippingDataPipeline/
 - [x] Vet & integrate **ShipLookup API** (free 1K credits/month, vessel registry)
 - [x] Vet & integrate **BarentsWatch** (Norwegian waters AIS, open data)
 - [x] Vet & integrate **NOAA MarineCadastre** (US waters historical AIS, bulk download)
-- [ ] Integration tests for collector-to-storage flow
+- [x] Integration tests for collector-to-storage flow
 
 ### Phase 3 — Analytics ✓ COMPLETE
 - [x] Build route mapping from AIS position sequences
@@ -206,8 +206,12 @@ ShippingDataPipeline/
 8. ✓ Add CLI reporting (`sdp` command)
 9. ✓ Build curation layer (dedup + validation + enrichment)
 10. ✓ Add source tracking (checkpoints, timestamps)
-11. Create integration tests for collector-to-storage flow
-12. Research and add new data sources
+11. ✓ Create integration tests for collector-to-storage flow
+12. ✓ Research and add new data sources (GFW, VesselAPI, UN Comtrade, ShipLookup, BarentsWatch, NOAA)
+13. Set up API keys in `.env` for live testing
+14. GitHub Actions workflow for scheduled collection
+15. Data quality monitoring (row counts, null rates, staleness)
+16. Documentation (module-level docstrings, README usage guide)
 
 ---
 
