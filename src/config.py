@@ -16,6 +16,7 @@ class Settings:
     vesselapi_api_key: str | None = None
     shiplookup_api_key: str | None = None
     un_comtrade_api_key: str | None = None
+    barentswatch_token: str | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -28,6 +29,7 @@ class Settings:
             vesselapi_api_key=os.getenv("VESSELAPI_API_KEY"),
             shiplookup_api_key=os.getenv("SHIPLOOKUP_API_KEY"),
             un_comtrade_api_key=os.getenv("UN_COMITRADE_API_KEY"),
+            barentswatch_token=os.getenv("BARENTSWATCH_TOKEN"),
         )
 
     def ensure_dirs(self) -> None:

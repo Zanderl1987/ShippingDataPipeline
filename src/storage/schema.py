@@ -186,6 +186,23 @@ CREATE TABLE IF NOT EXISTS weather (
 """,
 )
 
+SOURCE_TRACKING = TableSchema(
+    name="source_tracking",
+    partition_cols=[],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS source_tracking (
+    source          VARCHAR,
+    collection_ts   TIMESTAMP,
+    rows_fetched    INTEGER,
+    rows_written    INTEGER,
+    status          VARCHAR,
+    error_message   VARCHAR,
+    duration_ms     INTEGER,
+    PRIMARY KEY (source, collection_ts)
+);
+""",
+)
+
 ALL_TABLES: list[TableSchema] = [
     AIS_POSITIONS,
     VESSELS,
@@ -195,4 +212,5 @@ ALL_TABLES: list[TableSchema] = [
     WEATHER,
     TRADE_FLOW,
     FREIGHT_RATES,
+    SOURCE_TRACKING,
 ]

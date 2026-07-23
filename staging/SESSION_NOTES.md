@@ -1,5 +1,188 @@
 # Session Notes
 
+## 2026-07-22 — Session 6
+
+### Starting state
+- All 60 tests pass (`pytest -v`)
+- `ruff check .` clean
+- `mypy src/` clean
+- Phases 1-3 complete (storage, 3 collectors, curation, analytics, CLI)
+
+### Session plan
+- [x] Add 6 new data source collectors (GFW, VesselAPI, UN Comtrade, ShipLookup, BarentsWatch, NOAA MarineCadastre)
+- [x] Write tests for all new collectors
+- [x] Update config with new API key settings
+
+### Session results
+- **90 tests total** (60 existing + 30 new), all passing
+- `ruff check .` clean
+- `mypy src/` clean
+- New files:
+  - `src/collectors/global_fishing_watch.py` — GFW vessel search, events, port visits
+  - `src/collectors/vesselapi.py` — Port events, vessel lookup
+  - `src/collectors/un_comtrade.py` — Trade flow data
+  - `src/collectors/shiplookup.py` — Ship registry search/lookup
+  - `src/collectors/barentswatch.py` — Norwegian waters AIS positions
+  - `src/collectors/noaa_marinecadastre.py` — US waters bulk AIS download
+  - `tests/collectors/test_global_fishing_watch.py` — 6 tests
+  - `tests/collectors/test_vesselapi.py` — 5 tests
+  - `tests/collectors/test_un_comtrade.py` — 3 tests
+  - `tests/collectors/test_shiplookup.py` — 6 tests
+  - `tests/collectors/test_barentswatch.py` — 6 tests
+  - `tests/collectors/test_noaa_marinecadastre.py` — 4 tests
+- Modified files:
+  - `src/config.py` — Added `barentswatch_token` setting
+
+### API details verified
+- **Global Fishing Watch** (`gateway.api.globalfishingwatch.org/v3`)
+  - Bearer token auth (free registration)
+  - `/v3/vessels/search` — vessel identity search
+  - `/v3/events` — fishing, port visits, encounters, loitering
+  - Historical from 2012 to ~5 days ago
+- **VesselAPI** (`api.vesselapi.com/v1`)
+  - Bearer token auth (free tier, 150 calls/month)
+  - `/portevents` — port arrivals/departures
+  - `/vessel/{id}` — vessel details
+- **UN Comtrade** (`comtradeapi.un.org`)
+  - Subscription key (free tier, 500 calls/day)
+  - `/data/v1/get` — global trade flows by HS code
+- **ShipLookup** (`shiplookup.com/api`)
+  - API key auth (free tier, 1000 credits/month)
+  - `/ships/search` — free search (no credits)
+  - `/ships/{imo}` — detailed lookup (1 credit)
+- **BarentsWatch** (`live.ais.barentswatch.no/v1`)
+  - Bearer token auth (free registration)
+  - Norwegian economic zone only
+  - No fishing <15m, no leisure <45m
+  - Data older than 14 days unavailable
+- **NOAA MarineCadastre** (`coast.noaa.gov/data/marinecadastre/ais`)
+  - No auth required (public bulk download)
+  - US waters AIS from 2009 onward
+  - GeoParquet format for recent years
+
+### Issues encountered
+- Polars `str.to_datetime` requires explicit format when timestamps contain timezone "Z"
+  - Fixed by adding `"%Y-%m-%dT%H:%M:%SZ"` format string to all collectors
+- Polars fails on `str.to_datetime` when column is all nulls
+  - Fixed by checking `dtype == pl.String` before parsing datetime columns
+- Unused imports in new collector files — fixed with `ruff --fix`
+
+### Next steps
+1. Update `staging/DATA_SOURCES.md` with probe results
+2. Commit and push changes
+3. Consider integration tests for collector-to-storage flow
+4. Set up API keys in `.env` for live testing
+
+---
+
+## 2026-07-21 — Session 5
+
+### Starting state
+- All 44 tests pass (`pytest -v`)
+- `ruff check .` clean
+- `mypy src/` clean
+- Source tracking complete
+
+### Session plan
+- [x] Create curation module (dedup, validation, enrichment)
+- [x] Write tests for curation functions (16 new tests)
+
+### Session results
+- **60 tests total** (44 existing + 16 new), all passing
+- `ruff check .` clean
+- `mypy src/` clean
+- New files:
+  - `src/curation/dedup.py` — Deduplication for ais_positions, vessels, ports
+  - `src/curation/validation.py` — Not-null, range, positive checks + table validators
+  - `src/curation/enrichment.py` — AIS + vessel + port joins, curated tables
+  - `src/curation/pipeline.py` — `run_curation()` orchestrator
+  - `tests/curation/test_dedup.py` — 4 tests
+  - `tests/curation/test_validation.py` — 8 tests
+  - `tests/curation/test_enrichment.py` — 4 tests
+
+### Curation module features
+- **Deduplication**: Remove duplicates based on key columns
+  - `deduplicate_ais_positions()` — mmsi + timestamp + source
+  - `deduplicate_vessels()` — imo (primary key)
+  - `deduplicate_ports()` — unlocode (primary key)
+  - `deduplicate_table()` — Generic function for any table
+- **Validation**: Data quality checks
+  - `validate_not_null()` — No NULL values
+  - `validate_range()` — Values within min/max
+  - `validate_positive()` — All values positive
+  - `validate_ais_positions()` — All AIS checks
+  - `validate_vessels()` — All vessel checks
+  - `validate_ports()` — All port checks
+- **Enrichment**: Create enriched/curated tables
+  - `enrich_ais_with_vessel_info()` — AIS + vessel metadata
+  - `enrich_ais_with_port_info()` — AIS + destination port
+  - `create_curated_ais_positions()` — Full curated AIS table
+  - `create_curated_vessels()` — Vessels with computed fields
+- **Pipeline**: `run_curation()` orchestrates all steps
+
+### Issues encountered
+- Unused imports in curation modules — removed
+- Import ordering violations — fixed with `ruff --fix`
+- mypy errors with `fetchone()` returning `tuple | None` — added `_get_count()` helper
+- Test failures for vessels/ports dedup — `INSERT OR REPLACE` already handles upserts
+
+### Next steps
+1. Update `staging/PLAN.md` to reflect curation completion
+2. Commit and push changes
+3. Create integration tests for collector-to-storage flow
+
+---
+
+## 2026-07-21 — Session 4
+
+### Starting state
+- All 35 tests pass (`pytest -v`)
+- `ruff check .` clean
+- `mypy src/` clean
+- 3 collectors + storage layer + analytics complete
+
+### Session plan
+- [x] Add source tracking (checkpoints, timestamps)
+- [x] Create SourceTracker class for recording collection events
+- [x] Integrate tracker into all 3 collectors
+- [x] Write tests for SourceTracker (9 new tests)
+
+### Session results
+- **44 tests total** (35 existing + 9 new), all passing
+- `ruff check .` clean
+- `mypy src/` clean
+- New files:
+  - `src/storage/tracker.py` — SourceTracker class + TimedCollector context manager
+  - `tests/storage/test_tracker.py` — 9 tests
+- Modified files:
+  - `src/storage/schema.py` — Added `source_tracking` table
+  - `src/collectors/axiomancer.py` — Added tracker parameter to collect functions
+  - `src/collectors/seafarer_index.py` — Added tracker parameter to collect functions
+  - `src/collectors/open_meteo.py` — Added tracker parameter to collect functions
+
+### Source tracking features
+- `source_tracking` table tracks: source, collection_ts, rows_fetched, rows_written, status, error_message, duration_ms
+- `SourceTracker` class provides:
+  - `record_collection()` — Record a collection event
+  - `get_last_collection()` — Get most recent successful collection
+  - `get_collection_history()` — Get recent collection history
+  - `get_all_sources_status()` — Get status for all sources
+  - `get_staleness_hours()` — Get hours since last successful collection
+- `TimedCollector` context manager automatically times collections and records results
+- All collectors accept optional `tracker` parameter for dependency injection
+
+### Issues encountered
+- Import ordering violations — fixed by sorting imports alphabetically
+- Unused `datetime` import in test file — removed
+- mypy error returning `Any` from `get_staleness_hours()` — fixed by adding explicit type annotation
+
+### Next steps
+1. Update `staging/PLAN.md` to reflect source tracking completion
+2. Commit and push changes
+3. Consider curation layer or integration tests
+
+---
+
 ## 2026-07-21 — Session 3
 
 ### Starting state

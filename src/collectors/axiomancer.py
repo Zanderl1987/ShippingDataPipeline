@@ -7,6 +7,7 @@ from typing import Any
 import polars as pl
 import requests
 
+from src.storage.tracker import SourceTracker, TimedCollector
 from src.storage.writer import write_raw
 
 logger = logging.getLogger(__name__)
@@ -202,12 +203,14 @@ def collect_global_snapshot(
     *,
     vessel_type: str | None = None,
     bbox: tuple[float, float, float, float] | None = None,
+    tracker: SourceTracker | None = None,
 ) -> int:
     """Fetch global positions snapshot and write to storage.
 
     Args:
         vessel_type: Optional filter (e.g. "container", "tanker").
         bbox: Optional (west, south, east, north) bounding box.
+        tracker: Optional SourceTracker for recording collection events.
 
     Returns:
         Number of rows written.
@@ -218,28 +221,47 @@ def collect_global_snapshot(
     if bbox:
         kwargs["west"], kwargs["south"], kwargs["east"], kwargs["north"] = bbox
 
-    raw = fetch_positions_latest(**kwargs)
-    df = _parse_global_snapshot(raw)
-    if df.height == 0:
-        logger.warning("No positions returned")
-        return 0
+    if tracker is None:
+        tracker = SourceTracker()
 
-    logger.info("Writing %d positions to storage", df.height)
-    count = write_raw(SOURCE, df)
-    return count
+    with TimedCollector(tracker, SOURCE) as tc:
+        raw = fetch_positions_latest(**kwargs)
+        df = _parse_global_snapshot(raw)
+        tc.rows_fetched = df.height
+        if df.height == 0:
+            logger.warning("No positions returned")
+            return 0
+
+        logger.info("Writing %d positions to storage", df.height)
+        count = write_raw(SOURCE, df)
+        tc.rows_written = count
+        return count
 
 
-def collect_port(port: str) -> int:
+def collect_port(
+    port: str,
+    tracker: SourceTracker | None = None,
+) -> int:
     """Fetch positions at a specific port and write to storage.
+
+    Args:
+        port: Port slug (e.g. "rotterdam", "singapore").
+        tracker: Optional SourceTracker for recording collection events.
 
     Returns number of rows written.
     """
-    raw = fetch_port_positions(port)
-    df = _parse_port_positions(raw)
-    if df.height == 0:
-        logger.warning("No positions returned for port %s", port)
-        return 0
+    if tracker is None:
+        tracker = SourceTracker()
 
-    logger.info("Writing %d positions for port %s", df.height, port)
-    count = write_raw(SOURCE, df)
-    return count
+    with TimedCollector(tracker, SOURCE) as tc:
+        raw = fetch_port_positions(port)
+        df = _parse_port_positions(raw)
+        tc.rows_fetched = df.height
+        if df.height == 0:
+            logger.warning("No positions returned for port %s", port)
+            return 0
+
+        logger.info("Writing %d positions for port %s", df.height, port)
+        count = write_raw(SOURCE, df)
+        tc.rows_written = count
+        return count

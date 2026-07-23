@@ -7,6 +7,7 @@ from typing import Any
 import polars as pl
 import requests
 
+from src.storage.tracker import SourceTracker, TimedCollector
 from src.storage.writer import write_raw
 
 logger = logging.getLogger(__name__)
@@ -189,6 +190,7 @@ def collect_marine(
     *,
     past_days: int = 0,
     forecast_days: int = 5,
+    tracker: SourceTracker | None = None,
 ) -> int:
     """Fetch marine weather data and write to storage.
 
@@ -197,24 +199,31 @@ def collect_marine(
         longitude: Longitude coordinate.
         past_days: Number of past days to include.
         forecast_days: Number of forecast days.
+        tracker: Optional SourceTracker for recording collection events.
 
     Returns:
         Number of rows written.
     """
-    raw = fetch_marine(
-        latitude,
-        longitude,
-        past_days=past_days,
-        forecast_days=forecast_days,
-    )
-    df = _parse_marine_response(raw, latitude, longitude)
-    if df.height == 0:
-        logger.warning("No marine data returned for (%s, %s)", latitude, longitude)
-        return 0
+    if tracker is None:
+        tracker = SourceTracker()
 
-    logger.info("Writing %d marine records to storage", df.height)
-    count = write_raw(SOURCE, df, table_name="marine_weather")
-    return count
+    with TimedCollector(tracker, SOURCE) as tc:
+        raw = fetch_marine(
+            latitude,
+            longitude,
+            past_days=past_days,
+            forecast_days=forecast_days,
+        )
+        df = _parse_marine_response(raw, latitude, longitude)
+        tc.rows_fetched = df.height
+        if df.height == 0:
+            logger.warning("No marine data returned for (%s, %s)", latitude, longitude)
+            return 0
+
+        logger.info("Writing %d marine records to storage", df.height)
+        count = write_raw(SOURCE, df, table_name="marine_weather")
+        tc.rows_written = count
+        return count
 
 
 def collect_weather(
@@ -223,6 +232,7 @@ def collect_weather(
     *,
     past_days: int = 0,
     forecast_days: int = 5,
+    tracker: SourceTracker | None = None,
 ) -> int:
     """Fetch weather data and write to storage.
 
@@ -231,21 +241,28 @@ def collect_weather(
         longitude: Longitude coordinate.
         past_days: Number of past days to include.
         forecast_days: Number of forecast days.
+        tracker: Optional SourceTracker for recording collection events.
 
     Returns:
         Number of rows written.
     """
-    raw = fetch_weather(
-        latitude,
-        longitude,
-        past_days=past_days,
-        forecast_days=forecast_days,
-    )
-    df = _parse_weather_response(raw, latitude, longitude)
-    if df.height == 0:
-        logger.warning("No weather data returned for (%s, %s)", latitude, longitude)
-        return 0
+    if tracker is None:
+        tracker = SourceTracker()
 
-    logger.info("Writing %d weather records to storage", df.height)
-    count = write_raw(SOURCE, df, table_name="weather")
-    return count
+    with TimedCollector(tracker, SOURCE) as tc:
+        raw = fetch_weather(
+            latitude,
+            longitude,
+            past_days=past_days,
+            forecast_days=forecast_days,
+        )
+        df = _parse_weather_response(raw, latitude, longitude)
+        tc.rows_fetched = df.height
+        if df.height == 0:
+            logger.warning("No weather data returned for (%s, %s)", latitude, longitude)
+            return 0
+
+        logger.info("Writing %d weather records to storage", df.height)
+        count = write_raw(SOURCE, df, table_name="weather")
+        tc.rows_written = count
+        return count

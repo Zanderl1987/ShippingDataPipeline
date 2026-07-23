@@ -79,6 +79,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Format** | JSON, GeoJSON, 4Wings tiled maps |
 | **SDK** | V3 API — vessel search, events, map visualization |
 | **License** | CC BY 4.0 for derived data |
+| **Collector** | `src/collectors/global_fishing_watch.py` — 6 functions: search, get vessel, get events, get port visits, get fishing events, get loitering events |
 | **Verdict** | **GO** — 10+ years of historical AIS, vessel identity with registry cross-reference, event detection built in. Free token available. |
 
 ### 1.6 BarentsWatch (Norway) `barentswatch.no`
@@ -86,9 +87,12 @@ Each source is categorized by data type and rated across the axes that matter fo
 | Field | Detail |
 |-------|--------|
 | **Data** | Norwegian coastal waters AIS — real-time vessel positions, identities |
-| **Access** | **Open data** — free, no registration for basic access |
-| **Auth** | None (basic), API key (extended) |
-| **Depth** | Real-time only |
+| **Access** | **Open data** — free, registration required for API access |
+| **Auth** | Bearer token (free registration) |
+| **Rate Limit** | Not documented — reasonable use |
+| **Depth** | Real-time only (14-day window) |
+| **Limitations** | Norwegian economic zone only. Fishing vessels <15m and leisure craft <45m excluded. Data older than 14 days unavailable. |
+| **Collector** | `src/collectors/barentswatch.py` — get_positions, get_vessel_track, get_vessels_in_area |
 | **Verdict** | **GO** — Valuable for North Sea / Norwegian Sea coverage. Regional but high quality. |
 
 ### 1.7 NOAA MarineCadastre (US) `marinecadastre.gov`
@@ -99,7 +103,8 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Access** | **Free, public domain** |
 | **Auth** | None |
 | **Depth** | Multi-year historical, delayed by ~3-6 months |
-| **Format** | Shapefile, GeoPackage, CSV |
+| **Format** | GeoParquet (2023+), Shapefile, GeoPackage, CSV |
+| **Collector** | `src/collectors/noaa_marinecadastre.py` — get_available_years, download_year, parse_parquet_chunk |
 | **Verdict** | **GO** — Best source for US waters historical AIS. Bulk download, not API. Good for backfill + training. |
 
 ### 1.8 Danish Maritime Authority `dma.dk`
@@ -123,10 +128,11 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Data** | Port arrivals/departures, vessel port history, inbound vessels with ETA |
 | **Access** | **Free tier** (no credit card), Paid for higher volume |
 | **Auth** | Bearer token (free registration) |
-| **Rate Limit** | Free tier: not strictly documented but reasonable |
+| **Rate Limit** | Free tier: 150 calls/month |
 | **Depth** | Rolling window (free), extended history (paid) |
 | **Format** | REST JSON |
 | **Endpoints** | `/portevents`, `/portevents/port/{unlocode}`, `/portevents/vessel/{id}`, `/port/{unlocode}/inbound` |
+| **Collector** | `src/collectors/vesselapi.py` — get_port_events, get_vessel_port_events, get_inbound_vessels, search_vessel |
 | **Verdict** | **GO** — Free tier available, comprehensive port events API. Good for current port operations. |
 
 ### 2.2 Data Docked `datadocked.com`
@@ -260,6 +266,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Auth** | API key (`X-API-Key` header) |
 | **Rate Limit** | Free: 10 requests/minute |
 | **Search** | Search by IMO, MMSI, name, or callsign (search endpoint is free, no credits consumed) |
+| **Collector** | `src/collectors/shiplookup.py` — search_vessels (free), get_vessel_by_imo (1 credit), get_vessel_by_mmsi (1 credit), get_vessel_by_name (1 credit) |
 | **Verdict** | **GO** — Free tier, credit system, search is free. Good supplement to Seafarer Index. |
 
 ### 4.3 VesselAPI Vessels `vesselapi.com`
@@ -269,8 +276,9 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Data** | Full vessel information — name, type, dimensions, flag, builder, owner, manager, class society, engine specs, IMO/MMSI |
 | **Access** | **Free tier** (no credit card) |
 | **Auth** | Bearer token |
-| **Rate Limit** | Free: reasonable usage |
+| **Rate Limit** | Free: 150 calls/month |
 | **Search** | By IMO, MMSI, name, callsign, flag, vessel type, year built, owner |
+| **Collector** | `src/collectors/vesselapi.py` — search_vessel, get_vessel_details |
 | **Verdict** | **GO** — Combines vessel registry + position + port events in one API. Free tier available. |
 
 ### 4.4 IMO GISIS `gisis.imo.org`
@@ -308,6 +316,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Depth** | From 1962 (varies by reporter country) |
 | **Format** | REST JSON, bulk CSV/Parquet files |
 | **SDK** | Official Python package: `comtradeapicall` (pypi) |
+| **Collector** | `src/collectors/un_comtrade.py` — get_trade_flow, get_commodity_trade, get_bilateral_trade |
 | **Verdict** | **GO** — The canonical source for trade flow data. Free tier adequate for research/analysis. 100K records per call is generous. |
 
 ### 5.2 World Bank WITS `wits.worldbank.org`

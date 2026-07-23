@@ -88,14 +88,25 @@ ShippingDataPipeline/
 │   │   ├── __init__.py
 │   │   ├── axiomancer.py     # Axiomancer Overwatch (AIS positions)
 │   │   ├── seafarer_index.py # Seafarer Index (ships, ports)
-│   │   └── open_meteo.py     # Open-Meteo (marine + weather)
+│   │   ├── open_meteo.py     # Open-Meteo (marine + weather)
+│   │   ├── global_fishing_watch.py # Global Fishing Watch (vessels, events)
+│   │   ├── vesselapi.py      # VesselAPI (port events, vessel lookup)
+│   │   ├── un_comtrade.py    # UN Comtrade (trade flows)
+│   │   ├── shiplookup.py     # ShipLookup (vessel registry)
+│   │   ├── barentswatch.py   # BarentsWatch (Norwegian waters AIS)
+│   │   └── noaa_marinecadastre.py # NOAA MarineCadastre (US waters AIS)
 │   ├── storage/              # DuckDB schema, Parquet IO, partitioning
-│   │   ├── __init__.py
-│   │   ├── schema.py         # Table schemas (ais_positions, vessels, ports, marine_weather, weather)
-│   │   ├── reader.py         # Query + read dataset functions
-│   │   └── writer.py         # Write raw + curated data
+    │   │   ├── __init__.py
+    │   │   ├── schema.py         # Table schemas (ais_positions, vessels, ports, marine_weather, weather, source_tracking)
+    │   │   ├── reader.py         # Query + read dataset functions
+    │   │   ├── writer.py         # Write raw + curated data
+    │   │   └── tracker.py        # Source tracking (checkpoints, timestamps)
     │   ├── curation/             # Dedup, validation, enrichment (Phase 2)
-    │   │   └── __init__.py
+    │   │   ├── __init__.py
+    │   │   ├── dedup.py          # Deduplication functions
+    │   │   ├── validation.py     # Data quality checks
+    │   │   ├── enrichment.py     # Enrichment & curated tables
+    │   │   └── pipeline.py       # Curation orchestrator
     │   └── analytics/            # Analysis & reporting modules (Phase 3)
     │       ├── __init__.py
     │       ├── routes.py         # Vessel tracks, route segments, active vessels
@@ -108,7 +119,19 @@ ShippingDataPipeline/
 │   ├── collectors/
 │   │   ├── test_axiomancer.py
 │   │   ├── test_seafarer_index.py
-│   │   └── test_open_meteo.py
+│   │   ├── test_open_meteo.py
+│   │   ├── test_global_fishing_watch.py
+│   │   ├── test_vesselapi.py
+│   │   ├── test_un_comtrade.py
+│   │   ├── test_shiplookup.py
+│   │   ├── test_barentswatch.py
+│   │   └── test_noaa_marinecadastre.py
+│   ├── storage/
+│   │   └── test_tracker.py
+│   ├── curation/
+│   │   ├── test_dedup.py
+│   │   ├── test_validation.py
+│   │   └── test_enrichment.py
 │   └── analytics/
 │       ├── test_routes.py
 │       ├── test_congestion.py
@@ -139,8 +162,14 @@ ShippingDataPipeline/
 - [x] Vet & integrate **Seafarer Index** (vessel + port registry)
 - [x] Vet & integrate **Open-Meteo** (marine + weather data)
 - [ ] Vet & integrate **OpenAIS** (self-hosted only, deferred)
-- [ ] Add source tracking (checkpoints, timestamps)
-- [ ] Write curation layer (dedup + validation)
+- [x] Add source tracking (checkpoints, timestamps)
+- [x] Write curation layer (dedup + validation + enrichment)
+- [x] Vet & integrate **Global Fishing Watch** (free token, 2012+ AIS + events)
+- [x] Vet & integrate **VesselAPI** (free tier, port events + vessel lookup)
+- [x] Vet & integrate **UN Comtrade** (free API key, global trade flows)
+- [x] Vet & integrate **ShipLookup API** (free 1K credits/month, vessel registry)
+- [x] Vet & integrate **BarentsWatch** (Norwegian waters AIS, open data)
+- [x] Vet & integrate **NOAA MarineCadastre** (US waters historical AIS, bulk download)
 - [ ] Integration tests for collector-to-storage flow
 
 ### Phase 3 — Analytics ✓ COMPLETE
@@ -175,9 +204,10 @@ ShippingDataPipeline/
 6. ✓ Implement Open-Meteo collector (marine + weather data)
 7. ✓ Build analytics modules (routes, congestion, trade_flow)
 8. ✓ Add CLI reporting (`sdp` command)
-9. Build curation layer for dedup + validation
-10. Add source tracking (checkpoints, timestamps)
-11. GitHub Actions workflow for scheduled collection
+9. ✓ Build curation layer (dedup + validation + enrichment)
+10. ✓ Add source tracking (checkpoints, timestamps)
+11. Create integration tests for collector-to-storage flow
+12. Research and add new data sources
 
 ---
 

@@ -6,6 +6,7 @@ from typing import Any
 import polars as pl
 import requests
 
+from src.storage.tracker import SourceTracker, TimedCollector
 from src.storage.writer import write_raw
 
 logger = logging.getLogger(__name__)
@@ -109,33 +110,51 @@ def _parse_ports(data: list[dict[str, Any]]) -> pl.DataFrame:
     return df
 
 
-def collect_ships() -> int:
+def collect_ships(tracker: SourceTracker | None = None) -> int:
     """Fetch ship registry and write to storage.
 
+    Args:
+        tracker: Optional SourceTracker for recording collection events.
+
     Returns number of rows written.
     """
-    raw = fetch_ships()
-    df = _parse_ships(raw)
-    if df.height == 0:
-        logger.warning("No ships returned")
-        return 0
+    if tracker is None:
+        tracker = SourceTracker()
 
-    logger.info("Writing %d ships to storage", df.height)
-    count = write_raw(SOURCE, df, table_name="vessels")
-    return count
+    with TimedCollector(tracker, SOURCE) as tc:
+        raw = fetch_ships()
+        df = _parse_ships(raw)
+        tc.rows_fetched = df.height
+        if df.height == 0:
+            logger.warning("No ships returned")
+            return 0
+
+        logger.info("Writing %d ships to storage", df.height)
+        count = write_raw(SOURCE, df, table_name="vessels")
+        tc.rows_written = count
+        return count
 
 
-def collect_ports() -> int:
+def collect_ports(tracker: SourceTracker | None = None) -> int:
     """Fetch port registry and write to storage.
 
+    Args:
+        tracker: Optional SourceTracker for recording collection events.
+
     Returns number of rows written.
     """
-    raw = fetch_ports()
-    df = _parse_ports(raw)
-    if df.height == 0:
-        logger.warning("No ports returned")
-        return 0
+    if tracker is None:
+        tracker = SourceTracker()
 
-    logger.info("Writing %d ports to storage", df.height)
-    count = write_raw(SOURCE, df, table_name="ports")
-    return count
+    with TimedCollector(tracker, SOURCE) as tc:
+        raw = fetch_ports()
+        df = _parse_ports(raw)
+        tc.rows_fetched = df.height
+        if df.height == 0:
+            logger.warning("No ports returned")
+            return 0
+
+        logger.info("Writing %d ports to storage", df.height)
+        count = write_raw(SOURCE, df, table_name="ports")
+        tc.rows_written = count
+        return count
