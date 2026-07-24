@@ -364,9 +364,91 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 
 ---
 
-## 8. Aggregated / Derived Datasets
+## 8. Oil & Energy Data
 
-### 7.1 Neptune AIS (Python Library) `github.com/xang1234/neptune`
+### 8.1 EIA Petroleum `eia.gov/opendata`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | US petroleum — weekly crude oil stocks, refinery utilization, imports by country of origin, product supply |
+| **Access** | **Free with API key** (registration required) |
+| **Auth** | API key (`api_key` query parameter) |
+| **Rate Limit** | 5,000 requests/hour per key |
+| **Depth** | Historical from 1920s (varies by series) |
+| **Format** | REST JSON (JSON API 2.0) |
+| **Endpoints** | `/v2/petroleum/pri/spt/data/` (stocks), `/v2/petroleum/pri/sup/data/` (supply), `/v2/petroleum/import/pnt/data/` (imports) |
+| **Collector** | `src/collectors/eia_petroleum.py` — get_weekly_stocks, get_weekly_supply, get_monthly_imports_by_country, get_refinery_utilization |
+| **Table** | `oil_inventories` |
+| **Verdict** | **GO** — Authoritative US petroleum data. Free API key, generous rate limits. Essential for US crude inventory analysis. |
+
+### 8.2 JODI-Oil `data.jodiol.org`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Global oil data — production, consumption, imports, exports, stocks for 90+ countries. 13 products (crude, NGL, gasoline, diesel, jet fuel, etc.), 14 flow categories |
+| **Access** | **Free, no auth** — bulk CSV download |
+| **Auth** | None |
+| **Rate Limit** | No API rate limit (CSV download) |
+| **Depth** | Monthly from **2002** (varies by country/product) |
+| **Format** | CSV bulk download |
+| **Products** | CRUDEOIL, NGL, GASOLINE, GASDIES, JETKERO, FUELOIL, KEROSEN, NAPHTHA, LPG, OTHER, REFINERY, TOTAL |
+| **Flows** | INDPROD (production), TOTIMPSB (imports), TOTEXPSB (exports), TOTDEMO (consumption), INDTRNF (transfers) |
+| **Collector** | `src/collectors/jodi_oil.py` — get_primary_data, get_secondary_data, collect_primary, collect_secondary |
+| **Table** | `oil_trade` |
+| **Notes** | Data is 1-2 months behind. KTONS units (convert to barrels: crude × 7.37, products × 7.40) |
+| **Verdict** | **GO** — Best free source for global oil production and trade. Monthly frequency, 20+ year history. |
+
+### 8.3 IMF PortWatch `portwatch.imf.org`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Daily chokepoint transit counts — vessel numbers by type (container, tanker, bulk, general cargo, RoRo) + capacity (DWT) for 7 major chokepoints |
+| **Access** | **Free, no auth** — ArcGIS REST API |
+| **Auth** | None |
+| **Rate Limit** | No documented limit (pagination required for >1000 features) |
+| **Depth** | Daily from **2019** |
+| **Format** | ArcGIS Feature Service (JSON) |
+| **Chokepoints** | Hormuz, Suez, Bab el-Mandeb, Panama, Malacca, Turkish Straits, Cape of Good Hope |
+| **Collector** | `src/collectors/imf_portwatch.py` — get_chokepoint_info, get_daily_chokepoint_data, collect_chokepoint_transits |
+| **Table** | `chokepoint_transits` |
+| **Verdict** | **GO** — Unique daily chokepoint transit data. No auth, 5+ year history. Essential for supply chain risk analysis. |
+
+### 8.4 TankerMap `tankermap.com`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Live tanker positions — vessel name, type, flag, destination, ETA, speed, cargo estimates (barrels). Port calls at oil terminals with arrival/departure times |
+| **Access** | **Free, no auth** — JSON API |
+| **Auth** | None |
+| **Rate Limit** | No documented limit |
+| **Depth** | Real-time only (live positions + recent port calls) |
+| **Format** | JSON |
+| **Endpoints** | `/api/vessels` (tanker positions), `/api/portcalls` (oil terminal port calls) |
+| **Cargo Estimates** | Tanker type → tonnes (VLCC 200K, Suezmax 120K, Aframax 80K, Handysize 35K). Converted to barrels: crude × 7.37, products × 7.40 |
+| **Collector** | `src/collectors/tankermap.py` — get_live_vessels, get_port_calls, collect_vessels, collect_port_calls |
+| **Tables** | `ais_positions` (tanker positions), `port_calls` (oil terminal calls) |
+| **Verdict** | **GO** — Free tanker tracking with cargo estimates. Unique oil-specific vessel data. |
+
+### 8.5 Hormuz Monitor `hormuzmonitor.com`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Composite risk index (0-10) for Strait of Hormuz. Oil prices (Brent/WTI/Dubai, 15-min delay). VLCC rates (WS index + TCE USD/day). LNG JKM prices. Traffic volume |
+| **Access** | **Free tier** (60 requests/hour) |
+| **Auth** | API key (free registration) |
+| **Rate Limit** | 60 requests/hour |
+| **Depth** | Daily from **2019** (risk index), near-real-time (prices) |
+| **Format** | REST JSON |
+| **Endpoints** | `/api/risk` (composite risk index), `/api/prices` (oil + freight rates), `/api/crisis` (crisis mode data), `/api/traffic` (vessel counts) |
+| **Collector** | `src/collectors/hormuz_monitor.py` — get_risk, get_prices, get_crisis, get_traffic, collect_oil_prices, collect_traffic |
+| **Tables** | `oil_prices` (Brent/WTI/Dubai/VLCC rates), `chokepoint_transits` (Hormuz traffic) |
+| **Verdict** | **GO** — Unique Hormuz risk + oil price data. Free tier adequate for daily collection. Essential for oil market analysis. |
+
+---
+
+## 9. Aggregated / Derived Datasets
+
+### 9.1 Neptune AIS (Python Library) `github.com/xang1234/neptune`
 
 | Field | Detail |
 |-------|--------|
@@ -379,42 +461,52 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 
 ## Prioritized Integration Order
 
-### Phase 1 (Quick wins — minimal auth, free, rich data)
+### Phase 1 ✓ Complete (Quick wins — minimal auth, free, rich data)
 
-| Priority | Source | Why first |
-|----------|--------|-----------|
-| 1 | **Axiomancer Overwatch** | Free, no auth, instant AIS positions. Zero setup cost for development. |
-| 2 | **OpenAIS** | Free, no auth, **historical backfill** from 2021. Track reconstruction. |
-| 3 | **Seafarer Index** | Free, CC BY 4.0 vessel registry + port reference. Enrichment layer. |
-| 4 | **Open-Meteo** | Free weather data for route/delay analysis. |
+| Priority | Source | Status |
+|----------|--------|--------|
+| 1 | **Axiomancer Overwatch** | ✓ Integrated |
+| 2 | **OpenAIS** | Deferred (self-hosted) |
+| 3 | **Seafarer Index** | ✓ Integrated |
+| 4 | **Open-Meteo** | ✓ Integrated |
 
-### Phase 2 (Registration required, free tier)
+### Phase 2 ✓ Complete (Registration required, free tier)
 
-| Priority | Source | Why here |
-|----------|--------|----------|
-| 5 | **Global Fishing Watch** | Free token, 10+ years AIS, vessel identity, event detection. Rich but needs registration. |
-| 6 | **VesselAPI Port Events** | Free tier, port call data + vessel lookup in one API. |
-| 7 | **UN Comtrade** | Free API key, trade flow volumes. Registration + key needed. |
-| 8 | **ShipLookup API** | Free 1K credits/month vessel registry. |
+| Priority | Source | Status |
+|----------|--------|--------|
+| 5 | **Global Fishing Watch** | ✓ Integrated |
+| 6 | **VesselAPI Port Events** | ✓ Integrated |
+| 7 | **UN Comtrade** | ✓ Integrated |
+| 8 | **ShipLookup API** | ✓ Integrated |
 
-### Phase 3 (Streaming / specialized)
+### Phase 3 ✓ Complete (Streaming / specialized)
 
-| Priority | Source | Why here |
-|----------|--------|----------|
-| 9 | **AISStream** | Live WebSocket streaming. Needs running process + persistence. |
-| 10 | **BarentsWatch** | Norwegian waters — regional but high quality. |
-| 11 | **NOAA MarineCadastre** | US waters historical bulk download. |
-| 12 | **Danish Maritime Authority** | European waters daily files. |
+| Priority | Source | Status |
+|----------|--------|--------|
+| 9 | **AISStream** | ✓ Integrated |
+| 10 | **BarentsWatch** | ✓ Integrated |
+| 11 | **NOAA MarineCadastre** | ✓ Integrated |
+| 12 | **Danish Maritime Authority** | Deferred |
 
-### Phase 4 (Analysis data)
+### Phase 4 ✓ Complete (Analysis data — oil & risk)
 
-| Priority | Source | Why here |
-|----------|--------|----------|
-| 13 | **Eagle Intelligence** | Free chokepoint risk data. No auth, JSON API, 6 chokepoints. |
-| 14 | **FBX / Baltic Exchange** | Freight rate data for market analysis. Depends on trial/scrape outcome. |
-| 15 | **SCFI** | Weekly Shanghai container rates. Public, free, low frequency. |
-| 16 | **Port of Barcelona** | Open port operations API — reference model for port data. |
-| 17 | **Singapore OCEANS-X** | Transshipment hub data. Register to evaluate. |
+| Priority | Source | Status |
+|----------|--------|--------|
+| 13 | **Eagle Intelligence** | ✓ Integrated |
+| 14 | **EIA Petroleum** | ✓ Integrated |
+| 15 | **JODI-Oil** | ✓ Integrated |
+| 16 | **IMF PortWatch** | ✓ Integrated |
+| 17 | **TankerMap** | ✓ Integrated |
+| 18 | **Hormuz Monitor** | ✓ Integrated |
+
+### Phase 5 (Freight rates & dashboards)
+
+| Priority | Source | Status |
+|----------|--------|--------|
+| 19 | **FBX / Baltic Exchange** | Pending (trial/scrape) |
+| 20 | **SCFI** | Pending |
+| 21 | **Port of Barcelona** | Pending |
+| 22 | **Singapore OCEANS-X** | Pending |
 
 ---
 
@@ -426,7 +518,6 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 | HVCC Hamburg | B2B contract required. Not viable for Phase 1-3. |
 | VT Explorer | Paid credit model. Defer. |
 | MarineTraffic APIs (free) | Most endpoints behind paid tier. Free tier too restrictive. |
-| HormuzMonitor.com | 401 without valid key, unclear free tier access. |
 | Sinay.ai | 401 without API key, registration required. |
 | FreightPulse | Returns HTML landing page, API may not be live. |
 | emissions.dev | 401 without valid key, needs registration. |

@@ -56,8 +56,14 @@
 
 ### Next steps
 1. Set up GitHub repository secrets for API keys
-2. Test workflow on GitHub Actions
+2. Test workflow on GitHub Actions (first run)
 3. Optional: lightweight dashboard (Streamlit or static HTML)
+4. Documentation (README usage guide)
+
+### Git
+- Commit: `a3c11d9` — 27 files, +3,843 lines
+- Message: "Session 9-10: Add oil collectors + Phase 4 automation (204 tests)"
+- Pushed to `origin/main`
 
 ---
 
