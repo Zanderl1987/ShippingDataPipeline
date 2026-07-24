@@ -1,0 +1,111 @@
+name: Collect Data
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: 'Comma-separated source names to collect (empty = all)'
+        required: false
+        default: ''
+      force:
+        description: 'Force collection even if recently collected'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  SDP_DATA_DIR: ./data
+  SDP_STORAGE_DIR: ./storage
+  SDP_LOG_LEVEL: INFO
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.7"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run linter
+        run: uv run ruff check .
+
+      - name: Run type checker
+        run: uv run mypy src/
+
+      - name: Run tests
+        run: uv run python -m pytest tests/ -x -q
+
+      - name: Collect data
+        env:
+          AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
+          GFW_API_TOKEN: ${{ secrets.GFW_API_TOKEN }}
+          VESSELAPI_API_KEY: ${{ secrets.VESSELAPI_API_KEY }}
+          SHIPLOOKUP_API_KEY: ${{ secrets.SHIPLOOKUP_API_KEY }}
+          UN_COMITRADE_API_KEY: ${{ secrets.UN_COMITRADE_API_KEY }}
+          BARENTSWATCH_TOKEN: ${{ secrets.BARENTSWATCH_TOKEN }}
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          HORMUZ_API_KEY: ${{ secrets.HORMUZ_API_KEY }}
+        run: |
+          uv run python -m src.monitoring.collect_all \
+            ${{ github.event.inputs.sources && format('--sources {0}', github.event.inputs.sources) || '' }} \
+            ${{ github.event.inputs.force == 'true' && '--force' || '' }}
+
+      - name: Run data quality checks
+        run: uv run python -m src.monitoring.quality
+
+      - name: Generate status report
+        run: uv run python -m src.analytics.reports overview > status_report.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-status-${{ github.run_number }}
+          path: |
+            status_report.txt
+            storage/pipeline.db
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Collection pipeline failed. Check logs for details."
+
+  quality-gate:
+    needs: collect
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.7"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Check data quality
+        run: |
+          uv run python -m src.monitoring.quality --check-staleness --check-nulls
+          echo "Quality gate passed"

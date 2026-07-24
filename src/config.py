@@ -17,6 +17,18 @@ class Settings:
     shiplookup_api_key: str | None = None
     un_comtrade_api_key: str | None = None
     barentswatch_token: str | None = None
+    eia_api_key: str | None = None
+    hormuz_api_key: str | None = None
+
+    slack_webhook_url: str | None = None
+    discord_webhook_url: str | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    email_from: str | None = None
+    email_to: str | None = None
+    notification_log_file: str | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -30,6 +42,17 @@ class Settings:
             shiplookup_api_key=os.getenv("SHIPLOOKUP_API_KEY"),
             un_comtrade_api_key=os.getenv("UN_COMITRADE_API_KEY"),
             barentswatch_token=os.getenv("BARENTSWATCH_TOKEN"),
+            eia_api_key=os.getenv("EIA_API_KEY"),
+            hormuz_api_key=os.getenv("HORMUZ_API_KEY"),
+            slack_webhook_url=os.getenv("SLACK_WEBHOOK_URL"),
+            discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL"),
+            smtp_host=os.getenv("SMTP_HOST"),
+            smtp_port=int(os.getenv("SMTP_PORT", "587")) if os.getenv("SMTP_PORT") else None,
+            smtp_user=os.getenv("SMTP_USER"),
+            smtp_password=os.getenv("SMTP_PASSWORD"),
+            email_from=os.getenv("EMAIL_FROM"),
+            email_to=os.getenv("EMAIL_TO"),
+            notification_log_file=os.getenv("NOTIFICATION_LOG_FILE", "./data/notifications.log"),
         )
 
     def ensure_dirs(self) -> None:

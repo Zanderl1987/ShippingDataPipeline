@@ -146,6 +146,53 @@ def cmd_weather(args: argparse.Namespace) -> None:
     print_table(result)
 
 
+def cmd_status(args: argparse.Namespace) -> None:
+    """Show pipeline status and health."""
+    print_header("Pipeline Status")
+
+    from src.monitoring.quality import get_quality_report, print_quality_report
+
+    report = get_quality_report(stale_threshold_hours=args.threshold)
+    print_quality_report(report)
+
+    if args.warnings_only:
+        from src.monitoring.quality import check_quality_thresholds
+
+        warnings = check_quality_thresholds(report)
+        if warnings:
+            print("\nWARNINGS:")
+            for w in warnings:
+                print(f"  - {w}")
+        else:
+            print("\nNo warnings.")
+
+
+def cmd_collect(args: argparse.Namespace) -> None:
+    """Run data collection."""
+    print_header("Data Collection")
+
+    from src.monitoring.collect_all import print_collection_report, run_all_collectors
+
+    report = run_all_collectors(
+        sources=args.sources,
+        force=args.force,
+        notify=not args.no_notify,
+    )
+    print_collection_report(report)
+
+    sys.exit(0 if report.failed == 0 else 1)
+
+
+def cmd_quality(args: argparse.Namespace) -> None:
+    """Show detailed quality metrics."""
+    print_header("Data Quality Metrics")
+
+    from src.monitoring.quality import get_quality_report, print_quality_report
+
+    report = get_quality_report(stale_threshold_hours=args.threshold)
+    print_quality_report(report)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -155,9 +202,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
+    # Overview
     overview = subparsers.add_parser("overview", help="Show pipeline overview")
     overview.set_defaults(func=cmd_overview)
 
+    # Vessels
     vessels = subparsers.add_parser("vessels", help="Show active vessels")
     vessels.add_argument("--date-from", type=date.fromisoformat, default=None)
     vessels.add_argument("--date-to", type=date.fromisoformat, default=None)
@@ -165,6 +214,7 @@ def build_parser() -> argparse.ArgumentParser:
     vessels.add_argument("--limit", type=int, default=20)
     vessels.set_defaults(func=cmd_vessels)
 
+    # Ports
     ports = subparsers.add_parser("ports", help="Show port activity")
     ports.add_argument("--date-from", type=date.fromisoformat, default=None)
     ports.add_argument("--date-to", type=date.fromisoformat, default=None)
@@ -172,6 +222,7 @@ def build_parser() -> argparse.ArgumentParser:
     ports.add_argument("--limit", type=int, default=20)
     ports.set_defaults(func=cmd_ports)
 
+    # Congestion
     congestion = subparsers.add_parser("congestion", help="Show congestion estimates")
     congestion.add_argument("--date-from", type=date.fromisoformat, default=None)
     congestion.add_argument("--date-to", type=date.fromisoformat, default=None)
@@ -180,6 +231,7 @@ def build_parser() -> argparse.ArgumentParser:
     congestion.add_argument("--limit", type=int, default=20)
     congestion.set_defaults(func=cmd_congestion)
 
+    # Destinations
     destinations = subparsers.add_parser("destinations", help="Show vessel destinations")
     destinations.add_argument("--date-from", type=date.fromisoformat, default=None)
     destinations.add_argument("--date-to", type=date.fromisoformat, default=None)
@@ -187,6 +239,7 @@ def build_parser() -> argparse.ArgumentParser:
     destinations.add_argument("--limit", type=int, default=20)
     destinations.set_defaults(func=cmd_destinations)
 
+    # Routes
     routes = subparsers.add_parser("routes", help="Show port-to-port routes")
     routes.add_argument("--date-from", type=date.fromisoformat, default=None)
     routes.add_argument("--date-to", type=date.fromisoformat, default=None)
@@ -194,9 +247,34 @@ def build_parser() -> argparse.ArgumentParser:
     routes.add_argument("--limit", type=int, default=20)
     routes.set_defaults(func=cmd_routes)
 
+    # Weather
     weather = subparsers.add_parser("weather", help="Show recent weather data")
     weather.add_argument("--limit", type=int, default=20)
     weather.set_defaults(func=cmd_weather)
+
+    # Status (new)
+    status = subparsers.add_parser("status", help="Show pipeline health status")
+    status.add_argument("--threshold", type=float, default=168.0,
+                       help="Staleness threshold in hours (default: 168)")
+    status.add_argument("--warnings-only", action="store_true",
+                       help="Only show warnings")
+    status.set_defaults(func=cmd_status)
+
+    # Collect (new)
+    collect = subparsers.add_parser("collect", help="Run data collection")
+    collect.add_argument("--sources", nargs="*",
+                        help="Specific sources to collect (default: all)")
+    collect.add_argument("--force", action="store_true",
+                        help="Force collection even if recently collected")
+    collect.add_argument("--no-notify", action="store_true",
+                        help="Disable notifications")
+    collect.set_defaults(func=cmd_collect)
+
+    # Quality (new)
+    quality = subparsers.add_parser("quality", help="Show detailed quality metrics")
+    quality.add_argument("--threshold", type=float, default=168.0,
+                        help="Staleness threshold in hours (default: 168)")
+    quality.set_defaults(func=cmd_quality)
 
     return parser
 

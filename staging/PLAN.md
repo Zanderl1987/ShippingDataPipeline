@@ -172,6 +172,12 @@ ShippingDataPipeline/
 - [x] Vet & integrate **NOAA MarineCadastre** (US waters historical AIS, bulk download)
 - [x] Vet & integrate **Eagle Intelligence** (free chokepoint risk data, no auth)
 - [x] Vet & integrate **AISStream** (free real-time AIS WebSocket stream)
+- [x] Vet & integrate **EIA Petroleum** (US crude stocks, refinery, imports — free API key)
+- [x] Vet & integrate **JODI-Oil** (global oil production, consumption, trade — free CSV)
+- [x] Vet & integrate **IMF PortWatch** (chokepoint transit counts + capacity — free ArcGIS API)
+- [x] Vet & integrate **TankerMap** (live tanker positions, port calls — free, no auth)
+- [x] Vet & integrate **Hormuz Monitor** (risk score, oil prices, VLCC rates — free tier)
+- [x] Add tanker-type filter to Axiomancer collector
 - [x] Integration tests for collector-to-storage flow
 
 ### Phase 3 — Analytics ✓ COMPLETE
@@ -182,10 +188,12 @@ ShippingDataPipeline/
 - [x] Unit tests for each analytic
 
 ### Phase 4 — Automation & Polish (in progress)
-- [ ] GitHub Actions workflow for scheduled collection
-- [ ] Notification on failures / data gaps
+- [x] GitHub Actions workflow for scheduled collection
+- [x] Notification on failures / data gaps (Slack/Discord webhook, email, log file)
+- [x] Data quality monitoring (row counts, null rates, staleness)
+- [x] CLI enhancement (`sdp status`, `sdp collect`, `sdp quality`)
+- [x] Collection orchestrator with staleness checks
 - [ ] Optional: lightweight dashboard (Streamlit or static HTML)
-- [ ] Data quality monitoring (row counts, null rates, staleness)
 - [ ] Documentation (module-level docstrings, README usage guide)
 
 ### Phase 5 — Scale (if needed)
@@ -209,11 +217,13 @@ ShippingDataPipeline/
 9. ✓ Build curation layer (dedup + validation + enrichment)
 10. ✓ Add source tracking (checkpoints, timestamps)
 11. ✓ Create integration tests for collector-to-storage flow
-12. ✓ Research and add new data sources (GFW, VesselAPI, UN Comtrade, ShipLookup, BarentsWatch, NOAA)
-13. Set up API keys in `.env` for live testing
-14. GitHub Actions workflow for scheduled collection
-15. Data quality monitoring (row counts, null rates, staleness)
-16. Documentation (module-level docstrings, README usage guide)
+12. ✓ Research and add new data sources (GFW, VesselAPI, UN Comtrade, ShipLookup, BarentsWatch, NOAA, EIA, JODI, PortWatch, TankerMap, Hormuz)
+13. ✓ GitHub Actions workflow for scheduled collection
+14. ✓ Data quality monitoring (row counts, null rates, staleness)
+15. ✓ Notification system (Slack/Discord, email, log file)
+16. Set up API keys in `.env` for live testing
+17. Set up GitHub secrets for Actions workflow
+18. Documentation (module-level docstrings, README usage guide)
 
 ---
 

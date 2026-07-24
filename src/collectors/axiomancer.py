@@ -265,3 +265,25 @@ def collect_port(
         count = write_raw(SOURCE, df)
         tc.rows_written = count
         return count
+
+
+def collect_tankers(
+    bbox: tuple[float, float, float, float] | None = None,
+    tracker: SourceTracker | None = None,
+) -> int:
+    """Fetch global tanker-only positions snapshot and write to storage.
+
+    Convenience wrapper around collect_global_snapshot with vessel_type="tanker".
+
+    Args:
+        bbox: Optional (west, south, east, north) bounding box.
+        tracker: Optional SourceTracker for recording collection events.
+
+    Returns:
+        Number of rows written.
+    """
+    return collect_global_snapshot(
+        vessel_type="tanker",
+        bbox=bbox,
+        tracker=tracker,
+    )

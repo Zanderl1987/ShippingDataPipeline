@@ -224,6 +224,99 @@ CREATE TABLE IF NOT EXISTS chokepoint_status (
 """,
 )
 
+OIL_INVENTORIES = TableSchema(
+    name="oil_inventories",
+    partition_cols=["report_date", "source"],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS oil_inventories (
+    report_date         DATE,
+    product             VARCHAR,
+    area                VARCHAR,
+    area_code           VARCHAR,
+    stock_type          VARCHAR,
+    value_thousand_bbl  DOUBLE,
+    unit                VARCHAR,
+    frequency           VARCHAR,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+CHOKEPOINT_TRANSITS = TableSchema(
+    name="chokepoint_transits",
+    partition_cols=["transit_date", "source"],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS chokepoint_transits (
+    transit_date            DATE,
+    chokepoint_id           VARCHAR,
+    chokepoint_name         VARCHAR,
+    n_container             INTEGER,
+    n_dry_bulk              INTEGER,
+    n_general_cargo         INTEGER,
+    n_roro                  INTEGER,
+    n_tanker                INTEGER,
+    n_cargo                 INTEGER,
+    n_total                 INTEGER,
+    capacity_container      DOUBLE,
+    capacity_dry_bulk       DOUBLE,
+    capacity_general_cargo  DOUBLE,
+    capacity_roro           DOUBLE,
+    capacity_tanker         DOUBLE,
+    capacity_cargo          DOUBLE,
+    capacity                DOUBLE,
+    source                  VARCHAR,
+    partition_date          DATE,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+OIL_PRICES = TableSchema(
+    name="oil_prices",
+    partition_cols=["price_date", "source"],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS oil_prices (
+    price_date              DATE,
+    brent_usd               DOUBLE,
+    wti_usd                 DOUBLE,
+    dubai_usd               DOUBLE,
+    lng_jkm_mmbtu           DOUBLE,
+    vlcc_td3c_ws            DOUBLE,
+    vlcc_td3c_tce_usd_day   DOUBLE,
+    risk_premium_pct        DOUBLE,
+    td_change_pct           DOUBLE,
+    source                  VARCHAR,
+    partition_date          DATE,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+OIL_TRADE = TableSchema(
+    name="oil_trade",
+    partition_cols=["period", "source"],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS oil_trade (
+    period              VARCHAR,
+    reporting_country   VARCHAR,
+    reporting_code      INTEGER,
+    partner_country     VARCHAR,
+    partner_code        INTEGER,
+    product             VARCHAR,
+    product_code        VARCHAR,
+    flow                VARCHAR,
+    quantity_ktonnes    DOUBLE,
+    quantity_barrels    DOUBLE,
+    unit                VARCHAR,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 ALL_TABLES: list[TableSchema] = [
     AIS_POSITIONS,
     VESSELS,
@@ -234,5 +327,9 @@ ALL_TABLES: list[TableSchema] = [
     TRADE_FLOW,
     FREIGHT_RATES,
     CHOKEPOINT_STATUS,
+    OIL_INVENTORIES,
+    CHOKEPOINT_TRANSITS,
+    OIL_PRICES,
+    OIL_TRADE,
     SOURCE_TRACKING,
 ]

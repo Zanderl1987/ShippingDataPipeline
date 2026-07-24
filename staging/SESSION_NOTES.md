@@ -1,5 +1,117 @@
 # Session Notes
 
+## 2026-07-23 — Session 10
+
+### Starting state
+- 176 tests pass, `ruff check .` clean, `mypy src/` clean
+- Phase 2 complete (16 collectors + integration tests)
+- Oil sources: EIA, JODI-Oil, IMF PortWatch, TankerMap, Hormuz Monitor
+
+### Session plan
+- [x] Create GitHub Actions workflow for scheduled collection
+- [x] Build notification system (Slack/Discord webhook, email, log file)
+- [x] Build data quality monitoring (row counts, null rates, staleness)
+- [x] Enhance CLI with `sdp status`, `sdp collect`, `sdp quality` commands
+- [x] Add notification settings to config
+- [x] Write tests for all new monitoring modules
+
+### Session results
+- **204 tests total** (176 existing + 28 new), all passing
+- `ruff check .` clean
+- `mypy src/` clean
+- New files:
+  - `.github/workflows/collect.yml` — GitHub Actions workflow (daily collection, quality gate)
+  - `src/monitoring/__init__.py` — Monitoring module
+  - `src/monitoring/quality.py` — Data quality checks (row counts, null rates, staleness)
+  - `src/monitoring/notify.py` — Notification system (webhook, email, log file)
+  - `src/monitoring/collect_all.py` — Collection orchestrator
+  - `tests/monitoring/test_quality.py` — 9 tests
+  - `tests/monitoring/test_notify.py` — 9 tests
+  - `tests/monitoring/test_collect_all.py` — 10 tests
+- Modified files:
+  - `src/config.py` — Added notification settings (Slack, Discord, email, SMTP)
+  - `src/analytics/reports.py` — Added `sdp status`, `sdp collect`, `sdp quality` commands
+  - `.env.example` — Added notification settings
+
+### GitHub Actions workflow
+- Runs daily at 06:00 UTC
+- Manual trigger with source selection and force options
+- Steps: lint → typecheck → test → collect → quality check → artifact upload
+- Quality gate job runs after collection
+- API keys stored as GitHub secrets
+
+### CLI commands
+| Command | Description |
+|---------|-------------|
+| `sdp overview` | Show pipeline overview |
+| `sdp vessels` | Show active vessels |
+| `sdp ports` | Show port activity |
+| `sdp congestion` | Show congestion estimates |
+| `sdp destinations` | Show vessel destinations |
+| `sdp routes` | Show port-to-port routes |
+| `sdp weather` | Show recent weather data |
+| `sdp status` | Show pipeline health status |
+| `sdp collect` | Run data collection |
+| `sdp quality` | Show detailed quality metrics |
+
+### Next steps
+1. Set up GitHub repository secrets for API keys
+2. Test workflow on GitHub Actions
+3. Optional: lightweight dashboard (Streamlit or static HTML)
+
+---
+
+## 2026-07-23 — Session 9
+
+### Starting state
+- 122 tests pass, `ruff check .` clean, `mypy src/` clean
+- Phase 2 complete (11 collectors + integration tests)
+- Data sources vetted: Axiomancer, SeafarerIndex, Open-Meteo, GFW, VesselAPI, UN Comtrade, ShipLookup, BarentsWatch, NOAA MarineCadastre, Eagle Intelligence, AISStream
+
+### Session plan
+- [x] Research free oil shipping data sources
+- [x] Build collectors for all viable oil sources
+- [x] Add new table schemas for oil-specific data
+- [x] Write tests for all new collectors
+- [x] Update DATA_SOURCES.md, PLAN.md, SESSION_NOTES.md
+
+### Session results
+- **176 tests total** (122 existing + 54 new), all passing
+- `ruff check .` clean
+- `mypy src/` clean
+- New files:
+  - `src/collectors/eia_petroleum.py` — US petroleum stocks, refinery, imports (free API key)
+  - `src/collectors/jodi_oil.py` — Global oil production, consumption, trade (free CSV)
+  - `src/collectors/imf_portwatch.py` — Chokepoint transit counts + capacity (free ArcGIS API)
+  - `src/collectors/tankermap.py` — Live tanker positions, port calls (free, no auth)
+  - `src/collectors/hormuz_monitor.py` — Risk score, oil prices, VLCC rates (free tier)
+  - `tests/collectors/test_eia_petroleum.py` — 11 tests
+  - `tests/collectors/test_jodi_oil.py` — 10 tests
+  - `tests/collectors/test_imf_portwatch.py` — 8 tests
+  - `tests/collectors/test_tankermap.py` — 13 tests
+  - `tests/collectors/test_hormuz_monitor.py` — 12 tests
+- Modified files:
+  - `src/storage/schema.py` — Added `oil_inventories`, `chokepoint_transits`, `oil_prices`, `oil_trade` tables
+  - `src/config.py` — Added `eia_api_key`, `hormuz_api_key` settings
+  - `src/collectors/axiomancer.py` — Added `collect_tankers()` convenience function
+
+### New table schemas
+| Table | Purpose | Partitioned By |
+|-------|---------|----------------|
+| `oil_inventories` | US crude stocks, refinery data (EIA) | report_date, source |
+| `chokepoint_transits` | Daily vessel transits + capacity (PortWatch, Hormuz) | transit_date, source |
+| `oil_prices` | Brent/WTI/Dubai prices, VLCC rates (Hormuz Monitor) | price_date, source |
+| `oil_trade` | Global oil production/trade (JODI-Oil) | period, source |
+
+### Next steps
+1. Register for EIA API key (free, eia.gov)
+2. Register for Hormuz Monitor API key (free, hormuzmonitor.com)
+3. Set up API keys in `.env` for live testing
+4. Integration tests for new oil collectors
+5. GitHub Actions workflow for scheduled collection
+
+---
+
 ## 2026-07-23 — Session 8
 
 ### Starting state
