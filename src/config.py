@@ -40,7 +40,7 @@ class Settings:
             gfw_api_token=os.getenv("GFW_API_TOKEN"),
             vesselapi_api_key=os.getenv("VESSELAPI_API_KEY"),
             shiplookup_api_key=os.getenv("SHIPLOOKUP_API_KEY"),
-            un_comtrade_api_key=os.getenv("UN_COMITRADE_API_KEY"),
+            un_comtrade_api_key=os.getenv("UN_COMTRADE_API_KEY"),
             barentswatch_token=os.getenv("BARENTSWATCH_TOKEN"),
             eia_api_key=os.getenv("EIA_API_KEY"),
             hormuz_api_key=os.getenv("HORMUZ_API_KEY"),

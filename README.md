@@ -43,7 +43,7 @@ API keys are configured via environment variables or `.env` file:
 | `GFW_API_TOKEN` | Global Fishing Watch | No (free registration) |
 | `VESSELAPI_API_KEY` | VesselAPI | No (free tier) |
 | `SHIPLOOKUP_API_KEY` | ShipLookup | No (free tier) |
-| `UN_COMITRADE_API_KEY` | UN Comtrade | No (free registration) |
+| `UN_COMTRADE_API_KEY` | UN Comtrade | No (free registration) |
 | `BARENTSWATCH_TOKEN` | BarentsWatch | No (free registration) |
 | `EIA_API_KEY` | EIA Petroleum | No (free registration) |
 | `HORMUZ_API_KEY` | Hormuz Monitor | No (free tier) |

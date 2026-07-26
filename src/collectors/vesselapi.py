@@ -217,6 +217,13 @@ def _parse_vessel(data: dict[str, Any]) -> pl.DataFrame:
     }]
 
     df = pl.DataFrame(records)
+
+    today = date.today()
+    df = df.with_columns(
+        pl.lit(today).alias("partition_date"),
+        pl.lit(SOURCE).alias("source"),
+    )
+
     return df
 
 

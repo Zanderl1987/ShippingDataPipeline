@@ -162,6 +162,67 @@ def _parse_eia_response(
     return df
 
 
+def _parse_eia_supply_response(
+    data: dict[str, Any],
+    frequency: str = "weekly",
+    default_unit: str = "MBBL/D",
+) -> pl.DataFrame:
+    """Parse EIA API v2 response into oil_inventories schema."""
+    response_data = data.get("response", {})
+    records_raw = response_data.get("data", [])
+
+    if not records_raw:
+        return pl.DataFrame()
+
+    records: list[dict[str, Any]] = []
+    for row in records_raw:
+        product = row.get("product", ["unknown"])
+        if isinstance(product, list) and product:
+            product = product[0]
+
+        area = row.get("area", ["US"])
+        if isinstance(area, list) and area:
+            area = area[0]
+        elif isinstance(area, str):
+            pass
+        else:
+            area = "US"
+
+        period = row.get("period", "")
+        report_date = period
+        if len(period) == 8 and period.isdigit():
+            report_date = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
+        elif len(period) == 6 and period.isdigit():
+            report_date = f"{period[:4]}-{period[4:6]}-01"
+
+        records.append({
+            "report_date": report_date,
+            "product": product,
+            "area": area,
+            "area_code": area,
+            "stock_type": "supply",
+            "value_thousand_bbl": row.get("value"),
+            "unit": row.get("units", default_unit),
+            "frequency": frequency,
+        })
+
+    if not records:
+        return pl.DataFrame()
+
+    df = pl.DataFrame(records)
+
+    if "value_thousand_bbl" in df.columns:
+        df = df.with_columns(pl.col("value_thousand_bbl").cast(pl.Float64, strict=False))
+
+    today = date.today()
+    df = df.with_columns(
+        pl.lit(today).alias("partition_date"),
+        pl.lit(SOURCE).alias("source"),
+    )
+
+    return df
+
+
 def _parse_eia_stocks_response(data: dict[str, Any]) -> pl.DataFrame:
     """Parse EIA weekly stocks response into oil_inventories schema."""
     response_data = data.get("response", {})
@@ -253,7 +314,7 @@ def collect_weekly_supply(
 
     with TimedCollector(tracker, SOURCE) as tc:
         raw = get_weekly_supply()
-        df = _parse_eia_response(raw, frequency="weekly", default_unit="MBBL/D")
+        df = _parse_eia_supply_response(raw, frequency="weekly", default_unit="MBBL/D")
         tc.rows_fetched = df.height
         if df.height == 0:
             logger.warning("No EIA supply data returned")
@@ -278,7 +339,7 @@ def collect_monthly_imports(
 
     with TimedCollector(tracker, SOURCE) as tc:
         raw = get_monthly_imports_by_country()
-        df = _parse_eia_response(raw, frequency="monthly", default_unit="MBBL")
+        df = _parse_eia_supply_response(raw, frequency="monthly", default_unit="MBBL")
         tc.rows_fetched = df.height
         if df.height == 0:
             logger.warning("No EIA import data returned")

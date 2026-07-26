@@ -4,7 +4,7 @@ import logging
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from src.monitoring.notify import (
@@ -101,7 +101,7 @@ def get_collectors() -> list[CollectorDef]:
         collectors.append(
             CollectorDef(
                 name="open_meteo",
-                collect_fn=collect_marine,
+                collect_fn=lambda: collect_marine(latitude=1.264, longitude=103.82),
                 schedule="daily",
             )
         )
@@ -150,7 +150,10 @@ def get_collectors() -> list[CollectorDef]:
         collectors.append(
             CollectorDef(
                 name="global_fishing_watch",
-                collect_fn=collect_events,
+                collect_fn=lambda: collect_events(
+                    start_date=(date.today() - timedelta(days=1)).isoformat(),
+                    end_date=date.today().isoformat(),
+                ),
                 requires_key="gfw_api_token",
                 schedule="daily",
             )
@@ -159,11 +162,11 @@ def get_collectors() -> list[CollectorDef]:
         logger.warning("global_fishing_watch collector not available")
 
     try:
-        from src.collectors.vesselapi import collect_vessel
+        from src.collectors.vesselapi import collect_port_events
         collectors.append(
             CollectorDef(
                 name="vesselapi",
-                collect_fn=collect_vessel,
+                collect_fn=lambda: collect_port_events(limit=50),
                 requires_key="vesselapi_api_key",
                 schedule="daily",
             )
@@ -189,7 +192,7 @@ def get_collectors() -> list[CollectorDef]:
         collectors.append(
             CollectorDef(
                 name="un_comtrade",
-                collect_fn=collect_trade_data,
+                collect_fn=lambda: collect_trade_data(reporter_code=156),  # China
                 requires_key="un_comtrade_api_key",
                 schedule="weekly",
             )
@@ -283,7 +286,7 @@ def run_collector(
         collector.collect_fn()
         duration_ms = int((time.perf_counter() - start) * 1000)
 
-        # Get row count from tracker
+        # Read row counts from tracker (recorded by collector's TimedCollector)
         last = tracker.get_last_collection(collector.name)
         rows_fetched = last["rows_fetched"] if last else 0
         rows_written = last["rows_written"] if last else 0

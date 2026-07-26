@@ -22,7 +22,7 @@ def _get_api_key() -> str:
     """Get API key for UN Comtrade."""
     key = settings.un_comtrade_api_key
     if not key:
-        raise ValueError("UN_COMITRADE_API_KEY not set in environment")
+        raise ValueError("UN_COMTRADE_API_KEY not set in environment")
     return key
 
 
