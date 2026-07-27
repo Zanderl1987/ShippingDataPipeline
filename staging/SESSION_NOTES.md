@@ -1,5 +1,80 @@
 # Session Notes
 
+## 2026-07-27 — Session 11
+
+### Starting state
+- 204 tests pass, `ruff check .` clean, `mypy src/` clean
+- Phase 4 complete (automation, monitoring, notifications)
+- All 16 collectors registered and importable
+
+### Session plan
+- [x] Code review: fix P0 collector crashes (open_meteo, global_fishing_watch, un_comtrade)
+- [x] Code review: fix row count bug in run_collector
+- [x] Code review: fix EIA column mismatch for supply/imports collectors
+- [x] Code review: fix VesselAPI missing source column
+- [x] Code review: fix UN_COMITRADE_API_KEY typo (5 files)
+- [x] Adversarial review of all fixes
+- [x] Fix adversarial findings (README/.env typo remnants, row count regression, vesselapi removal)
+- [x] Fix SQL injection in reader.py (table name allowlist)
+- [x] Add module-level docstrings to all 37 source files
+- [x] Build static HTML dashboard generator (`sdp dashboard` command)
+- [x] Write dashboard tests
+
+### Session results
+- **208 tests total** (204 existing + 4 new), all passing
+- `ruff check .` clean
+- `mypy src/` clean (0 issues in 38 source files)
+- Commits:
+  - `948a61b` — Fix P0 collector crashes, row count bug, EIA schema mismatch, and UN_COMTRADE typo
+  - `44bc7a1` — Add SQL injection fix, module docstrings, and HTML dashboard
+
+### Bugs fixed
+1. **Collector crashes (P0)** — open_meteo, global_fishing_watch, un_comtrade collectors crashed on missing required args in `get_collectors()`. Fixed by wrapping in lambdas with sensible defaults.
+2. **Row count bug (P0)** — `run_collector()` read from tracker before collector wrote to it. Restored read-after-collect pattern (works because collector's TimedCollector writes to same DuckDB file).
+3. **EIA column mismatch (P1)** — `collect_weekly_supply()` and `collect_monthly_imports()` produced columns that didn't match `oil_inventories` schema. Added `_parse_eia_supply_response()` parser.
+4. **VesselAPI missing source (P1)** — `_parse_vessel()` didn't add `source` or `partition_date` columns. Added them.
+5. **UN_COMTRADE_API_KEY typo (P1)** — `UN_COMITRADE_API_KEY` misspelled in 5 files (config, collector, workflow, README, .env.example).
+6. **SQL injection (MEDIUM)** — `read_dataset()` and `get_latest_timestamp()` used f-string interpolation for table names. Added allowlist validation from `ALL_TABLES`.
+
+### New files
+- `src/monitoring/dashboard.py` — Static HTML dashboard generator
+- `tests/monitoring/test_dashboard.py` — 4 dashboard tests
+
+### Modified files
+- `src/storage/reader.py` — Added `VALID_TABLE_NAMES` allowlist and `_validate_table_name()` helper
+- `src/monitoring/collect_all.py` — Fixed collector registration, row count tracking, vesselapi re-registration
+- `src/collectors/eia_petroleum.py` — Added `_parse_eia_supply_response()`, updated supply/imports collectors
+- `src/collectors/vesselapi.py` — Added `source`/`partition_date` to `_parse_vessel()`
+- `src/config.py` — Fixed `UN_COMTRADE_API_KEY` typo
+- `src/collectors/un_comtrade.py` — Fixed error message typo
+- `.github/workflows/collect.yml` — Fixed secret name
+- `README.md` — Fixed env var name
+- `.env.example` — Fixed env var name
+- `src/analytics/reports.py` — Added `sdp dashboard` command
+- All 37 source files — Added module-level docstrings
+
+### CLI commands
+| Command | Description |
+|---------|-------------|
+| `sdp overview` | Show pipeline overview |
+| `sdp vessels` | Show active vessels |
+| `sdp ports` | Show port activity |
+| `sdp congestion` | Show congestion estimates |
+| `sdp destinations` | Show vessel destinations |
+| `sdp routes` | Show port-to-port routes |
+| `sdp weather` | Show recent weather data |
+| `sdp status` | Show pipeline health status |
+| `sdp collect` | Run data collection |
+| `sdp quality` | Show detailed quality metrics |
+| `sdp dashboard` | Generate HTML dashboard |
+
+### Next steps
+1. Register for API keys (EIA, Hormuz, AISStream)
+2. Set up GitHub repository secrets for API keys
+3. Test workflow on GitHub Actions (first run)
+
+---
+
 ## 2026-07-23 — Session 10
 
 ### Starting state

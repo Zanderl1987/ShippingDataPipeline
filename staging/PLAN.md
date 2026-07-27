@@ -187,14 +187,15 @@ ShippingDataPipeline/
 - [x] Add CLI reporting (`sdp` command)
 - [x] Unit tests for each analytic
 
-### Phase 4 — Automation & Polish (in progress)
+### Phase 4 — Automation & Polish ✓ COMPLETE
 - [x] GitHub Actions workflow for scheduled collection
 - [x] Notification on failures / data gaps (Slack/Discord webhook, email, log file)
 - [x] Data quality monitoring (row counts, null rates, staleness)
-- [x] CLI enhancement (`sdp status`, `sdp collect`, `sdp quality`)
+- [x] CLI enhancement (`sdp status`, `sdp collect`, `sdp quality`, `sdp dashboard`)
 - [x] Collection orchestrator with staleness checks
-- [ ] Optional: lightweight dashboard (Streamlit or static HTML)
-- [ ] Documentation (module-level docstrings, README usage guide)
+- [x] Static HTML dashboard (`sdp dashboard`)
+- [x] Module-level docstrings (all 37 source files)
+- [x] SQL injection fix (reader.py table name allowlist)
 
 ### Phase 5 — Scale (if needed)
 - [ ] Backfill historical data

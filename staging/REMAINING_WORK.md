@@ -1,6 +1,6 @@
 # Remaining Work
 
-## Immediate — Oil Source Live Testing
+## Immediate — API Key Setup
 
 | Task | Details | Status |
 |------|---------|--------|
@@ -18,16 +18,18 @@
 | GitHub Actions workflow | `.github/workflows/collect.yml` — daily at 06:00 UTC | ✅ Done |
 | Notification on failures | Slack/Discord webhook, email, log file via `src/monitoring/notify.py` | ✅ Done |
 | Data quality monitoring | `src/monitoring/quality.py` — row counts, null rates, staleness | ✅ Done |
-| CLI reporting (`sdp` command) | Added `status`, `collect`, `quality` commands | ✅ Done |
+| CLI reporting (`sdp` command) | Added `status`, `collect`, `quality`, `dashboard` commands | ✅ Done |
 | Collection orchestrator | `src/monitoring/collect_all.py` — runs all collectors with staleness checks | ✅ Done |
-| Optional dashboard | Streamlit or static HTML for visual overview | Not started |
+| Static HTML dashboard | `src/monitoring/dashboard.py` — `sdp dashboard` generates HTML report | ✅ Done |
+| Module docstrings | All 37 source files have module-level docstrings | ✅ Done |
+| SQL injection fix | `reader.py` — table name allowlist validation | ✅ Done |
 
 ## Documentation
 
 | Task | Details | Status |
 |------|---------|--------|
-| README usage guide | Install, configure, run collectors, query data | Not started |
-| Module-level docstrings | All collectors have basic docstrings, need review | In progress |
+| README usage guide | Install, configure, run collectors, query data | ✅ Done |
+| Module-level docstrings | All 37 source files | ✅ Done |
 | DATA_SOURCES.md update | Add new oil sources (EIA, JODI, PortWatch, TankerMap, Hormuz) | Not started |
 
 ## Deferred / Low Priority
@@ -41,4 +43,4 @@
 
 ---
 
-*Last updated: 2026-07-23 (Session 10)*
+*Last updated: 2026-07-27 (Session 11)*
