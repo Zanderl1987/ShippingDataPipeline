@@ -1,3 +1,4 @@
+"""Source tracking for collection events and staleness."""
 from __future__ import annotations
 
 import time

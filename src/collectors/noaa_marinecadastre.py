@@ -1,3 +1,4 @@
+"""Collect historical AIS data from NOAA MarineCadastre."""
 from __future__ import annotations
 
 import logging

@@ -1,3 +1,4 @@
+"""Vessel route analysis from AIS positions."""
 from __future__ import annotations
 
 import logging

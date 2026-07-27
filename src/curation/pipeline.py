@@ -1,3 +1,4 @@
+"""Curation pipeline orchestrator."""
 from __future__ import annotations
 
 import logging

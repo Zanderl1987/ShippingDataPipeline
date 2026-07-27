@@ -1,3 +1,4 @@
+"""Collect chokepoint risk data from Eagle Intelligence."""
 from __future__ import annotations
 
 import logging

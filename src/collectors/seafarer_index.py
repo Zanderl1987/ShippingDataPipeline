@@ -1,3 +1,4 @@
+"""Collect vessel and port registry from Seafarer Index."""
 from __future__ import annotations
 
 import logging

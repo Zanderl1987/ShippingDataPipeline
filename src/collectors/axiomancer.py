@@ -1,3 +1,4 @@
+"""Collect AIS positions from Axiomancer Overwatch."""
 from __future__ import annotations
 
 import logging

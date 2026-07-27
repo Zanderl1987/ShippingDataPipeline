@@ -1,3 +1,4 @@
+"""Collect real-time AIS data from AISStream WebSocket."""
 from __future__ import annotations
 
 import asyncio

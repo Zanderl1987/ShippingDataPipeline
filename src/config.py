@@ -1,3 +1,4 @@
+"""Environment-based configuration for the shipping pipeline."""
 from __future__ import annotations
 
 import os

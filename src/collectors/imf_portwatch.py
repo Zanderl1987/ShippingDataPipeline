@@ -1,3 +1,4 @@
+"""Collect chokepoint transit data from IMF PortWatch."""
 from __future__ import annotations
 
 import logging

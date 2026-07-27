@@ -1,3 +1,4 @@
+"""Deduplication functions for raw data tables."""
 from __future__ import annotations
 
 import logging

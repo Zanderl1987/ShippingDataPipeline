@@ -1,3 +1,4 @@
+"""Collect marine weather and forecasts from Open-Meteo."""
 from __future__ import annotations
 
 import logging

@@ -1,3 +1,4 @@
+"""Collect US petroleum data from EIA."""
 from __future__ import annotations
 
 import logging

@@ -1,3 +1,4 @@
+"""Collect vessel registry data from ShipLookup."""
 from __future__ import annotations
 
 import logging

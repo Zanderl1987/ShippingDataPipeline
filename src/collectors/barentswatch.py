@@ -1,3 +1,4 @@
+"""Collect AIS positions from BarentsWatch (Norwegian waters)."""
 from __future__ import annotations
 
 import logging

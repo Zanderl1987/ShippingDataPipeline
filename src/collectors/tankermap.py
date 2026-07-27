@@ -1,3 +1,4 @@
+"""Collect tanker positions and port calls from TankerMap."""
 from __future__ import annotations
 
 import logging

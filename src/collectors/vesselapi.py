@@ -1,3 +1,4 @@
+"""Collect port events and vessel data from VesselAPI."""
 from __future__ import annotations
 
 import logging

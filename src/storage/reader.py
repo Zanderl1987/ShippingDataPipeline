@@ -1,3 +1,4 @@
+"""Query and read data from DuckDB."""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -7,7 +8,16 @@ import duckdb
 import polars as pl
 
 from src.config import settings
+from src.storage.schema import ALL_TABLES
 from src.storage.writer import get_db_path
+
+VALID_TABLE_NAMES: set[str] = {t.name for t in ALL_TABLES}
+
+
+def _validate_table_name(table_name: str) -> None:
+    if table_name not in VALID_TABLE_NAMES:
+        msg = f"Invalid table name: {table_name!r}"
+        raise ValueError(msg)
 
 
 def query(
@@ -38,6 +48,7 @@ def read_dataset(
     source: str | None = None,
     limit: int | None = None,
 ) -> pl.DataFrame:
+    _validate_table_name(table_name)
     clauses: list[str] = []
     params: list[Any] = []
 
@@ -94,6 +105,7 @@ def list_sources() -> pl.DataFrame:
 def get_latest_timestamp(
     table_name: str, source: str
 ) -> datetime | None:
+    _validate_table_name(table_name)
     sql = f"""
         SELECT max(timestamp) as max_ts
         FROM {table_name}

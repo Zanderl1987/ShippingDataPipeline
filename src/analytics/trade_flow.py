@@ -1,3 +1,4 @@
+"""Port-to-port trade flow analysis."""
 from __future__ import annotations
 
 import logging

@@ -1,3 +1,4 @@
+"""Collection orchestrator for all data sources."""
 from __future__ import annotations
 
 import logging

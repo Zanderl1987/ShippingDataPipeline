@@ -1,3 +1,4 @@
+"""Collect risk scores and oil prices from Hormuz Monitor."""
 from __future__ import annotations
 
 import logging

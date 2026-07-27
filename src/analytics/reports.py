@@ -1,3 +1,4 @@
+"""CLI entry point for the shipping pipeline."""
 from __future__ import annotations
 
 import argparse
@@ -193,6 +194,14 @@ def cmd_quality(args: argparse.Namespace) -> None:
     print_quality_report(report)
 
 
+def cmd_dashboard(args: argparse.Namespace) -> None:
+    """Generate HTML dashboard."""
+    from src.monitoring.dashboard import generate_dashboard
+
+    path = generate_dashboard(output_path=args.output)
+    print(f"Dashboard generated: {path}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -275,6 +284,12 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("--threshold", type=float, default=168.0,
                         help="Staleness threshold in hours (default: 168)")
     quality.set_defaults(func=cmd_quality)
+
+    # Dashboard
+    dashboard = subparsers.add_parser("dashboard", help="Generate HTML dashboard")
+    dashboard.add_argument("--output", type=str, default=None,
+                          help="Output path (default: storage/dashboard.html)")
+    dashboard.set_defaults(func=cmd_dashboard)
 
     return parser
 

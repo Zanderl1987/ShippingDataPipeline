@@ -1,3 +1,4 @@
+"""Collect AIS and fishing events from Global Fishing Watch."""
 from __future__ import annotations
 
 import logging

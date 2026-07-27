@@ -1,3 +1,4 @@
+"""Write raw and curated data to DuckDB and Parquet."""
 from __future__ import annotations
 
 from pathlib import Path

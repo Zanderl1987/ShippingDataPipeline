@@ -1,3 +1,4 @@
+"""Enrichment and curated table creation."""
 from __future__ import annotations
 
 import logging

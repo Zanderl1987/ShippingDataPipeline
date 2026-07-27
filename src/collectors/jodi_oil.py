@@ -1,3 +1,4 @@
+"""Collect global oil data from JODI-Oil."""
 from __future__ import annotations
 
 import csv

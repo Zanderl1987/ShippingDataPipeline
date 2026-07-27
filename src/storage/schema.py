@@ -1,3 +1,4 @@
+"""DuckDB table schemas for the shipping pipeline."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
