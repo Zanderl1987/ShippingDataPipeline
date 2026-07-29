@@ -114,14 +114,13 @@ class TestParseEiaResponse:
 
 class TestGetEiaData:
     @patch("src.collectors.eia_petroleum._get_api_key", return_value="test_key")
-    @patch("src.collectors.eia_petroleum.requests.get")
+    @patch("src.collectors.eia_petroleum.get_with_retry")
     def test_returns_json(
         self, mock_get: MagicMock, mock_key: MagicMock,
         mock_eia_stocks_response: dict,
     ) -> None:
         mock_resp = MagicMock()
         mock_resp.json.return_value = mock_eia_stocks_response
-        mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
         result = get_weekly_stocks()
@@ -129,35 +128,33 @@ class TestGetEiaData:
         assert len(result["response"]["data"]) == 3
 
     @patch("src.collectors.eia_petroleum._get_api_key", return_value="test_key")
-    @patch("src.collectors.eia_petroleum.requests.get")
+    @patch("src.collectors.eia_petroleum.get_with_retry")
     def test_raises_on_error(self, mock_get: MagicMock, mock_key: MagicMock) -> None:
         mock_get.side_effect = Exception("Connection failed")
         with pytest.raises(Exception, match="Connection failed"):
             get_weekly_stocks()
 
     @patch("src.collectors.eia_petroleum._get_api_key", return_value="test_key")
-    @patch("src.collectors.eia_petroleum.requests.get")
+    @patch("src.collectors.eia_petroleum.get_with_retry")
     def test_supply_endpoint(
         self, mock_get: MagicMock, mock_key: MagicMock,
         mock_eia_supply_response: dict,
     ) -> None:
         mock_resp = MagicMock()
         mock_resp.json.return_value = mock_eia_supply_response
-        mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
         result = get_weekly_supply()
         assert "response" in result
 
     @patch("src.collectors.eia_petroleum._get_api_key", return_value="test_key")
-    @patch("src.collectors.eia_petroleum.requests.get")
+    @patch("src.collectors.eia_petroleum.get_with_retry")
     def test_imports_endpoint(
         self, mock_get: MagicMock, mock_key: MagicMock,
         mock_eia_supply_response: dict,
     ) -> None:
         mock_resp = MagicMock()
         mock_resp.json.return_value = mock_eia_supply_response
-        mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
         result = get_monthly_imports_by_country()

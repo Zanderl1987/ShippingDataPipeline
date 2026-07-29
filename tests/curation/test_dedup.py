@@ -86,10 +86,13 @@ def test_deduplicate_vessels(db) -> None:
     write_raw("test", df, table_name="vessels")
 
     count_df = query("SELECT count(*) as cnt FROM vessels")
-    assert count_df[0, "cnt"] == 2
+    assert count_df[0, "cnt"] == 3
 
     removed = deduplicate_vessels()
-    assert removed == 0
+    assert removed == 1
+
+    count_df2 = query("SELECT count(*) as cnt FROM vessels")
+    assert count_df2[0, "cnt"] == 2
 
 
 def test_deduplicate_ports(db) -> None:

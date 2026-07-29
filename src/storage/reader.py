@@ -9,7 +9,7 @@ import polars as pl
 
 from src.config import settings
 from src.storage.schema import ALL_TABLES
-from src.storage.writer import get_db_path
+from src.storage.writer import get_db_path, get_connection
 
 VALID_TABLE_NAMES: set[str] = {t.name for t in ALL_TABLES}
 
@@ -24,21 +24,19 @@ def query(
     sql: str,
     params: list[Any] | None = None,
 ) -> pl.DataFrame:
-    db_path = get_db_path()
-    conn = duckdb.connect(str(db_path))
-    conn.execute("SET autoinstall_known_extensions=1;")
-    conn.execute("SET autoload_known_extensions=1;")
+    conn = get_connection(read_only=True)
+    try:
+        if params:
+            result = conn.execute(sql, params)
+        else:
+            result = conn.execute(sql)
 
-    if params:
-        result = conn.execute(sql, params)
-    else:
-        result = conn.execute(sql)
-
-    arrow_table = result.to_arrow_table()
-    conn.close()
-    result_df = pl.from_arrow(arrow_table)
-    assert isinstance(result_df, pl.DataFrame)
-    return result_df
+        arrow_table = result.to_arrow_table()
+        result_df = pl.from_arrow(arrow_table)
+        assert isinstance(result_df, pl.DataFrame)
+        return result_df
+    finally:
+        conn.close()
 
 
 def read_dataset(
@@ -88,9 +86,13 @@ def list_sources() -> pl.DataFrame:
             if not parquet_files:
                 continue
             latest = max(f.stat().st_mtime for f in parquet_files)
-            total_rows = sum(
-                pl.read_parquet(str(f)).height for f in parquet_files
-            )
+            total_rows = 0
+            for f in parquet_files:
+                try:
+                    pf = __import__("pyarrow.parquet", fromlist=["ParquetFile"]).ParquetFile(str(f))
+                    total_rows += pf.metadata.num_rows
+                except Exception:
+                    total_rows += pl.read_parquet(str(f), n_rows=0).height
             sources.append(
                 {
                     "source": p.name,

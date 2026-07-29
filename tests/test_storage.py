@@ -8,7 +8,7 @@ import pytest
 
 from src.storage.reader import list_sources, query, read_dataset
 from src.storage.schema import ALL_TABLES
-from src.storage.writer import init_db, write_raw
+from src.storage.writer import init_db, write_raw, write_curated
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def db(tmp_path: Path) -> None:
 def test_init_db(db) -> None:
     conn = init_db()
     tables = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
     ).fetchall()
     table_names = {r[0] for r in tables}
     for t in ALL_TABLES:
@@ -141,3 +141,28 @@ def test_read_with_date_filter(db) -> None:
         date_to=date(2026, 1, 3),
     )
     assert result.height == 2
+
+
+def test_write_curated(db) -> None:
+    init_db()
+
+    df = pl.DataFrame(
+        {
+            "imo": [1111111],
+            "mmsi": [111111111],
+            "vessel_name": ["CURATED TEST"],
+            "vessel_type": ["Tanker"],
+            "flag": ["SG"],
+            "source": ["test"],
+        }
+    )
+
+    count = write_curated("vessels", df)
+    assert count == 1
+
+    result = query("SELECT * FROM curated_vessels")
+    assert result.height == 1
+    assert result[0, "vessel_name"] == "CURATED TEST"
+
+    count2 = write_curated("vessels", df)
+    assert count2 == 1  # CREATE OR REPLACE replaces the table

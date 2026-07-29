@@ -108,8 +108,8 @@ def get_table_quality(
                     null_rate = result[1] / result[0]
                     if null_rate > 0:
                         null_rates[col_name] = round(null_rate, 4)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Quality check failed for %s.%s: %s", table_name, col_name, e)
 
         # Get stale sources
         stale_sources: list[StaleSource] = []
@@ -146,8 +146,8 @@ def get_table_quality(
                                     hours_stale=round(hours_stale, 1),
                                 )
                             )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Staleness check failed for %s: %s", table_name, e)
 
         return TableQuality(
             table_name=table_name,

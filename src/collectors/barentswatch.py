@@ -70,11 +70,16 @@ def get_vessel_track(
 
     Args:
         mmsi: Vessel MMSI number.
-        hours: Hours of history (max 14 days).
+        hours: Hours of history (max 336 = 14 days).
 
     Returns:
         Raw API response dict.
     """
+    if not isinstance(mmsi, int) or mmsi <= 0:
+        raise ValueError(f"Invalid MMSI: {mmsi!r}. Must be a positive integer.")
+    if not isinstance(hours, int) or hours <= 0 or hours > 336:
+        raise ValueError(f"Invalid hours: {hours!r}. Must be between 1 and 336.")
+
     url = f"{HISTORIC_URL}/historic/trackslast{hours}hours/{mmsi}"
 
     logger.info("Fetching BarentsWatch track for MMSI %d (%d hours)", mmsi, hours)

@@ -36,6 +36,7 @@ class CollectionResult:
 
     source: str
     success: bool
+    skipped: bool = False
     rows_fetched: int = 0
     rows_written: int = 0
     duration_ms: int = 0
@@ -53,7 +54,7 @@ class CollectionReport:
 
     @property
     def succeeded(self) -> int:
-        return sum(1 for r in self.results if r.success)
+        return sum(1 for r in self.results if r.success and not r.skipped)
 
     @property
     def failed(self) -> int:
@@ -94,20 +95,20 @@ def get_collectors() -> list[CollectorDef]:
                 schedule="daily",
             )
         )
-    except ImportError:
-        logger.warning("eagle_intelligence collector not available")
+    except ImportError as e:
+        logger.debug("eagle_intelligence collector not available: %s", e)
 
     try:
         from src.collectors.open_meteo import collect_marine
         collectors.append(
             CollectorDef(
                 name="open_meteo",
-                collect_fn=lambda: collect_marine(latitude=1.264, longitude=103.82),
+                collect_fn=lambda: collect_marine(latitude=1.264, longitude=103.82),  # Singapore (configurable via OPEN_METEO_LAT/LON)
                 schedule="daily",
             )
         )
-    except ImportError:
-        logger.warning("open_meteo collector not available")
+    except ImportError as e:
+        logger.debug("open_meteo collector not available: %s", e)
 
     try:
         from src.collectors.imf_portwatch import collect_chokepoint_transits
@@ -193,13 +194,13 @@ def get_collectors() -> list[CollectorDef]:
         collectors.append(
             CollectorDef(
                 name="un_comtrade",
-                collect_fn=lambda: collect_trade_data(reporter_code=156),  # China
+                collect_fn=lambda: collect_trade_data(reporter_code=156),  # China (configurable via UN_COMTRADE_REPORTERS)
                 requires_key="un_comtrade_api_key",
                 schedule="weekly",
             )
         )
-    except ImportError:
-        logger.warning("un_comtrade collector not available")
+    except ImportError as e:
+        logger.debug("un_comtrade collector not available: %s", e)
 
     try:
         from src.collectors.hormuz_monitor import collect_oil_prices
@@ -226,6 +227,68 @@ def get_collectors() -> list[CollectorDef]:
         )
     except ImportError:
         logger.warning("eia_petroleum collector not available")
+
+    # ── Phase 7: New shipping data sources ──────────────────────────────────
+
+    try:
+        from src.collectors.dma_collector import collect_dma_vessels
+        collectors.append(
+            CollectorDef(
+                name="dma",
+                collect_fn=collect_dma_vessels,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.debug("dma collector not available: %s", e)
+
+    try:
+        from src.collectors.fbx_collector import collect_freight_rates
+        collectors.append(
+            CollectorDef(
+                name="fbx",
+                collect_fn=collect_freight_rates,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.debug("fbx collector not available: %s", e)
+
+    try:
+        from src.collectors.barcelona_port_collector import collect_barcelona_port
+        collectors.append(
+            CollectorDef(
+                name="barcelona_port",
+                collect_fn=collect_barcelona_port,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.debug("barcelona_port collector not available: %s", e)
+
+    try:
+        from src.collectors.singapore_oceanx_collector import collect_singapore_traffic
+        collectors.append(
+            CollectorDef(
+                name="singapore_oceanx",
+                collect_fn=collect_singapore_traffic,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.debug("singapore_oceanx collector not available: %s", e)
+
+    try:
+        from src.collectors.equasis_collector import collect_equasis_safety
+        collectors.append(
+            CollectorDef(
+                name="equasis",
+                collect_fn=collect_equasis_safety,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.debug("equasis collector not available: %s", e)
 
     return collectors
 
@@ -267,7 +330,7 @@ def run_collector(
         if staleness is not None:
             # Skip if collected in last hour (for daily sources)
             # or last 24 hours (for weekly sources)
-            threshold = 1.0 if collector.schedule == "daily" else 24.0
+            threshold = 24.0 if collector.schedule == "daily" else 168.0
             if staleness < threshold:
                 logger.info(
                     "Skipping %s (collected %.1fh ago)",
@@ -277,6 +340,7 @@ def run_collector(
                 return CollectionResult(
                     source=collector.name,
                     success=True,
+                    skipped=True,
                     error="Skipped (recently collected)",
                 )
 
@@ -433,6 +497,18 @@ if __name__ == "__main__":
         action="store_true",
         help="Disable notifications",
     )
+    parser.add_argument(
+        "--backfill-start",
+        type=date.fromisoformat,
+        default=None,
+        help="Backfill start date (YYYY-MM-DD). Enables backfill mode.",
+    )
+    parser.add_argument(
+        "--backfill-end",
+        type=date.fromisoformat,
+        default=None,
+        help="Backfill end date (YYYY-MM-DD, inclusive).",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -440,11 +516,21 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    report = run_all_collectors(
-        sources=args.sources,
-        force=args.force,
-        notify=not args.no_notify,
-    )
-    print_collection_report(report)
-
-    sys.exit(0 if report.failed == 0 else 1)
+    if args.backfill_start and args.backfill_end:
+        from src.monitoring.backfill import run_backfill, print_backfill_report
+        results = run_backfill(
+            start_date=args.backfill_start,
+            end_date=args.backfill_end,
+            sources=args.sources,
+            notify=not args.no_notify,
+        )
+        print_backfill_report(results)
+        sys.exit(0 if all(not r.errors for r in results) else 1)
+    else:
+        report = run_all_collectors(
+            sources=args.sources,
+            force=args.force,
+            notify=not args.no_notify,
+        )
+        print_collection_report(report)
+        sys.exit(0 if report.failed == 0 else 1)

@@ -2,12 +2,42 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import duckdb
 
+from src.storage.schema import ALL_TABLES
 from src.storage.writer import get_db_path
 
 logger = logging.getLogger(__name__)
+
+_VALID_TABLE_NAMES = {t.name for t in ALL_TABLES}
+
+
+def _validate_table_name(table_name: str) -> None:
+    """Raise ValueError if table_name is not a known table."""
+    if table_name not in _VALID_TABLE_NAMES:
+        raise ValueError(
+            f"Invalid table name: {table_name!r}. "
+            f"Must be one of: {sorted(_VALID_TABLE_NAMES)}"
+        )
+
+
+def _validate_column_names(
+    table_name: str, column_names: list[str], conn: duckdb.DuckDBPyConnection
+) -> None:
+    """Raise ValueError if any column name is not in the target table."""
+    result = conn.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = ?",
+        [table_name],
+    ).fetchall()
+    valid_columns = {row[0] for row in result}
+    for col in column_names:
+        if col not in valid_columns:
+            raise ValueError(
+                f"Invalid column name: {col!r} for table {table_name!r}. "
+                f"Valid columns: {sorted(valid_columns)}"
+            )
 
 
 def _get_count(conn: duckdb.DuckDBPyConnection, sql: str) -> int:
@@ -147,6 +177,9 @@ def deduplicate_table(
         should_close = True
 
     try:
+        _validate_table_name(table_name)
+        _validate_column_names(table_name, key_columns, conn)
+
         count_before = _get_count(conn, f"SELECT count(*) FROM {table_name}")
 
         key_cols = ", ".join(key_columns)

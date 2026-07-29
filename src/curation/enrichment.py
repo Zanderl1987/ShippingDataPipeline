@@ -119,9 +119,8 @@ def create_curated_ais_positions(
         should_close = True
 
     try:
-        conn.execute("DROP TABLE IF EXISTS curated_ais_positions")
         conn.execute("""
-            CREATE TABLE curated_ais_positions AS
+            CREATE OR REPLACE TABLE curated_ais_positions AS
             SELECT
                 a.mmsi,
                 a.imo,

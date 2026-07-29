@@ -6,6 +6,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def _safe_int(val: str | None, default: int) -> int:
+    """Parse an integer from a string, returning default on failure."""
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
 @dataclass
 class Settings:
     data_dir: Path = Path("./data")
@@ -48,7 +58,7 @@ class Settings:
             slack_webhook_url=os.getenv("SLACK_WEBHOOK_URL"),
             discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL"),
             smtp_host=os.getenv("SMTP_HOST"),
-            smtp_port=int(os.getenv("SMTP_PORT", "587")) if os.getenv("SMTP_PORT") else None,
+            smtp_port=_safe_int(os.getenv("SMTP_PORT"), 587) if os.getenv("SMTP_PORT") else None,
             smtp_user=os.getenv("SMTP_USER"),
             smtp_password=os.getenv("SMTP_PASSWORD"),
             email_from=os.getenv("EMAIL_FROM"),

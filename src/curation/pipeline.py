@@ -88,6 +88,7 @@ def run_enrichment(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
 
 def run_curation(
     skip_enrichment: bool = False,
+    tracker: "SourceTracker | None" = None,
 ) -> CurationResult:
     """Run the full curation pipeline.
 
@@ -98,13 +99,34 @@ def run_curation(
 
     Args:
         skip_enrichment: If True, skip the enrichment step.
+        tracker: Optional SourceTracker for audit trail.
 
     Returns:
         CurationResult with details of what was done.
     """
+    import time
+    from datetime import datetime
+    from src.storage.lineage import LineageTracker
+    from src.storage.tracker import SourceTracker as _SourceTracker
+
     result = CurationResult()
     db_path = get_db_path()
     conn = duckdb.connect(str(db_path))
+    _tracker = tracker or _SourceTracker()
+    _started_at = datetime.now()
+    _start_perf = time.perf_counter()
+
+    lineage = LineageTracker()
+    _lineage_id: int | None = None
+    try:
+        _lineage_id = lineage.record_event(
+            event_type="curation",
+            source="curation_pipeline",
+            started_at=_started_at,
+            config={"skip_enrichment": skip_enrichment},
+        )
+    except Exception as e:
+        logger.debug("Lineage recording failed: %s", e)
 
     try:
         logger.info("Starting curation pipeline")
@@ -127,11 +149,43 @@ def run_curation(
             len(result.validation_reports),
         )
 
+        if _lineage_id is not None:
+            try:
+                duration_ms = int((time.perf_counter() - _start_perf) * 1000)
+                lineage.update_event(
+                    _lineage_id,
+                    completed_at=datetime.now(),
+                    status="success",
+                    rows_output=result.total_deduped,
+                    duration_ms=duration_ms,
+                    metadata={
+                        "dedup_results": result.dedup_results,
+                        "validation_passed": result.validation_passed,
+                        "enrichment_results": result.enrichment_results,
+                    },
+                )
+            except Exception as e:
+                logger.debug("Lineage update failed: %s", e)
+
     except Exception as e:
         result.errors.append(str(e))
         logger.error("Curation pipeline failed: %s", e)
+
+        if _lineage_id is not None:
+            try:
+                duration_ms = int((time.perf_counter() - _start_perf) * 1000)
+                lineage.update_event(
+                    _lineage_id,
+                    completed_at=datetime.now(),
+                    status="error",
+                    duration_ms=duration_ms,
+                    error_message=str(e),
+                )
+            except Exception:
+                pass
     finally:
         conn.close()
+        lineage.close()
 
     return result
 

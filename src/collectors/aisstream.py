@@ -145,6 +145,8 @@ async def _collect_stream(
         except TimeoutError:
             total = len(positions) + len(vessels)
             logger.info("AISStream collection complete (%d messages)", total)
+        except Exception as e:
+            logger.warning("AISStream WebSocket disconnected unexpectedly: %s", e)
 
     return positions, vessels
 

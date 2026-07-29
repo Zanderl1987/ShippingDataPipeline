@@ -9,6 +9,8 @@ dependencies = [
     "requests>=2.31",
     "polars>=1.0",
     "pyarrow>=17.0",
+    "tenacity>=8.0",
+    "websockets>=12.0",
 ]
 
 [project.scripts]

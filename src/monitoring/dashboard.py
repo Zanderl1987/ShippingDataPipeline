@@ -1,6 +1,7 @@
 """Static HTML dashboard generator for the Shipping Data Pipeline."""
 from __future__ import annotations
 
+import html
 from pathlib import Path
 
 from src.config import settings
@@ -67,6 +68,7 @@ def _build_html(
     report: QualityReport,
     warnings: list[str],
     sources_df: object,
+    sla_violations: list[dict] | None = None,
 ) -> str:
     now_str = report.generated_at.strftime("%Y-%m-%d %H:%M:%S")
     source_names: list[str] = []
@@ -92,7 +94,7 @@ def _build_html(
         else:
             last_update = "\u2014"
         tables_html += (
-            f"<tr><td>{t.table_name}</td>"
+            f"<tr><td>{html.escape(str(t.table_name))}</td>"
             f"<td>{t.row_count:,}</td>"
             f"<td>{t.partition_count}</td>"
             f"<td>{last_update}</td>"
@@ -105,8 +107,8 @@ def _build_html(
             fmt = "%Y-%m-%d %H:%M"
             sp = s.last_partition.strftime(fmt)
             source_details_html += (
-                f"<tr><td>{s.source}</td>"
-                f"<td>{t.table_name}</td>"
+                f"<tr><td>{html.escape(str(s.source))}</td>"
+                f"<td>{html.escape(str(t.table_name))}</td>"
                 f"<td>{sp}</td>"
                 f"<td>{s.hours_stale:.1f}h</td></tr>\n"
             )
@@ -148,6 +150,26 @@ def _build_html(
         "<th>Latest Partition</th><th>Hours Stale</th>"
     )
 
+    # ── SLA Violations ──────────────────────────────────────────────────────
+    sla_html = ""
+    if sla_violations:
+        for v in sla_violations:
+            color = "#e53e3e" if v.get("severity") == "critical" else "#dd6b20" if v.get("severity") == "high" else "#d69e2e"
+            sla_html += (
+                f'<li style="border-left-color:{color};background:{color}11">'
+                f'{html.escape(v.get("message", ""))}</li>\n'
+            )
+    else:
+        sla_html = '<li class="no-warnings">All sources within freshness SLA</li>\n'
+
+    sla_section = (
+        '  <div class="card">\n'
+        "    <h2>Freshness SLA Violations</h2>\n"
+        '    <ul class="warning-list">'
+        f"{sla_html}</ul>\n"
+        "  </div>\n"
+    )
+
     return (
         "<!DOCTYPE html>\n"
         '<html lang="en">\n'
@@ -155,14 +177,25 @@ def _build_html(
         '<meta charset="UTF-8">\n'
         '<meta name="viewport" '
         'content="width=device-width, initial-scale=1.0">\n'
+        '<meta http-equiv="refresh" content="300">\n'
         "<title>Shipping Data Pipeline Dashboard</title>\n"
         f"<style>{CSS}</style>\n"
+        '<script>\n'
+        "  const REFRESH_INTERVAL = 300;\n"
+        "  let countdown = REFRESH_INTERVAL;\n"
+        "  setInterval(() => {\n"
+        "    countdown--;\n"
+        "    const el = document.getElementById('refresh-countdown');\n"
+        "    if (el) el.textContent = `Next refresh in ${countdown}s`;\n"
+        "    if (countdown <= 0) location.reload();\n"
+        "  }, 1000);\n"
+        "</script>\n"
         "</head>\n"
         "<body>\n"
         '<div class="header">\n'
         "  <h1>Shipping Data Pipeline Dashboard</h1>\n"
-        f'  <div class="timestamp">'
-        f"Generated: {now_str}</div>\n"
+        f'  <div class="timestamp">Generated: {now_str}</div>\n'
+        '  <div id="refresh-countdown" style="font-size:0.75rem;color:#718096;margin-top:2px"></div>\n'
         "</div>\n"
         '<div class="container">\n'
         '  <div class="card">\n'
@@ -190,6 +223,7 @@ def _build_html(
         '    <ul class="warning-list">'
         f"{warnings_html}</ul>\n"
         "  </div>\n"
+        f"{sla_section}"
         "</div>\n"
         "</body>\n"
         "</html>"
@@ -199,7 +233,7 @@ def _build_html(
 def generate_dashboard(
     output_path: str | Path | None = None,
 ) -> Path:
-    """Generate a static HTML dashboard."""
+    """Generate a static HTML dashboard with auto-refresh and SLA violations."""
     if output_path is None:
         output_path = settings.storage_dir / "dashboard.html"
     path = Path(output_path)
@@ -208,7 +242,18 @@ def generate_dashboard(
     warnings = check_quality_thresholds(report)
     sources = list_sources()
 
-    html = _build_html(report, warnings, sources)
+    # Check freshness SLAs
+    sla_violations: list[dict] = []
+    try:
+        from src.monitoring.freshness_sla import FreshnessSLA
+        from src.storage.tracker import SourceTracker
+        with SourceTracker() as tracker:
+            sla_checker = FreshnessSLA()
+            sla_violations = sla_checker.check_all(tracker)
+    except Exception:
+        pass  # dashboard should still render without SLA data
+
+    html = _build_html(report, warnings, sources, sla_violations=sla_violations)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8")
     return path

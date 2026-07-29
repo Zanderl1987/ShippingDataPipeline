@@ -9,7 +9,6 @@ from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
-from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
@@ -139,22 +138,20 @@ class Notifier:
         }
         emoji = emoji_map.get(notification.level, "📢")
 
+        import requests as _requests
+
         payload = {
             "text": f"{emoji} *{notification.title}*\n{notification.message}",
             "username": "ShippingDataPipeline",
         }
 
-        data = json.dumps(payload).encode("utf-8")
-        req = Request(
-            self.webhook_url,  # type: ignore
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
+        resp = _requests.post(
+            self.webhook_url,
+            json=payload,
+            timeout=10,
         )
-
-        with urlopen(req, timeout=10) as resp:
-            if resp.status >= 400:
-                raise RuntimeError(f"Webhook returned {resp.status}")
+        if resp.status_code >= 400:
+            raise RuntimeError(f"Webhook returned {resp.status_code}")
 
     def _send_email(self, notification: Notification) -> None:
         """Send email notification."""

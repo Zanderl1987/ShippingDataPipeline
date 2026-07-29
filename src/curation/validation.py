@@ -6,9 +6,37 @@ from dataclasses import dataclass, field
 
 import duckdb
 
+from src.storage.schema import ALL_TABLES
 from src.storage.writer import get_db_path
 
 logger = logging.getLogger(__name__)
+
+_VALID_TABLE_NAMES = {t.name for t in ALL_TABLES}
+
+
+def _validate_table_name(table_name: str) -> None:
+    """Raise ValueError if table_name is not a known table."""
+    if table_name not in _VALID_TABLE_NAMES:
+        raise ValueError(
+            f"Invalid table name: {table_name!r}. "
+            f"Must be one of: {sorted(_VALID_TABLE_NAMES)}"
+        )
+
+
+def _validate_column_name(
+    table_name: str, column: str, conn: duckdb.DuckDBPyConnection
+) -> None:
+    """Raise ValueError if column is not in the target table."""
+    result = conn.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = ?",
+        [table_name],
+    ).fetchall()
+    valid_columns = {row[0] for row in result}
+    if column not in valid_columns:
+        raise ValueError(
+            f"Invalid column name: {column!r} for table {table_name!r}. "
+            f"Valid columns: {sorted(valid_columns)}"
+        )
 
 
 def _get_count(conn: duckdb.DuckDBPyConnection, sql: str) -> int:
@@ -68,6 +96,9 @@ def validate_not_null(
         should_close = True
 
     try:
+        _validate_table_name(table)
+        _validate_column_name(table, column, conn)
+
         total = _get_count(conn, f"SELECT count(*) FROM {table}")
         null_count = _get_count(conn, f"SELECT count(*) FROM {table} WHERE {column} IS NULL")
 
@@ -102,6 +133,9 @@ def validate_range(
         should_close = True
 
     try:
+        _validate_table_name(table)
+        _validate_column_name(table, column, conn)
+
         total = _get_count(conn, f"SELECT count(*) FROM {table}")
 
         conditions = []

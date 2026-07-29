@@ -6,8 +6,8 @@ from datetime import date
 from typing import Any
 
 import polars as pl
-import requests
 
+from src.collectors.http_utils import get_with_retry
 from src.config import settings
 from src.storage.tracker import SourceTracker, TimedCollector
 from src.storage.writer import write_raw
@@ -61,8 +61,7 @@ def get_petroleum_series(
                 params[f"facets[{key}][]"] = v
 
     logger.info("Fetching EIA petroleum data: %s (%s)", data, frequency)
-    resp = requests.get(url, params=params, timeout=60)
-    resp.raise_for_status()
+    resp = get_with_retry(url, params=params, timeout=60)
     result: dict[str, Any] = resp.json()
     return result
 
@@ -124,7 +123,10 @@ def _parse_eia_response(
         product_name = ""
         facets = row.get("facets", [])
         if facets:
-            product_name = facets[0] if isinstance(facets, list) and facets else ""
+            if isinstance(facets, list):
+                product_name = " | ".join(str(f) for f in facets if f)
+            elif isinstance(facets, str):
+                product_name = facets
 
         area = row.get("area", [])
         area_name = ""

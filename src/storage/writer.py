@@ -1,6 +1,8 @@
 """Write raw and curated data to DuckDB and Parquet."""
 from __future__ import annotations
 
+import logging
+import re
 from pathlib import Path
 
 import duckdb
@@ -9,17 +11,59 @@ import polars as pl
 from src.config import settings
 from src.storage.schema import ALL_TABLES, TableSchema
 
+logger = logging.getLogger(__name__)
+
+_VALID_TABLE_NAMES = {t.name for t in ALL_TABLES}
+
 
 def get_db_path() -> Path:
     return settings.storage_dir / "pipeline.db"
 
 
-def init_db() -> duckdb.DuckDBPyConnection:
+def get_connection(read_only: bool = False) -> duckdb.DuckDBPyConnection:
+    """Open a DuckDB connection with consistent WAL settings.
+
+    DuckDB uses WAL by default for read-write connections, allowing
+    concurrent reads while a write transaction is active.
+    """
     db_path = get_db_path()
-    conn = duckdb.connect(str(db_path))
+    conn = duckdb.connect(str(db_path), read_only=read_only)
+    if not read_only:
+        conn.execute("PRAGMA enable_progress_bar")
+    return conn
+
+
+def init_db() -> duckdb.DuckDBPyConnection:
+    conn = get_connection()
     for table in ALL_TABLES:
         conn.execute(table.create_sql())
+    try:
+        from src.storage.migrations import apply_pending_migrations
+        apply_pending_migrations(conn)
+    except Exception as e:
+        logging.getLogger(__name__).warning("Migration runner failed: %s", e)
     return conn
+
+
+def _validate_dataset_name(name: str) -> str:
+    """Validate and sanitize a dataset/table name for safe SQL interpolation."""
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+        raise ValueError(
+            f"Invalid dataset name: {name!r}. "
+            "Must contain only letters, digits, and underscores, "
+            "and start with a letter or underscore."
+        )
+    return name
+
+
+def _table_has_pk(conn: duckdb.DuckDBPyConnection, table_name: str) -> bool:
+    """Check if a table has a PRIMARY KEY constraint."""
+    result = conn.execute(
+        "SELECT constraint_type FROM information_schema.table_constraints "
+        "WHERE table_name = ? AND constraint_type = 'PRIMARY KEY'",
+        [table_name],
+    ).fetchall()
+    return len(result) > 0
 
 
 def write_raw(
@@ -27,49 +71,52 @@ def write_raw(
     df: pl.DataFrame,
     table_name: str = "ais_positions",
 ) -> int:
-    db_path = get_db_path()
-    conn = duckdb.connect(str(db_path))
-    conn.execute("SET autoinstall_known_extensions=1;")
-    conn.execute("SET autoload_known_extensions=1;")
+    rows_written = df.height
+    conn = get_connection()
+    try:
+        conn.execute("SET autoinstall_known_extensions=1;")
+        conn.execute("SET autoload_known_extensions=1;")
 
-    schema = _find_table(table_name)
-    partition_cols = schema.partition_cols if schema else []
+        schema = _find_table(table_name)
+        partition_cols = schema.partition_cols if schema else []
 
-    if "partition_date" in df.columns:
-        df = df.with_columns(
-            pl.col("partition_date").cast(pl.Date)
-        )
+        if "partition_date" in df.columns:
+            df = df.with_columns(
+                pl.col("partition_date").cast(pl.Date)
+            )
 
-    table_columns = _get_table_columns(conn, table_name)
-    insert_cols = [c for c in df.columns if c != "ingested_at" and c in table_columns]
-    col_list = ", ".join(insert_cols)
+        table_columns = _get_table_columns(conn, table_name)
+        insert_cols = [c for c in df.columns if c != "ingested_at" and c in table_columns]
+        col_list = ", ".join(insert_cols)
 
-    if not insert_cols:
+        if not insert_cols:
+            return 0
+
+        dropped = set(df.columns) - set(insert_cols) - {"ingested_at"}
+        if dropped:
+            logger.warning("Dropping columns not in %s: %s", table_name, dropped)
+
+        df = df.select(insert_cols)
+
+        if partition_cols:
+            base = settings.storage_dir / "parquet" / "raw" / source
+            base.mkdir(parents=True, exist_ok=True)
+            df.write_parquet(str(base), partition_by=partition_cols)
+            conn.execute(
+                f"INSERT INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
+            )
+        elif _table_has_pk(conn, table_name):
+            conn.execute(
+                f"INSERT OR REPLACE INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
+            )
+        else:
+            conn.execute(
+                f"INSERT INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
+            )
+
+        return rows_written
+    finally:
         conn.close()
-        return 0
-
-    df = df.select(insert_cols)
-
-    if partition_cols:
-        base = settings.storage_dir / "parquet" / "raw" / source
-        base.mkdir(parents=True, exist_ok=True)
-        df.write_parquet(str(base), partition_by=partition_cols)
-        conn.execute(
-            f"INSERT INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
-        )
-    else:
-        conn.execute(
-            f"INSERT OR REPLACE INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
-        )
-
-    row = conn.execute(
-        f"SELECT count(*) FROM {table_name} WHERE source = ?",
-        [source],
-    ).fetchone()
-    assert row is not None
-    count: int = row[0]
-    conn.close()
-    return count
 
 
 def write_curated(
@@ -77,21 +124,21 @@ def write_curated(
     df: pl.DataFrame,
     table_name: str | None = None,
 ) -> int:
-    dest = table_name or dataset
-    db_path = get_db_path()
-    conn = duckdb.connect(str(db_path))
-    conn.execute("SET autoinstall_known_extensions=1;")
-    conn.execute("SET autoload_known_extensions=1;")
+    dest = _validate_dataset_name(table_name or dataset)
+    conn = get_connection()
+    try:
+        conn.execute("SET autoinstall_known_extensions=1;")
+        conn.execute("SET autoload_known_extensions=1;")
 
-    conn.execute(
-        f"CREATE TABLE IF NOT EXISTS curated_{dest} AS SELECT * FROM df WHERE 1=0;"
-    )
-    conn.execute(f"INSERT OR REPLACE INTO curated_{dest} SELECT * FROM df;")
-    row = conn.execute(f"SELECT count(*) FROM curated_{dest}").fetchone()
-    assert row is not None
-    count: int = row[0]
-    conn.close()
-    return count
+        conn.execute(
+            f"CREATE OR REPLACE TABLE curated_{dest} AS SELECT * FROM df;"
+        )
+        row = conn.execute(f"SELECT count(*) FROM curated_{dest}").fetchone()
+        assert row is not None
+        count: int = row[0]
+        return count
+    finally:
+        conn.close()
 
 
 def _find_table(name: str) -> TableSchema | None:

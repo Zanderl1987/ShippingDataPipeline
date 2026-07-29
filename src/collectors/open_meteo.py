@@ -6,8 +6,8 @@ from datetime import date
 from typing import Any
 
 import polars as pl
-import requests
 
+from src.collectors.http_utils import get_with_retry
 from src.storage.tracker import SourceTracker, TimedCollector
 from src.storage.writer import write_raw
 
@@ -68,8 +68,7 @@ def fetch_marine(
     }
 
     logger.info("Fetching marine weather for (%s, %s)", latitude, longitude)
-    resp = requests.get(MARINE_BASE_URL, params=params, timeout=30)
-    resp.raise_for_status()
+    resp = get_with_retry(MARINE_BASE_URL, params=params, timeout=30)
     result: dict[str, Any] = resp.json()
     return result
 
@@ -101,8 +100,7 @@ def fetch_weather(
     }
 
     logger.info("Fetching weather for (%s, %s)", latitude, longitude)
-    resp = requests.get(WEATHER_BASE_URL, params=params, timeout=30)
-    resp.raise_for_status()
+    resp = get_with_retry(WEATHER_BASE_URL, params=params, timeout=30)
     result: dict[str, Any] = resp.json()
     return result
 

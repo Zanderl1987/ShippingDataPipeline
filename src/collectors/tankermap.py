@@ -6,8 +6,8 @@ from datetime import date
 from typing import Any
 
 import polars as pl
-import requests
 
+from src.collectors.http_utils import get_with_retry
 from src.storage.tracker import SourceTracker, TimedCollector
 from src.storage.writer import write_raw
 
@@ -37,8 +37,7 @@ def get_live_vessels(
         params["type"] = vessel_type
 
     logger.info("Fetching TankerMap live vessels (type=%s)", vessel_type or "all")
-    resp = requests.get(url, params=params, timeout=30)
-    resp.raise_for_status()
+    resp = get_with_retry(url, params=params, timeout=30)
     result: dict[str, Any] = resp.json()
     return result
 
@@ -60,8 +59,7 @@ def get_port_calls(
         url = f"{BASE_URL}/ports"
 
     logger.info("Fetching TankerMap port calls (port=%s)", port_slug or "all")
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
+    resp = get_with_retry(url, timeout=30)
     result: dict[str, Any] = resp.json()
     return result
 
@@ -90,6 +88,7 @@ def _parse_vessels(data: dict[str, Any]) -> pl.DataFrame:
             "mmsi": mmsi,
             "imo": imo,
             "vessel_name": v.get("name", v.get("vessel_name", "")),
+            "vessel_type": v.get("type", v.get("vessel_type", "")),
             "latitude": v.get("lat", v.get("latitude")),
             "longitude": v.get("lon", v.get("longitude")),
             "sog": v.get("sog", v.get("speed")),

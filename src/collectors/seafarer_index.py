@@ -38,10 +38,16 @@ def fetch_ports() -> list[dict[str, Any]]:
     CC BY 4.0.
     """
     url = f"{BASE_URL}/ports"
-    logger.info("Fetching ports from %s", url)
-    resp = requests.get(url, timeout=120)
+    logger.info("Fetching ports from %s (expect ~43MB)", url)
+    resp = requests.get(url, timeout=120, stream=True)
     resp.raise_for_status()
+
+    content_length = resp.headers.get("Content-Length")
+    if content_length and int(content_length) > 100_000_000:
+        logger.warning("Port registry is %s bytes (>100MB), may cause OOM", content_length)
+
     result: list[dict[str, Any]] = resp.json()
+    resp.close()
     return result
 
 

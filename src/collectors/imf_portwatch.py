@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime
 from typing import Any
 
@@ -77,6 +78,8 @@ def get_daily_chokepoint_data(
         where_clause = "1=1"
 
     if start_date:
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", start_date):
+            raise ValueError(f"Invalid start_date format: {start_date!r}. Must be YYYY-MM-DD.")
         where_clause += f" AND date >= TIMESTAMP '{start_date} 00:00:00'"
 
     params: dict[str, Any] = {
@@ -88,6 +91,8 @@ def get_daily_chokepoint_data(
     }
 
     if end_date:
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", end_date):
+            raise ValueError(f"Invalid end_date format: {end_date!r}. Must be YYYY-MM-DD.")
         params["where"] += f" AND date <= TIMESTAMP '{end_date} 23:59:59'"
 
     logger.info("Fetching PortWatch daily chokepoint data")

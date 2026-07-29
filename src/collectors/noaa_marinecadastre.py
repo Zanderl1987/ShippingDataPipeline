@@ -68,6 +68,12 @@ def download_file(url: str, dest: Path) -> bool:
             for chunk in resp.iter_content(chunk_size=8192):
                 f.write(chunk)
 
+        # Integrity check: file must be > 1KB (a truncated download is useless)
+        if dest.stat().st_size < 1024:
+            logger.warning("Downloaded file %s is suspiciously small (%d bytes), removing", dest, dest.stat().st_size)
+            dest.unlink(missing_ok=True)
+            return False
+
         logger.info("Downloaded to %s", dest)
         return True
 

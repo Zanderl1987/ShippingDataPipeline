@@ -152,28 +152,26 @@ class TestParsePortCalls:
 
 
 class TestGetLiveData:
-    @patch("src.collectors.tankermap.requests.get")
+    @patch("src.collectors.tankermap.get_with_retry")
     def test_returns_json(self, mock_get: MagicMock, mock_vessels_response: dict) -> None:
         mock_resp = MagicMock()
         mock_resp.json.return_value = mock_vessels_response
-        mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
         result = get_live_vessels()
         assert "vessels" in result
         assert len(result["vessels"]) == 2
 
-    @patch("src.collectors.tankermap.requests.get")
+    @patch("src.collectors.tankermap.get_with_retry")
     def test_raises_on_error(self, mock_get: MagicMock) -> None:
         mock_get.side_effect = Exception("Connection failed")
         with pytest.raises(Exception, match="Connection failed"):
             get_live_vessels()
 
-    @patch("src.collectors.tankermap.requests.get")
+    @patch("src.collectors.tankermap.get_with_retry")
     def test_port_calls(self, mock_get: MagicMock, mock_port_calls_response: dict) -> None:
         mock_resp = MagicMock()
         mock_resp.json.return_value = mock_port_calls_response
-        mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
         result = get_port_calls()

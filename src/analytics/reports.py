@@ -47,6 +47,8 @@ def cmd_overview(args: argparse.Namespace) -> None:
     print_table(sources)
 
     for table in ["ais_positions", "vessels", "ports", "marine_weather", "weather"]:
+        if table not in ("ais_positions", "vessels", "ports", "marine_weather", "weather"):
+            continue
         result = query(f"SELECT count(*) as row_count FROM {table}")
         count = result[0, "row_count"]
         print(f"  {table}: {count:,} rows")
@@ -56,12 +58,18 @@ def cmd_vessels(args: argparse.Namespace) -> None:
     """Show active vessels."""
     print_header("Active Vessels")
 
+    from src.storage.lineage import record_analytics_run
+    _started = __import__("datetime").datetime.now()
+
     df = get_active_vessels(
         date_from=args.date_from,
         date_to=args.date_to,
         source=args.source,
     )
 
+    record_analytics_run("routes", _started, rows_output=df.height, params={
+        "date_from": args.date_from, "date_to": args.date_to, "source": args.source,
+    })
     print_table(df, max_rows=args.limit)
 
 
@@ -69,18 +77,27 @@ def cmd_ports(args: argparse.Namespace) -> None:
     """Show port activity."""
     print_header("Port Activity")
 
+    from src.storage.lineage import record_analytics_run
+    _started = __import__("datetime").datetime.now()
+
     df = calculate_port_activity(
         date_from=args.date_from,
         date_to=args.date_to,
         source=args.source,
     )
 
+    record_analytics_run("congestion", _started, rows_output=df.height, params={
+        "date_from": args.date_from, "date_to": args.date_to, "source": args.source,
+    })
     print_table(df, max_rows=args.limit)
 
 
 def cmd_congestion(args: argparse.Namespace) -> None:
     """Show congestion estimates."""
     print_header("Port Congestion Estimates")
+
+    from src.storage.lineage import record_analytics_run
+    _started = __import__("datetime").datetime.now()
 
     df = estimate_congestion(
         date_from=args.date_from,
@@ -89,6 +106,10 @@ def cmd_congestion(args: argparse.Namespace) -> None:
         speed_threshold=args.speed_threshold,
     )
 
+    record_analytics_run("congestion", _started, rows_output=df.height, params={
+        "date_from": args.date_from, "date_to": args.date_to, "source": args.source,
+        "speed_threshold": args.speed_threshold,
+    })
     print_table(df, max_rows=args.limit)
 
 
@@ -96,12 +117,18 @@ def cmd_destinations(args: argparse.Namespace) -> None:
     """Show destination summary."""
     print_header("Vessel Destinations")
 
+    from src.storage.lineage import record_analytics_run
+    _started = __import__("datetime").datetime.now()
+
     df = get_vessel_destination_summary(
         date_from=args.date_from,
         date_to=args.date_to,
         source=args.source,
     )
 
+    record_analytics_run("trade_flow", _started, rows_output=df.height, params={
+        "date_from": args.date_from, "date_to": args.date_to, "source": args.source,
+    })
     print_table(df, max_rows=args.limit)
 
 
@@ -110,6 +137,8 @@ def cmd_routes(args: argparse.Namespace) -> None:
     print_header("Port-to-Port Routes")
 
     from src.analytics.trade_flow import analyze_port_pairs
+    from src.storage.lineage import record_analytics_run
+    _started = __import__("datetime").datetime.now()
 
     df = analyze_port_pairs(
         date_from=args.date_from,
@@ -117,6 +146,9 @@ def cmd_routes(args: argparse.Namespace) -> None:
         source=args.source,
     )
 
+    record_analytics_run("trade_flow", _started, rows_output=df.height, params={
+        "date_from": args.date_from, "date_to": args.date_to, "source": args.source,
+    })
     print_table(df, max_rows=args.limit)
 
 
@@ -131,8 +163,7 @@ def cmd_weather(args: argparse.Namespace) -> None:
             longitude,
             avg(wave_height) as avg_wave_height,
             max(wave_height) as max_wave_height,
-            avg(wind_speed_10m) as avg_wind_speed,
-            max(wind_speed_10m) as max_wind_speed,
+            avg(swell_wave_height) as avg_swell_height,
             avg(sea_surface_temperature) as avg_sst,
             count(*) as readings
         FROM marine_weather
@@ -184,6 +215,21 @@ def cmd_collect(args: argparse.Namespace) -> None:
     sys.exit(0 if report.failed == 0 else 1)
 
 
+def cmd_backfill(args: argparse.Namespace) -> None:
+    """Run historical backfill."""
+    print_header("Historical Backfill")
+
+    from src.monitoring.backfill import print_backfill_report, run_backfill
+
+    results = run_backfill(
+        start_date=args.start_date,
+        end_date=args.end_date,
+        sources=args.sources,
+        notify=not args.no_notify,
+    )
+    print_backfill_report(results)
+
+
 def cmd_quality(args: argparse.Namespace) -> None:
     """Show detailed quality metrics."""
     print_header("Data Quality Metrics")
@@ -200,6 +246,40 @@ def cmd_dashboard(args: argparse.Namespace) -> None:
 
     path = generate_dashboard(output_path=args.output)
     print(f"Dashboard generated: {path}")
+
+
+def cmd_schema(args: argparse.Namespace) -> None:
+    """Show schema version status."""
+    print_header("Schema Version Status")
+
+    from src.storage.migrations import get_schema_status, get_current_version
+
+    version = get_current_version()
+    print(f"  Current version: {version or 'none'}\n")
+
+    status = get_schema_status()
+    for s in status:
+        marker = "APPLIED" if s["status"] == "applied" else "PENDING"
+        print(f"  [{marker}] {s['version']}: {s['description']}")
+
+
+def cmd_migrate(args: argparse.Namespace) -> None:
+    """Apply pending schema migrations."""
+    print_header("Schema Migration")
+
+    from src.storage.migrations import apply_pending_migrations, get_current_version
+
+    version_before = get_current_version()
+    print(f"  Current version: {version_before or 'none'}")
+
+    applied = apply_pending_migrations()
+
+    if applied:
+        print(f"\n  Applied {len(applied)} migration(s):")
+        for v in applied:
+            print(f"    - {v}")
+    else:
+        print("\n  Schema is already up to date.")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -279,6 +359,21 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Disable notifications")
     collect.set_defaults(func=cmd_collect)
 
+    backfill = subparsers.add_parser("backfill", help="Run historical data backfill")
+    backfill.add_argument(
+        "--start-date", type=date.fromisoformat, required=True,
+        help="Start date (YYYY-MM-DD)",
+    )
+    backfill.add_argument(
+        "--end-date", type=date.fromisoformat, required=True,
+        help="End date (YYYY-MM-DD, inclusive)",
+    )
+    backfill.add_argument("--sources", nargs="*",
+                        help="Specific sources to backfill (default: all date-aware sources)")
+    backfill.add_argument("--no-notify", action="store_true",
+                        help="Disable notifications")
+    backfill.set_defaults(func=cmd_backfill)
+
     # Quality (new)
     quality = subparsers.add_parser("quality", help="Show detailed quality metrics")
     quality.add_argument("--threshold", type=float, default=168.0,
@@ -290,6 +385,14 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--output", type=str, default=None,
                           help="Output path (default: storage/dashboard.html)")
     dashboard.set_defaults(func=cmd_dashboard)
+
+    # Schema
+    schema = subparsers.add_parser("schema", help="Show schema version status")
+    schema.set_defaults(func=cmd_schema)
+
+    # Migrate
+    migrate = subparsers.add_parser("migrate", help="Apply pending schema migrations")
+    migrate.set_defaults(func=cmd_migrate)
 
     return parser
 

@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import duckdb
 import polars as pl
 
-from src.storage.writer import get_db_path
+from src.storage.writer import get_connection
 
 
 class SourceTracker:
@@ -21,12 +21,15 @@ class SourceTracker:
     def __init__(self) -> None:
         self._conn: duckdb.DuckDBPyConnection | None = None
 
+    def __enter__(self) -> SourceTracker:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
+
     def _get_conn(self) -> duckdb.DuckDBPyConnection:
         if self._conn is None:
-            db_path = get_db_path()
-            self._conn = duckdb.connect(str(db_path))
-            self._conn.execute("SET autoinstall_known_extensions=1;")
-            self._conn.execute("SET autoload_known_extensions=1;")
+            self._conn = get_connection()
         return self._conn
 
     def close(self) -> None:
@@ -145,6 +148,36 @@ class SourceTracker:
         result: float = delta.total_seconds() / 3600
         return result
 
+    def record_lineage(
+        self,
+        source: str,
+        event_type: str,
+        started_at: datetime,
+        *,
+        rows_input: int = 0,
+        rows_output: int = 0,
+        duration_ms: int | None = None,
+        version: str | None = None,
+        config: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        from src.storage.lineage import LineageTracker
+        tracker = LineageTracker()
+        try:
+            return tracker.record_event(
+                event_type=event_type,
+                source=source,
+                started_at=started_at,
+                rows_input=rows_input,
+                rows_output=rows_output,
+                duration_ms=duration_ms,
+                version=version,
+                config=config,
+                metadata=metadata,
+            )
+        finally:
+            tracker.close()
+
 
 class TimedCollector:
     """Context manager that times a collection and records it to SourceTracker."""
@@ -187,3 +220,20 @@ class TimedCollector:
             error_message=self._error,
             duration_ms=duration_ms,
         )
+
+        from src.storage.lineage import LineageTracker
+        lineage = LineageTracker()
+        try:
+            lineage.record_event(
+                event_type="collection",
+                source=self.source,
+                started_at=datetime.now() - timedelta(milliseconds=duration_ms),
+                completed_at=datetime.now(),
+                status=status,
+                rows_input=self.rows_fetched,
+                rows_output=self.rows_written,
+                duration_ms=duration_ms,
+                error_message=self._error,
+            )
+        finally:
+            lineage.close()
