@@ -434,15 +434,9 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 | Field | Detail |
 |-------|--------|
 | **Data** | Composite risk index (0-10) for Strait of Hormuz. Oil prices (Brent/WTI/Dubai, 15-min delay). VLCC rates (WS index + TCE USD/day). LNG JKM prices. Traffic volume |
-| **Access** | **Free tier** (60 requests/hour) |
-| **Auth** | API key (free registration) |
-| **Rate Limit** | 60 requests/hour |
-| **Depth** | Daily from **2019** (risk index), near-real-time (prices) |
-| **Format** | REST JSON |
-| **Endpoints** | `/api/risk` (composite risk index), `/api/prices` (oil + freight rates), `/api/crisis` (crisis mode data), `/api/traffic` (vessel counts) |
-| **Collector** | `src/collectors/hormuz_monitor.py` — get_risk, get_prices, get_crisis, get_traffic, collect_oil_prices, collect_traffic |
-| **Tables** | `oil_prices` (Brent/WTI/Dubai/VLCC rates), `chokepoint_transits` (Hormuz traffic) |
-| **Verdict** | **GO** — Unique Hormuz risk + oil price data. Free tier adequate for daily collection. Essential for oil market analysis. |
+| **Access** | **Paid** — registration shows no free tier available |
+| **Auth** | API key (paid registration) |
+| **Verdict** | **NO-GO** — free tier claimed but registration yields only paid plans. Collector preserved for future use if access changes. |
 
 ---
 
@@ -521,6 +515,7 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 | Sinay.ai | 401 without API key, registration required. |
 | FreightPulse | Returns HTML landing page, API may not be live. |
 | emissions.dev | 401 without valid key, needs registration. |
+| Hormuz Monitor | Listed as having free tier but registration yields only paid plans. Collector kept for future use. |
 
 ---
 

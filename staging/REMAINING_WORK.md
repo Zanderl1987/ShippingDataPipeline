@@ -1,13 +1,13 @@
 # Remaining Work
 
-## Immediate — API Key Setup
+## API Key Setup
 
 | Task | Details | Status |
 |------|---------|--------|
-| Register for EIA API key | Free at eia.gov/open, needed for `eia_petroleum.py` | Not started |
-| Register for Hormuz Monitor API key | Free tier 60 req/hr, needed for `hormuz_monitor.py` | Not started |
-| Register for AISStream API key | Free via GitHub OAuth, needed for `aisstream.py` WebSocket | Not started |
-| Set up `.env` with API keys | Add `EIA_API_KEY`, `HORMUZ_API_KEY`, `AISSTREAM_API_KEY` | Blocked on registrations |
+| Register for EIA API key | Free at eia.gov/open, needed for `eia_petroleum.py` | ✅ Done |
+| Register for AISStream API key | Free via GitHub OAuth, needed for `aisstream.py` WebSocket | ✅ Done |
+| Hormuz Monitor | Listed as having free tier but registration yields only paid plans. NO-GO. | ❌ No free tier |
+| Set up `.env` with API keys | Added `EIA_API_KEY`, `AISSTREAM_API_KEY` | ✅ Done |
 | Set up GitHub secrets | Add API keys to repository secrets for Actions workflow | Not started |
 | Test GitHub Actions workflow | Verify workflow runs correctly on schedule | Pending |
 

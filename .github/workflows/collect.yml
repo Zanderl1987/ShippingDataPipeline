@@ -59,7 +59,7 @@ jobs:
           UN_COMTRADE_API_KEY: ${{ secrets.UN_COMTRADE_API_KEY }}
           BARENTSWATCH_TOKEN: ${{ secrets.BARENTSWATCH_TOKEN }}
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
-          HORMUZ_API_KEY: ${{ secrets.HORMUZ_API_KEY }}
+          # HORMUZ_API_KEY: not available (NO-GO, no free tier)
         run: |
           uv run python -m src.monitoring.collect_all \
             ${{ github.event.inputs.sources && format('--sources {0}', github.event.inputs.sources) || '' }} \
