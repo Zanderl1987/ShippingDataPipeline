@@ -19,6 +19,7 @@ from src.curation.validation import (
     ValidationReport,
     run_all_validations,
 )
+from src.storage.tracker import SourceTracker
 from src.storage.writer import get_db_path
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ def run_enrichment(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
 
 def run_curation(
     skip_enrichment: bool = False,
-    tracker: "SourceTracker | None" = None,
+    tracker: SourceTracker | None = None,
 ) -> CurationResult:
     """Run the full curation pipeline.
 
@@ -106,13 +107,13 @@ def run_curation(
     """
     import time
     from datetime import datetime
+
     from src.storage.lineage import LineageTracker
-    from src.storage.tracker import SourceTracker as _SourceTracker
 
     result = CurationResult()
     db_path = get_db_path()
     conn = duckdb.connect(str(db_path))
-    _tracker = tracker or _SourceTracker()
+    _tracker = tracker or SourceTracker()
     _started_at = datetime.now()
     _start_perf = time.perf_counter()
 

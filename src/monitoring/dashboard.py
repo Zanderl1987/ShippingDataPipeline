@@ -154,7 +154,12 @@ def _build_html(
     sla_html = ""
     if sla_violations:
         for v in sla_violations:
-            color = "#e53e3e" if v.get("severity") == "critical" else "#dd6b20" if v.get("severity") == "high" else "#d69e2e"
+            sev = v.get("severity")
+            color = (
+                "#e53e3e" if sev == "critical"
+                else "#dd6b20" if sev == "high"
+                else "#d69e2e"
+            )
             sla_html += (
                 f'<li style="border-left-color:{color};background:{color}11">'
                 f'{html.escape(v.get("message", ""))}</li>\n'
@@ -195,7 +200,8 @@ def _build_html(
         '<div class="header">\n'
         "  <h1>Shipping Data Pipeline Dashboard</h1>\n"
         f'  <div class="timestamp">Generated: {now_str}</div>\n'
-        '  <div id="refresh-countdown" style="font-size:0.75rem;color:#718096;margin-top:2px"></div>\n'
+        '  <div id="refresh-countdown" style="font-size:0.75rem;'
+        'color:#718096;margin-top:2px"></div>\n',
         "</div>\n"
         '<div class="container">\n'
         '  <div class="card">\n'

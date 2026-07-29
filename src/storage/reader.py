@@ -4,12 +4,11 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-import duckdb
 import polars as pl
 
 from src.config import settings
 from src.storage.schema import ALL_TABLES
-from src.storage.writer import get_db_path, get_connection
+from src.storage.writer import get_connection
 
 VALID_TABLE_NAMES: set[str] = {t.name for t in ALL_TABLES}
 

@@ -103,7 +103,7 @@ def get_collectors() -> list[CollectorDef]:
         collectors.append(
             CollectorDef(
                 name="open_meteo",
-                collect_fn=lambda: collect_marine(latitude=1.264, longitude=103.82),  # Singapore (configurable via OPEN_METEO_LAT/LON)
+                collect_fn=lambda: collect_marine(latitude=1.264, longitude=103.82),  # Singapore
                 schedule="daily",
             )
         )
@@ -194,7 +194,7 @@ def get_collectors() -> list[CollectorDef]:
         collectors.append(
             CollectorDef(
                 name="un_comtrade",
-                collect_fn=lambda: collect_trade_data(reporter_code=156),  # China (configurable via UN_COMTRADE_REPORTERS)
+                collect_fn=lambda: collect_trade_data(reporter_code=156),  # China
                 requires_key="un_comtrade_api_key",
                 schedule="weekly",
             )
@@ -517,7 +517,7 @@ if __name__ == "__main__":
     )
 
     if args.backfill_start and args.backfill_end:
-        from src.monitoring.backfill import run_backfill, print_backfill_report
+        from src.monitoring.backfill import print_backfill_report, run_backfill
         results = run_backfill(
             start_date=args.backfill_start,
             end_date=args.backfill_end,

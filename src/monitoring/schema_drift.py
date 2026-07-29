@@ -17,7 +17,7 @@ from typing import Any
 
 import polars as pl
 
-from src.storage.schema import ALL_TABLES, TableSchema
+from src.storage.schema import ALL_TABLES
 
 logger = logging.getLogger(__name__)
 

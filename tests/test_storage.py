@@ -8,7 +8,7 @@ import pytest
 
 from src.storage.reader import list_sources, query, read_dataset
 from src.storage.schema import ALL_TABLES
-from src.storage.writer import init_db, write_raw, write_curated
+from src.storage.writer import init_db, write_curated, write_raw
 
 
 @pytest.fixture

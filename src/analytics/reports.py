@@ -252,7 +252,7 @@ def cmd_schema(args: argparse.Namespace) -> None:
     """Show schema version status."""
     print_header("Schema Version Status")
 
-    from src.storage.migrations import get_schema_status, get_current_version
+    from src.storage.migrations import get_current_version, get_schema_status
 
     version = get_current_version()
     print(f"  Current version: {version or 'none'}\n")

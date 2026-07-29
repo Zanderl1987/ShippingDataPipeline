@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 import polars as pl
 
 from src.collectors.http_utils import get_with_retry
-from src.config import settings
 from src.storage.tracker import SourceTracker, TimedCollector
 from src.storage.writer import write_raw
 

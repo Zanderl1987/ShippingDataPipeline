@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 import polars as pl
@@ -115,7 +115,10 @@ def _parse_vessel_details(records: list[dict[str, Any]]) -> pl.DataFrame:
 
 def _parse_inspections(records: list[dict[str, Any]]) -> pl.DataFrame:
     """Parse inspection records into a DataFrame."""
-    inspection_records = [r for r in records if "inspector" in r or "inspection_date" in r or "deficiency" in r]
+    inspection_records = [
+        r for r in records
+        if "inspector" in r or "inspection_date" in r or "deficiency" in r
+    ]
     if not inspection_records:
         return pl.DataFrame()
 

@@ -120,7 +120,8 @@ def apply_pending_migrations(conn: duckdb.DuckDBPyConnection | None = None) -> l
         pending = [m for m in MIGRATIONS if m.version not in applied]
 
         if not pending:
-            logger.info("Schema is up to date (version %s)", MIGRATIONS[-1].version if MIGRATIONS else "none")
+            latest = MIGRATIONS[-1].version if MIGRATIONS else "none"
+            logger.info("Schema is up to date (version %s)", latest)
             return []
 
         applied_versions: list[str] = []

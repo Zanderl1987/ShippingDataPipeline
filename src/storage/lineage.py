@@ -10,7 +10,6 @@ import duckdb
 
 from src.storage.writer import get_connection
 
-
 LINEAGE_TABLES_SQL = [
     "CREATE SEQUENCE IF NOT EXISTS lineage_event_id_seq START 1;",
     """
@@ -98,7 +97,7 @@ class LineageTracker:
         config_hash = _hash_config(config) if config else None
         metadata_json = json.dumps(metadata, default=str) if metadata else None
 
-        result = conn.execute(
+        conn.execute(
             """
             INSERT INTO lineage_events
             (event_id, event_type, source, started_at, completed_at, status,

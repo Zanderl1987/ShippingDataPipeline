@@ -176,7 +176,7 @@ class FreshnessSLA:
 
         lines = [
             f"\n{'='*60}",
-            f"  FRESHNESS SLA REPORT",
+            "  FRESHNESS SLA REPORT",
             f"{'='*60}",
             f"  Sources: {total} total, {compliant} compliant, {len(violations)} violations\n",
         ]

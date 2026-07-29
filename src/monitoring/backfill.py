@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Callable
 
 from src.monitoring.collect_all import CollectorDef
 from src.monitoring.notify import Notifier, notify_collection_error
@@ -73,7 +73,11 @@ def _get_backfill_adapters() -> dict[str, Callable[..., list[Callable[[], int]]]
     def _open_meteo_adapter(start: date, end: date) -> list[Callable[[], int]]:
         from src.collectors.open_meteo import collect_marine
         total_days = (end - start).days + 1
-        return [lambda td=total_days: collect_marine(latitude=1.264, longitude=103.82, past_days=td)]
+        return [
+            lambda td=total_days: collect_marine(
+                latitude=1.264, longitude=103.82, past_days=td
+            )
+        ]
     adapters["open_meteo"] = _open_meteo_adapter
 
     def _comtrade_adapter(start: date, end: date) -> list[Callable[[], int]]:
