@@ -231,64 +231,64 @@ def get_collectors() -> list[CollectorDef]:
     # ── Phase 7: New shipping data sources ──────────────────────────────────
 
     try:
-        from src.collectors.dma_collector import collect_dma_vessels
+        from src.collectors.dma_collector import collect_data as collect_dma
         collectors.append(
             CollectorDef(
                 name="dma",
-                collect_fn=collect_dma_vessels,
+                collect_fn=collect_dma,
                 schedule="weekly",
             )
         )
     except ImportError as e:
-        logger.debug("dma collector not available: %s", e)
+        logger.warning("dma collector not available: %s", e)
 
     try:
-        from src.collectors.fbx_collector import collect_freight_rates
+        from src.collectors.fbx_collector import collect_data as collect_fbx
         collectors.append(
             CollectorDef(
                 name="fbx",
-                collect_fn=collect_freight_rates,
+                collect_fn=collect_fbx,
                 schedule="weekly",
             )
         )
     except ImportError as e:
-        logger.debug("fbx collector not available: %s", e)
+        logger.warning("fbx collector not available: %s", e)
 
     try:
-        from src.collectors.barcelona_port_collector import collect_barcelona_port
+        from src.collectors.barcelona_port_collector import collect_data as collect_barcelona
         collectors.append(
             CollectorDef(
                 name="barcelona_port",
-                collect_fn=collect_barcelona_port,
+                collect_fn=collect_barcelona,
                 schedule="daily",
             )
         )
     except ImportError as e:
-        logger.debug("barcelona_port collector not available: %s", e)
+        logger.warning("barcelona_port collector not available: %s", e)
 
     try:
-        from src.collectors.singapore_oceanx_collector import collect_singapore_traffic
+        from src.collectors.singapore_oceanx_collector import collect_data as collect_singapore
         collectors.append(
             CollectorDef(
                 name="singapore_oceanx",
-                collect_fn=collect_singapore_traffic,
+                collect_fn=collect_singapore,
                 schedule="daily",
             )
         )
     except ImportError as e:
-        logger.debug("singapore_oceanx collector not available: %s", e)
+        logger.warning("singapore_oceanx collector not available: %s", e)
 
     try:
-        from src.collectors.equasis_collector import collect_equasis_safety
+        from src.collectors.equasis_collector import collect_data as collect_equasis
         collectors.append(
             CollectorDef(
                 name="equasis",
-                collect_fn=collect_equasis_safety,
+                collect_fn=collect_equasis,
                 schedule="weekly",
             )
         )
     except ImportError as e:
-        logger.debug("equasis collector not available: %s", e)
+        logger.warning("equasis collector not available: %s", e)
 
     return collectors
 
@@ -408,6 +408,12 @@ def run_all_collectors(
     from src.config import settings
 
     settings.ensure_dirs()
+
+    # Ensure the full schema exists before collecting. Without this, a collector
+    # writing to a table that was never created silently persists 0 rows.
+    from src.storage.writer import init_db
+    init_db().close()
+
     tracker = SourceTracker()
     notifier = Notifier.from_env() if notify else Notifier()
 

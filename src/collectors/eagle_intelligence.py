@@ -132,7 +132,7 @@ def collect_chokepoint_status(
         logger.info(
             "Writing %d chokepoint statuses from Eagle Intelligence", df.height
         )
-        count = write_raw(SOURCE, df)
+        count = write_raw(SOURCE, df, table_name="chokepoint_status")
         tc.rows_written = count
         return count
 
@@ -157,6 +157,6 @@ def collect_hormuz_status(
             return 0
 
         logger.info("Writing Hormuz status from Eagle Intelligence")
-        count = write_raw(SOURCE, df)
+        count = write_raw(SOURCE, df, table_name="chokepoint_status")
         tc.rows_written = count
         return count

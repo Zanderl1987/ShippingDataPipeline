@@ -123,9 +123,13 @@ def _parse_chokepoint_transits(data: dict[str, Any]) -> pl.DataFrame:
     records: list[dict[str, Any]] = []
     for feat in features:
         attr = feat.get("attributes", {})
-        date_ms = attr.get("date")
-        if date_ms and isinstance(date_ms, (int, float)):
-            transit_date = datetime.fromtimestamp(date_ms / 1000).strftime("%Y-%m-%d")
+        date_val = attr.get("date")
+        if isinstance(date_val, str) and date_val:
+            # ArcGIS returns ISO date strings ("2024-06-01")
+            transit_date = date_val[:10]
+        elif isinstance(date_val, (int, float)):
+            # Fallback: some ArcGIS layers return epoch milliseconds
+            transit_date = datetime.fromtimestamp(date_val / 1000).strftime("%Y-%m-%d")
         else:
             transit_date = ""
 
