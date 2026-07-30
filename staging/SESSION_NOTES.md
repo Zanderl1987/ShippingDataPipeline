@@ -66,10 +66,27 @@ The three `tests/curation/test_dedup.py` tests planted their duplicates *through
 directly. The curation functions themselves are still needed to clean DBs
 written before this change.
 
-### Not done
-- The live `storage/pipeline.db` still holds 5 duplicate axiomancer IMOs and 120
-  duplicate `marine_weather` rows from Session 13's repeated test runs. Small
-  enough to leave; `deduplicate_table` clears them if wanted.
+### Live DB cleanup
+
+`marine_weather` 240 → 120. The 120 removed rows were byte-identical beyond the
+key (verified: 120 duplicate groups, 0 with differing measurements) — a repeated
+Session 13 test run. Its parquet tree was rewritten from the table to match.
+Backup at `storage/pipeline.db.bak-20260730`.
+
+**`ais_positions` was left alone — its "duplicates" are not duplicates.**
+Axiomancer emits bogus, non-unique IMO values: imo `30` covers both an unnamed
+vessel off ALAMEA and "FUME BLANC COMMODORE", and two different vessels both
+named "NIMITZ" sit 80 km apart under imo `568812`. Deleting either row of those
+pairs would discard a real observation.
+
+That finding changed the key: adding `vessel_name` separates 3 of the 5
+collisions, cutting per-run loss from 5 rows in 59k to 2. Position was tried and
+rejected — with lat/long in the key a re-run went 59,076 → 59,272, because
+axiomancer is a **live feed** and 196 vessels genuinely moved between two calls
+seconds apart. One row per vessel per day is the intended grain.
+
+The 2 residual collisions are two distinct vessels sharing both a junk IMO and a
+name; nothing in the feed can tell them apart.
 
 ---
 

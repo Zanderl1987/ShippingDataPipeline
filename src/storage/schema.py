@@ -26,8 +26,20 @@ AIS_POSITIONS = TableSchema(
     partition_cols=["partition_date", "source"],
     # Axiomancer identifies vessels by imo and reports no mmsi or timestamp at
     # all, so a (mmsi, timestamp) key would collapse its whole snapshot into one
-    # row. partition_date keeps successive daily snapshots apart.
-    dedup_keys=["mmsi", "imo", "timestamp", "source", "partition_date"],
+    # row. partition_date keeps successive daily snapshots apart. Its imo values
+    # are also not unique -- imo 30 covers two unrelated vessels -- so
+    # vessel_name is carried too, which keeps 3 of the 5 collisions in a 59k
+    # snapshot apart. Position deliberately is NOT in the key: this is a live
+    # feed, and vessels move between two calls seconds apart, so including it
+    # loses idempotency entirely. One row per vessel per day is the intent.
+    dedup_keys=[
+        "mmsi",
+        "imo",
+        "vessel_name",
+        "timestamp",
+        "source",
+        "partition_date",
+    ],
     version="0.1.0",
     description="AIS vessel position reports",
     raw_sql="""
