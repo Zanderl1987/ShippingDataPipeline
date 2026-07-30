@@ -130,6 +130,10 @@ class Notifier:
 
     def _send_webhook(self, notification: Notification) -> None:
         """Send to Slack/Discord webhook."""
+        if not self.webhook_url:
+            logger.debug("No webhook URL configured; skipping webhook notification")
+            return
+
         emoji_map = {
             "info": "ℹ️",
             "warning": "⚠️",

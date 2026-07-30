@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 from pathlib import Path
+from typing import Any
 
 from src.config import settings
 from src.monitoring.quality import (
@@ -68,7 +69,7 @@ def _build_html(
     report: QualityReport,
     warnings: list[str],
     sources_df: object,
-    sla_violations: list[dict] | None = None,
+    sla_violations: list[dict[str, Any]] | None = None,
 ) -> str:
     now_str = report.generated_at.strftime("%Y-%m-%d %H:%M:%S")
     source_names: list[str] = []
@@ -201,7 +202,7 @@ def _build_html(
         "  <h1>Shipping Data Pipeline Dashboard</h1>\n"
         f'  <div class="timestamp">Generated: {now_str}</div>\n'
         '  <div id="refresh-countdown" style="font-size:0.75rem;'
-        'color:#718096;margin-top:2px"></div>\n',
+        'color:#718096;margin-top:2px"></div>\n'
         "</div>\n"
         '<div class="container">\n'
         '  <div class="card">\n'
@@ -249,7 +250,7 @@ def generate_dashboard(
     sources = list_sources()
 
     # Check freshness SLAs
-    sla_violations: list[dict] = []
+    sla_violations: list[dict[str, Any]] = []
     try:
         from src.monitoring.freshness_sla import FreshnessSLA
         from src.storage.tracker import SourceTracker

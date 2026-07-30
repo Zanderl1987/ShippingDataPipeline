@@ -35,7 +35,8 @@ def fetch_vessel_page(offset: int = 0, limit: int = PAGE_SIZE) -> dict[str, Any]
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_all_vessels(max_pages: int = 50) -> list[dict[str, Any]]:
@@ -67,7 +68,8 @@ def fetch_vessel_detail(imo_number: str) -> dict[str, Any] | None:
     url = f"{API_SEARCH_URL}/{imo_number}"
     try:
         resp = get_with_retry(url, timeout=60, source=SOURCE)
-        return resp.json()
+        data: dict[str, Any] | None = resp.json()
+        return data
     except Exception:
         logger.warning("Could not fetch detail for IMO %s", imo_number)
         return None

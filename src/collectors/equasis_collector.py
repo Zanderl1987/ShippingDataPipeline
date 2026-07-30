@@ -40,7 +40,8 @@ def fetch_vessel_search(vessel_name: str | None = None, imo: str | None = None) 
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_vessel_detail(imo: str) -> dict[str, Any]:
@@ -52,7 +53,8 @@ def fetch_vessel_detail(imo: str) -> dict[str, Any]:
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_inspection_history(imo: str) -> dict[str, Any]:
@@ -64,7 +66,8 @@ def fetch_inspection_history(imo: str) -> dict[str, Any]:
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_vessel_batch(imo_list: list[str]) -> list[dict[str, Any]]:
