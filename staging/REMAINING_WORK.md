@@ -1,5 +1,34 @@
 # Remaining Work
 
+## Data Collection — pipeline now lands data (Session 13)
+
+The pipeline had collected **zero rows** until Session 13. Six bugs fixed across
+[PR #1](https://github.com/Zanderl1987/ShippingDataPipeline/pull/1) and
+[PR #2](https://github.com/Zanderl1987/ShippingDataPipeline/pull/2).
+
+| Task | Details | Status |
+|------|---------|--------|
+| Call `init_db()` before collecting | Only 11 of 18 tables existed; the rest were never created | ✅ Done |
+| Stop `write_raw()` returning 0 silently | Missing table made total failure look like `success` | ✅ Done |
+| Fix IMF PortWatch date parsing | ArcGIS returns an ISO string, parser assumed epoch ms | ✅ Done — 77,389 rows |
+| Route Eagle Intelligence writes | Defaulted to `ais_positions`, dropping all chokepoint columns | ✅ Done — 6 rows |
+| Register Phase 7 collectors | Imported names that don't exist; entry point is `collect_data` | ✅ Done |
+| Fix axiomancer | API 400s without viewport bounds | ✅ Done — 59,107 rows |
+| Fix tankermap | Endpoint returns a bare JSON array, not a dict | ✅ Done — 5,000 rows |
+| Fix jodi_oil | Moved to zipped CSV, every column renamed | ✅ Done — 1,648,728 rows |
+| Add `ais_positions.vessel_type` | Schema drift: `CREATE TABLE IF NOT EXISTS` never alters | ✅ Done — migration `20260730001` |
+| **Dedup on partitioned inserts** | **No dedup — a weekly JODI run appends another 1.65M duplicate rows. Fix before enabling the daily schedule.** | ❗ **Not started** |
+| Fix migration runner swallowing failures | `apply_pending_migrations` logs failed statements at `debug` and still marks the migration applied | Not started |
+| Fix `dashboard.py` `_build_html` | Returns a tuple → `write_text` TypeError, 4 test failures | ⏳ In progress (separate session) |
+
+### Priority tables for the data-lake join
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `chokepoint_transits` | 77,389 (2019-01-01 → 2026-07-26) | IMF PortWatch |
+| `chokepoint_status` | 6 | Eagle Intelligence |
+| `freight_rates` | **0** | ❌ no working free source — see Deferred |
+
 ## API Key Setup
 
 | Task | Details | Status |
@@ -31,7 +60,7 @@
 | README usage guide | Install, configure, run collectors, query data | ✅ Done |
 | Module-level docstrings | All 37 source files | ✅ Done |
 | DATA_SOURCES.md update | Add new oil sources (EIA, JODI, PortWatch, TankerMap, Hormuz) | ✅ Done |
-| DATA_SOURCES.md update | Add new collectors (Barcelona, DMA, Equasis, FBX, Singapore MPA) | Not started |
+| DATA_SOURCES.md update | Add new collectors (Barcelona, DMA, Equasis, FBX, Singapore MPA) — document these as **NO-GO**, not as working sources; their endpoints 404 (see Deferred) | Not started |
 
 ## Deferred / Low Priority
 
@@ -52,4 +81,4 @@
 
 ---
 
-*Last updated: 2026-07-30 (Session 12)*
+*Last updated: 2026-07-30 (Session 13)*
