@@ -77,6 +77,7 @@ Re-running a collector is now a no-op. Verified against live endpoints:
 | Barcelona Port Authority | `www.portdebarcelona.cat/wp-json/openinfo/v1/*` → 404 (bare domain also has no DNS). | ⚠️ Built, source dead |
 | Equasis | Requires login plus an IMO list; logs "No IMO numbers configured". | ⚠️ Built, needs auth |
 | FBX (Freightos Baltic Index) | Drewry WCI → 429 + HTML; FBX `wp-json` route returns the WordPress page. No free source for `freight_rates`. | ⚠️ Built, source dead |
+| TradingEconomics (from `origin/master`) | Pages load fine (200, no WAF, no auth) but serve a **current value only** — history is behind the paid plan, guest API returns **410 discontinued**, and BDI/BCI/BPI/BSI are routeless dry-bulk *indices* that don't fit the `freight_rates` schema. License is personal-use. Returns HTTP 200 for missing pages. | ❌ NO-GO, spiked 2026-07-30 |
 
 > **"Collector built" is not evidence a source works.** All five rows above were
 > written against endpoints that had never been called successfully. Each returns
