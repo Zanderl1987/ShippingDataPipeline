@@ -286,7 +286,9 @@ CREATE TABLE IF NOT EXISTS chokepoint_status (
 OIL_INVENTORIES = TableSchema(
     name="oil_inventories",
     partition_cols=["report_date", "source"],
-    dedup_keys=["report_date", "product", "area_code", "stock_type", "source"],
+    # EIA publishes the same measurement in two units (MBBL and MBBL/D) as
+    # separate rows, so unit has to be in the key or one of them is discarded.
+    dedup_keys=["report_date", "product", "area_code", "stock_type", "unit", "source"],
     version="0.1.0",
     description="Oil inventory stock levels",
     raw_sql="""
