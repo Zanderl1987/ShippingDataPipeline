@@ -1,5 +1,78 @@
 # Session Notes
 
+## 2026-07-30 — Session 14b: merge, branch cleanup, TradingEconomics spike
+
+### Merged
+
+PRs #1 and #2 are both merged; `main` is at `79c70d7`. Verified on `main` itself
+rather than trusting the merge: `_upsert_on_keys` / `_export_partitions` present
+in `writer.py`, 15 `dedup_keys` references in `schema.py`, `tests/test_writer_dedup.py`
+in the tree.
+
+**One thing needed intervention.** PR #2's base was still `claude/goofy-tharp-46a075`,
+and GitHub had not retargeted it because #1's branch was not deleted on merge.
+Merging as-is would have landed #2 on that stale branch instead of `main`.
+Retargeted to `main` first. Merge commits were used rather than squash so the
+stacked ancestry stayed clean.
+
+Both remote branches are now deleted; `origin` is down to `main` plus `master`.
+
+### TradingEconomics spike — NOT a solution for `freight_rates`
+
+`origin/master` turned out to be an abandoned first attempt at the repo (tip
+`472b296`, 2 commits, 2026-07-11, **no common ancestor with `main`** — the
+project was restarted 16 minutes after its own root commit). It contains four
+modules never ported, one of which is a `BalticExchangeIngestor` scraping
+TradingEconomics for BDI/BCI/BPI/BSI and a containerized freight index — a
+source absent from the NO-GO list, and `freight_rates` is still at 0 rows.
+
+Spiked it. Verdict: **NO-GO for `freight_rates`.** Reasons, in order of how
+decisive they are:
+
+1. **Schema misfit.** `freight_rates` models container rates by route
+   (`route_code`, `origin`, `destination`, `container_type`, `rate_usd`).
+   BDI/BCI/BPI/BSI are single dry-bulk index numbers with **no route at all**.
+   Only CFI is container-adjacent, and still routeless. Even a perfect scrape
+   would not fill this table.
+2. **Current snapshot only — no backfill.** The page yields Actual / Previous /
+   Highest / Lowest (BDI read 2673.00, previous 2632.00, daily). The "1985 -
+   2026" span is series *metadata*, not data. History sits behind the paid DATA
+   PLANS product, and the chart is an ASP.NET UpdatePanel postback, not a JSON
+   endpoint.
+3. **The free API tier was deliberately withdrawn.** `api.tradingeconomics.com`
+   with `c=guest:guest` returns **HTTP 410**: "the guest account has been
+   discontinued. Please subscribe to a plan."
+4. **License is personal-use.** `terms.aspx` has no explicit anti-scraping
+   clause, but grants only a "limited, personal, nontransferable, revocable
+   license to analyse data". Personal license + they sell this exact data + guest
+   API withdrawn = feeding a warehouse from the scrape cuts against the vendor's
+   commercial model. A judgment call, not a technical block.
+
+Access itself was never the problem: all five pages return HTTP 200 with real
+HTML, no WAF, no auth, `robots.txt` has no `Disallow`. **That is the trap** —
+this source looks green on the checks people usually run.
+
+Master's own code is dead regardless: all three of `_parse_te_page`'s paths
+(`var defined_values`, `<span id="p">`, `"data":[...]`) fail against today's
+HTML.
+
+**New trap for the dead-ends list: TradingEconomics returns HTTP 200 for missing
+pages**, with a `PAGE NOT FOUND` body. Any collector built against it must assert
+on body content, not status code.
+
+### Task list
+
+Eight tasks logged with full notes, so none of the above has to be re-derived:
+freight_rates strategy (#2), migration runner swallowing failures (#3), verify
+the daily workflow now that idempotency unblocks it (#4), the five dead-endpoint
+collectors (#5), salvage-or-drop `origin/master` (#6), remaining free API keys
+(#7), dashboard tuple bug (#8).
+
+`origin/master` is **not** deleted yet — it is the only copy of `us_itc.py` and
+`wto.py` (HTS and WTO tariff data), which are covered nowhere in `main`.
+
+---
+
 ## 2026-07-30 — Session 14: idempotent writes
 
 Session 13 left `write_raw` appending on every run — a scheduled daily job would
