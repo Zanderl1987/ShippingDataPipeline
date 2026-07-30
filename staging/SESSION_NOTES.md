@@ -1,5 +1,44 @@
 # Session Notes
 
+## 2026-07-30 — Session 12
+
+### Starting state
+- 208 tests pass, `ruff check .` clean, `mypy src/` clean
+- Phase 4 complete (automation, monitoring, notifications)
+- EIA + AISStream API keys obtained, `.env` configured, GitHub secrets set
+- Workflow triggered once — failed on ruff lint errors
+
+### Session plan
+- [x] Fix remaining ruff violations that `--fix` couldn't resolve
+- [x] Commit fixes and re-trigger workflow
+- [x] Update session notes, REMAINING_WORK.md, PLAN.md
+
+### Session results
+- `ruff check .` clean (all 4 remaining E501 + 1 F821 + 1 F841 manually fixed)
+- Commits:
+  - `e911642` — Add EIA + AISStream API keys to .env and GitHub secrets, mark Hormuz Monitor as NO-GO
+  - `ba24901` — Fix all ruff lint violations (E501, F821, F401, F541, I001, UP037)
+- Workflow re-triggered at `https://github.com/Zanderl1987/ShippingDataPipeline/actions/runs/30488432647`
+
+### Lint fixes applied
+1. **E501 (long lines)** — equasis_collector, noaa_marinecadastre, backfill, collect_all (2x), dashboard (2x), migrations
+2. **F821 (undefined name)** — `SourceTracker` in pipeline.py: moved import to module level, removed lazy re-import
+3. **F841 (unused variable)** — `result = conn.execute(...)` in lineage.py: removed assignment
+
+### Key updates
+- **Hormuz Monitor** confirmed NO-GO (webpage claims paid plans only, no free tier) — documented in DATA_SOURCES.md and removed from workflow
+- `.env` secrets now set for EIA_API_KEY and AISSTREAM_API_KEY
+- GitHub secrets set for both keys
+- Remaining keys still needed: GFW_API_TOKEN, VESSELAPI_API_KEY, SHIPLOOKUP_API_KEY, UN_COMTRADE_API_KEY, BARENTSWATCH_TOKEN
+
+### Next steps
+1. Monitor workflow run for passing status
+2. Register remaining free API keys (GFW, VesselAPI, ShipLookup, UN Comtrade, BarentsWatch)
+3. Update DATA_SOURCES.md with new oil sources
+4. Document ADVERSARIAL_REVIEW.md findings in PLAN.md
+
+---
+
 ## 2026-07-27 — Session 11
 
 ### Starting state
