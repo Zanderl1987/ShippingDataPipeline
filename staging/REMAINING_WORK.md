@@ -17,9 +17,13 @@ The pipeline had collected **zero rows** until Session 13. Six bugs fixed across
 | Fix tankermap | Endpoint returns a bare JSON array, not a dict | ✅ Done — 5,000 rows |
 | Fix jodi_oil | Moved to zipped CSV, every column renamed | ✅ Done — 1,648,728 rows |
 | Add `ais_positions.vessel_type` | Schema drift: `CREATE TABLE IF NOT EXISTS` never alters | ✅ Done — migration `20260730001` |
-| **Dedup on partitioned inserts** | **No dedup — a weekly JODI run appends another 1.65M duplicate rows. Fix before enabling the daily schedule.** | ❗ **Not started** |
+| Dedup on partitioned inserts | `TableSchema.dedup_keys` + delete-then-insert upsert; parquet partitions re-exported from DuckDB so the two stores can't drift | ✅ Done — collectors verified idempotent |
 | Fix migration runner swallowing failures | `apply_pending_migrations` logs failed statements at `debug` and still marks the migration applied | Not started |
 | Fix `dashboard.py` `_build_html` | Returns a tuple → `write_text` TypeError, 4 test failures | ⏳ In progress (separate session) |
+
+Re-running a collector is now a no-op. Verified against live endpoints:
+`chokepoint_transits` 77,389 → 77,389, `chokepoint_status` 6 → 6,
+`ais_positions` 59,071 → 59,071, with parquet matching DuckDB exactly.
 
 ### Priority tables for the data-lake join
 

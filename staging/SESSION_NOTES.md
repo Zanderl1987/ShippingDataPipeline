@@ -1,5 +1,78 @@
 # Session Notes
 
+## 2026-07-30 — Session 14: idempotent writes
+
+Session 13 left `write_raw` appending on every run — a scheduled daily job would
+have duplicated the whole dataset each time. Fixed, plus the two traps found
+while fixing it.
+
+### The mechanism
+
+`TableSchema.dedup_keys` declares the natural key per table. `write_raw` now
+dedups the incoming batch on that key, then does a `DELETE ... WHERE EXISTS`
+against the batch followed by `INSERT`, in one transaction.
+
+Why not `INSERT OR REPLACE`: partitioned tables carry no PRIMARY KEY, so DuckDB
+has no conflict target. Why not `CREATE OR REPLACE TABLE ... AS SELECT`: CTAS
+silently drops column defaults, so `ingested_at TIMESTAMP DEFAULT now()` would
+stop populating (this bit during the Session 13 manual dedup, and the repair was
+to rebuild each table from the `schema.py` DDL). Delete-then-insert never
+rewrites the table definition, so neither problem arises.
+
+`IS NOT DISTINCT FROM` rather than `=`, so a NULL key component matches itself.
+
+### Parquet no longer drifts from DuckDB
+
+Polars `write_parquet(partition_by=...)` **overwrites a partition directory
+wholesale** — verified: writing one row to `d=a` replaced the two rows already
+there. So writing only the batch discarded rows an earlier run had put in the
+same partition. JODI hits this directly: primary and secondary products share
+one `(period, source)` partition, so the secondary run erased the primary rows.
+
+`write_raw` now re-exports the touched partitions by querying them back out of
+DuckDB after the upsert, which makes the two stores identical by construction
+instead of by coincidence.
+
+### Two bugs found in verification, not in review
+
+1. **`ais_positions` key was wrong.** `(mmsi, timestamp, source)` looked
+   obvious, but axiomancer reports **no mmsi and no timestamp at all** — it
+   identifies vessels by `imo`. That key would have collapsed 59,107 rows into
+   one. Key is now `(mmsi, imo, timestamp, source, partition_date)`;
+   `partition_date` keeps successive daily snapshots apart.
+2. **A key column the source omits disabled dedup entirely.** The first fix
+   bailed out to append-only when a key column was missing from the batch, so
+   axiomancer still duplicated (59,075 → 118,150). An omitted column is NULL
+   once stored, so `write_raw` now supplies the NULL and dedups anyway.
+
+Both were caught by running real collectors twice against a scratch DB. Neither
+was visible in the unit tests, which used well-formed fixtures.
+
+### Verification
+
+Collectors run twice against live endpoints, scratch storage dir:
+
+| Table | Run 1 | Run 2 | Parquet |
+|-------|-------|-------|---------|
+| `chokepoint_transits` | 77,389 | 77,389 | 77,389 |
+| `chokepoint_status` | 6 | 6 | 6 |
+| `ais_positions` (axiomancer) | 59,071 | 59,071 | 59,071 |
+
+220 tests pass; the 4 `test_dashboard.py` failures are the pre-existing
+`_build_html` tuple bug being handled in a separate session. ruff and mypy clean.
+
+The three `tests/curation/test_dedup.py` tests planted their duplicates *through*
+`write_raw`, which can no longer produce any — they now insert duplicates
+directly. The curation functions themselves are still needed to clean DBs
+written before this change.
+
+### Not done
+- The live `storage/pipeline.db` still holds 5 duplicate axiomancer IMOs and 120
+  duplicate `marine_weather` rows from Session 13's repeated test runs. Small
+  enough to leave; `deduplicate_table` clears them if wanted.
+
+---
+
 ## 2026-07-30 — Session 13
 
 ### Starting state

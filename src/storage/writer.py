@@ -66,12 +66,65 @@ def _table_has_pk(conn: duckdb.DuckDBPyConnection, table_name: str) -> bool:
     return len(result) > 0
 
 
+def _upsert_on_keys(
+    conn: duckdb.DuckDBPyConnection,
+    table_name: str,
+    col_list: str,
+    keys: list[str],
+    df: pl.DataFrame,
+) -> None:
+    """Replace rows matching the incoming batch's natural key, then insert.
+
+    Partitioned tables have no PRIMARY KEY, so `INSERT OR REPLACE` and
+    `ON CONFLICT` are unavailable. `IS NOT DISTINCT FROM` is used rather than
+    `=` so a NULL key component still matches itself.
+    """
+    pred = " AND ".join(f"t.{k} IS NOT DISTINCT FROM d.{k}" for k in keys)
+    conn.execute("BEGIN TRANSACTION;")
+    try:
+        conn.execute(
+            f"DELETE FROM {table_name} AS t "
+            f"WHERE EXISTS (SELECT 1 FROM df AS d WHERE {pred});"
+        )
+        conn.execute(
+            f"INSERT INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
+        )
+        conn.execute("COMMIT;")
+    except Exception:
+        conn.execute("ROLLBACK;")
+        raise
+
+
+def _export_partitions(
+    conn: duckdb.DuckDBPyConnection,
+    base: Path,
+    table_name: str,
+    col_list: str,
+    partition_cols: list[str],
+    df: pl.DataFrame,
+) -> None:
+    """Rewrite the parquet partitions this batch touched, from the table.
+
+    Polars overwrites a partition directory wholesale, so writing the batch
+    alone would discard rows an earlier run put in the same partition (JODI
+    primary and secondary products share one `period`). Exporting the merged
+    rows straight out of DuckDB keeps the two stores identical by construction.
+    """
+    pred = " AND ".join(f"t.{c} IS NOT DISTINCT FROM d.{c}" for c in partition_cols)
+    merged = conn.execute(
+        f"SELECT {col_list} FROM {table_name} AS t "
+        f"WHERE EXISTS (SELECT 1 FROM df AS d WHERE {pred});"
+    ).pl()
+    base.mkdir(parents=True, exist_ok=True)
+    merged.write_parquet(str(base), partition_by=partition_cols)
+
+
 def write_raw(
     source: str,
     df: pl.DataFrame,
     table_name: str = "ais_positions",
 ) -> int:
-    rows_written = df.height
+    _validate_dataset_name(table_name)
     conn = get_connection()
     try:
         conn.execute("SET autoinstall_known_extensions=1;")
@@ -109,13 +162,48 @@ def write_raw(
 
         df = df.select(insert_cols)
 
-        if partition_cols:
-            base = settings.storage_dir / "parquet" / "raw" / source
-            base.mkdir(parents=True, exist_ok=True)
-            df.write_parquet(str(base), partition_by=partition_cols)
-            conn.execute(
-                f"INSERT INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
+        dedup_keys = schema.dedup_keys if schema else []
+        missing_keys = [k for k in dedup_keys if k not in table_columns]
+        if missing_keys:
+            # The key can't be evaluated against a column the table lacks.
+            logger.warning(
+                "Appending to %s without dedup: key columns missing from the "
+                "table: %s",
+                table_name,
+                missing_keys,
             )
+            dedup_keys = []
+
+        absent = [k for k in dedup_keys if k not in df.columns]
+        if absent:
+            # A key column the source omits entirely lands as NULL, and the
+            # upsert matches with IS NOT DISTINCT FROM — so supply the NULL
+            # rather than giving up on dedup (axiomancer sends no mmsi).
+            df = df.with_columns([pl.lit(None).alias(k) for k in absent])
+            logger.info(
+                "Dedup key columns absent from the %s batch, matched as NULL: %s",
+                table_name,
+                absent,
+            )
+
+        if dedup_keys:
+            before = df.height
+            df = df.unique(subset=dedup_keys, keep="last")
+            if df.height < before:
+                # A large collapse usually means the key doesn't fit the feed
+                # (a source that leaves a key column null flattens its whole
+                # batch), so it is worth seeing in the logs either way.
+                logger.info(
+                    "Collapsed %d of %d %s rows on %s",
+                    before - df.height,
+                    before,
+                    table_name,
+                    dedup_keys,
+                )
+        rows_written = df.height
+
+        if dedup_keys:
+            _upsert_on_keys(conn, table_name, col_list, dedup_keys, df)
         elif _table_has_pk(conn, table_name):
             conn.execute(
                 f"INSERT OR REPLACE INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
@@ -123,6 +211,23 @@ def write_raw(
         else:
             conn.execute(
                 f"INSERT INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
+            )
+
+        if partition_cols and all(c in insert_cols for c in partition_cols):
+            _export_partitions(
+                conn,
+                settings.storage_dir / "parquet" / "raw" / source,
+                table_name,
+                col_list,
+                partition_cols,
+                df,
+            )
+        elif partition_cols:
+            logger.warning(
+                "Skipping parquet export for %s: partition columns %s not in "
+                "the batch",
+                table_name,
+                [c for c in partition_cols if c not in insert_cols],
             )
 
         return rows_written
