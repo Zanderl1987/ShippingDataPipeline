@@ -86,11 +86,22 @@ def write_raw(
             )
 
         table_columns = _get_table_columns(conn, table_name)
+        if not table_columns and table_name in _VALID_TABLE_NAMES:
+            # Known table that was never created — create the full schema now
+            # rather than silently discarding the rows.
+            for t in ALL_TABLES:
+                conn.execute(t.create_sql())
+            table_columns = _get_table_columns(conn, table_name)
+
         insert_cols = [c for c in df.columns if c != "ingested_at" and c in table_columns]
         col_list = ", ".join(insert_cols)
 
         if not insert_cols:
-            return 0
+            raise ValueError(
+                f"No columns from the DataFrame match table {table_name!r} "
+                f"(table columns: {sorted(table_columns)}; "
+                f"df columns: {df.columns}). Refusing to silently write 0 rows."
+            )
 
         dropped = set(df.columns) - set(insert_cols) - {"ingested_at"}
         if dropped:
