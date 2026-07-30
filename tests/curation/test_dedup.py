@@ -13,7 +13,20 @@ from src.curation.dedup import (
     deduplicate_vessels,
 )
 from src.storage.reader import query
-from src.storage.writer import init_db, write_raw
+from src.storage.writer import get_connection, init_db, write_raw
+
+
+def _plant_duplicate(table_name: str, where: str) -> None:
+    """Copy an existing row so the table holds a duplicate.
+
+    `write_raw` now dedups on the natural key, so duplicates can only come from
+    a DB written before that landed. These functions exist to clean those up.
+    """
+    conn = get_connection()
+    try:
+        conn.execute(f"INSERT INTO {table_name} BY NAME SELECT * FROM {table_name} WHERE {where}")
+    finally:
+        conn.close()
 
 
 @pytest.fixture
@@ -56,6 +69,7 @@ def test_deduplicate_ais_positions(db) -> None:
     )
 
     write_raw("test", df)
+    _plant_duplicate("ais_positions", "mmsi = 123")
 
     removed = deduplicate_ais_positions()
     assert removed == 1
@@ -84,6 +98,7 @@ def test_deduplicate_vessels(db) -> None:
     )
 
     write_raw("test", df, table_name="vessels")
+    _plant_duplicate("vessels", "imo = 111")
 
     count_df = query("SELECT count(*) as cnt FROM vessels")
     assert count_df[0, "cnt"] == 3
@@ -145,6 +160,7 @@ def test_deduplicate_table(db) -> None:
     )
 
     write_raw("test", df)
+    _plant_duplicate("ais_positions", "mmsi = 123")
 
     removed = deduplicate_table("ais_positions", ["mmsi", "timestamp", "source"])
     assert removed == 1

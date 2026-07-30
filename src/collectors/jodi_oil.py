@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import zipfile
 from datetime import date
 from typing import Any
 
@@ -15,7 +16,7 @@ from src.storage.writer import write_raw
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://www.jodidata.org/oil/files"
+BASE_URL = "https://www.jodidata.org/_resources/files/downloads/oil-data"
 SOURCE = "jodi_oil"
 
 PRODUCT_MAP = {
@@ -34,6 +35,10 @@ PRODUCT_MAP = {
     "TOTPRODS": "Total oil products",
 }
 
+# Units that map onto the oil_trade schema's two quantity columns.
+MASS_UNITS = frozenset({"KTONS"})
+VOLUME_UNITS = frozenset({"KBBL", "KB", "CONVBBL"})
+
 FLOW_MAP = {
     "INDPROD": "Production",
     "TOTIMPSB": "Imports",
@@ -47,22 +52,35 @@ FLOW_MAP = {
 
 
 def download_csv(url: str) -> str:
-    """Download CSV content from URL."""
+    """Download JODI data from URL.
+
+    JODI distributes the datasets as zipped CSVs; the archive holds a single
+    CSV member which is returned as text.
+    """
     logger.info("Downloading JODI data from %s", url)
-    resp = requests.get(url, timeout=120)
+    resp = requests.get(url, timeout=300)
     resp.raise_for_status()
+
+    if url.endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+            names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+            if not names:
+                raise ValueError(f"No CSV member in JODI archive: {zf.namelist()}")
+            with zf.open(names[0]) as member:
+                return member.read().decode("utf-8", errors="replace")
+
     return resp.text
 
 
 def get_primary_data() -> str:
     """Download JODI-Oil primary products CSV (crude oil, NGL, other)."""
-    url = f"{BASE_URL}/Extended_Primary_CSV.csv"
+    url = f"{BASE_URL}/world_primary_csv.zip"
     return download_csv(url)
 
 
 def get_secondary_data() -> str:
     """Download JODI-Oil secondary products CSV (oil products)."""
-    url = f"{BASE_URL}/Extended_Secondary_CSV.csv"
+    url = f"{BASE_URL}/world_secondary_csv.zip"
     return download_csv(url)
 
 
@@ -80,24 +98,42 @@ def _parse_jodi_csv(csv_text: str, products: list[str] | None = None) -> pl.Data
 
     records: list[dict[str, Any]] = []
     for row in reader:
-        product_code = row.get("PRODUCT", "")
+        # JODI renamed its columns (PRODUCT -> ENERGY_PRODUCT, DATAVALUE ->
+        # OBS_VALUE, UNIT -> UNIT_MEASURE, REPORTING_COUNTRY -> REF_AREA);
+        # accept either spelling.
+        product_code = row.get("ENERGY_PRODUCT") or row.get("PRODUCT", "")
         if products and product_code not in products:
             continue
 
         flow_code = row.get("FLOW_BREAKDOWN", "")
         flow_name = FLOW_MAP.get(flow_code, flow_code)
 
-        quantity_str = row.get("DATAVALUE", "0")
+        quantity_str = row.get("OBS_VALUE") or row.get("DATAVALUE", "")
+        # "-" (not available), "x" (confidential) and "N/A" are placeholders,
+        # not zeroes — keep them null so they don't skew aggregates.
         try:
-            quantity = float(quantity_str.replace(",", "")) if quantity_str else 0.0
+            quantity = (
+                float(quantity_str.replace(",", "")) if quantity_str else None
+            )
         except (ValueError, AttributeError):
-            quantity = 0.0
+            quantity = None
 
-        unit = row.get("UNIT", "KTONS")
+        unit = row.get("UNIT_MEASURE") or row.get("UNIT", "KTONS")
 
         period = row.get("TIME_PERIOD", "")
-        reporting = row.get("REPORTING_COUNTRY", "")
+        reporting = row.get("REF_AREA") or row.get("REPORTING_COUNTRY", "")
         partner = row.get("PARTNER_COUNTRY", "")
+
+        # The schema only carries mass (ktonnes) and volume (barrels). JODI also
+        # publishes KBD (a rate) and KL (kilolitres), which map to neither
+        # column, so those rows would persist with no value at all — skip them.
+        if unit not in MASS_UNITS and unit not in VOLUME_UNITS:
+            continue
+
+        # A placeholder value means the country reported nothing for this
+        # series. Persisting it stores a row with no measurement in it.
+        if quantity is None:
+            continue
 
         records.append({
             "period": period,
@@ -108,8 +144,8 @@ def _parse_jodi_csv(csv_text: str, products: list[str] | None = None) -> pl.Data
             "product": PRODUCT_MAP.get(product_code, product_code),
             "product_code": product_code,
             "flow": flow_name,
-            "quantity_ktonnes": quantity if unit == "KTONS" else None,
-            "quantity_barrels": quantity if unit in ("KBBL", "KB") else None,
+            "quantity_ktonnes": quantity if unit in MASS_UNITS else None,
+            "quantity_barrels": quantity if unit in VOLUME_UNITS else None,
             "unit": unit,
         })
 

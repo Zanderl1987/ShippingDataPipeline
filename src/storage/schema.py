@@ -11,6 +11,11 @@ class TableSchema:
     raw_sql: str = ""
     version: str = "0.1.0"
     description: str = ""
+    #: Natural key identifying one row. Partitioned tables cannot carry a
+    #: PRIMARY KEY (DuckDB would reject the repeated inserts a backfill needs),
+    #: so `write_raw` uses these columns to replace rows a re-run resupplies
+    #: instead of appending them again. Empty means append-only.
+    dedup_keys: list[str] = field(default_factory=list)
 
     def create_sql(self) -> str:
         return self.raw_sql
@@ -19,6 +24,22 @@ class TableSchema:
 AIS_POSITIONS = TableSchema(
     name="ais_positions",
     partition_cols=["partition_date", "source"],
+    # Axiomancer identifies vessels by imo and reports no mmsi or timestamp at
+    # all, so a (mmsi, timestamp) key would collapse its whole snapshot into one
+    # row. partition_date keeps successive daily snapshots apart. Its imo values
+    # are also not unique -- imo 30 covers two unrelated vessels -- so
+    # vessel_name is carried too, which keeps 3 of the 5 collisions in a 59k
+    # snapshot apart. Position deliberately is NOT in the key: this is a live
+    # feed, and vessels move between two calls seconds apart, so including it
+    # loses idempotency entirely. One row per vessel per day is the intent.
+    dedup_keys=[
+        "mmsi",
+        "imo",
+        "vessel_name",
+        "timestamp",
+        "source",
+        "partition_date",
+    ],
     version="0.1.0",
     description="AIS vessel position reports",
     raw_sql="""
@@ -47,6 +68,7 @@ CREATE TABLE IF NOT EXISTS ais_positions (
 VESSELS = TableSchema(
     name="vessels",
     partition_cols=[],
+    dedup_keys=["imo", "mmsi", "source"],
     version="0.1.0",
     description="Vessel identification data",
     raw_sql="""
@@ -73,6 +95,7 @@ CREATE TABLE IF NOT EXISTS vessels (
 PORT_CALLS = TableSchema(
     name="port_calls",
     partition_cols=["partition_date", "source"],
+    dedup_keys=["mmsi", "port_unlocode", "event_type", "event_timestamp", "source"],
     version="0.1.0",
     description="Vessel port call events",
     raw_sql="""
@@ -99,6 +122,14 @@ CREATE TABLE IF NOT EXISTS port_calls (
 TRADE_FLOW = TableSchema(
     name="trade_flow",
     partition_cols=["year", "reporter_code"],
+    dedup_keys=[
+        "year",
+        "reporter_code",
+        "partner_code",
+        "commodity_code",
+        "flow_code",
+        "source",
+    ],
     version="0.1.0",
     description="International trade flow data",
     raw_sql="""
@@ -119,6 +150,7 @@ CREATE TABLE IF NOT EXISTS trade_flow (
 FREIGHT_RATES = TableSchema(
     name="freight_rates",
     partition_cols=["rate_date"],
+    dedup_keys=["rate_date", "route_code", "container_type", "source"],
     version="0.1.0",
     description="Container freight rates by route",
     raw_sql="""
@@ -160,6 +192,7 @@ CREATE TABLE IF NOT EXISTS ports (
 MARINE_WEATHER = TableSchema(
     name="marine_weather",
     partition_cols=["partition_date", "source"],
+    dedup_keys=["timestamp", "latitude", "longitude", "source"],
     version="0.1.0",
     description="Ocean and marine weather conditions",
     raw_sql="""
@@ -186,6 +219,7 @@ CREATE TABLE IF NOT EXISTS marine_weather (
 WEATHER = TableSchema(
     name="weather",
     partition_cols=["partition_date", "source"],
+    dedup_keys=["timestamp", "latitude", "longitude", "source"],
     version="0.1.0",
     description="General weather observations",
     raw_sql="""
@@ -228,6 +262,7 @@ CREATE TABLE IF NOT EXISTS source_tracking (
 CHOKEPOINT_STATUS = TableSchema(
     name="chokepoint_status",
     partition_cols=["partition_date", "source"],
+    dedup_keys=["partition_date", "chokepoint_id", "source"],
     version="0.1.0",
     description="Maritime chokepoint alert status",
     raw_sql="""
@@ -251,6 +286,7 @@ CREATE TABLE IF NOT EXISTS chokepoint_status (
 OIL_INVENTORIES = TableSchema(
     name="oil_inventories",
     partition_cols=["report_date", "source"],
+    dedup_keys=["report_date", "product", "area_code", "stock_type", "source"],
     version="0.1.0",
     description="Oil inventory stock levels",
     raw_sql="""
@@ -273,6 +309,7 @@ CREATE TABLE IF NOT EXISTS oil_inventories (
 CHOKEPOINT_TRANSITS = TableSchema(
     name="chokepoint_transits",
     partition_cols=["transit_date", "source"],
+    dedup_keys=["transit_date", "chokepoint_id", "source"],
     version="0.1.0",
     description="Vessel transits through chokepoints",
     raw_sql="""
@@ -304,6 +341,7 @@ CREATE TABLE IF NOT EXISTS chokepoint_transits (
 OIL_PRICES = TableSchema(
     name="oil_prices",
     partition_cols=["price_date", "source"],
+    dedup_keys=["price_date", "source"],
     version="0.1.0",
     description="Oil and LNG price benchmarks",
     raw_sql="""
@@ -327,6 +365,17 @@ CREATE TABLE IF NOT EXISTS oil_prices (
 OIL_TRADE = TableSchema(
     name="oil_trade",
     partition_cols=["period", "source"],
+    # Primary and secondary JODI products land in the same (period, source)
+    # partition, so the key has to reach past the partition columns.
+    dedup_keys=[
+        "period",
+        "reporting_country",
+        "partner_country",
+        "product_code",
+        "flow",
+        "unit",
+        "source",
+    ],
     version="0.1.0",
     description="Oil trade flows by country",
     raw_sql="""
@@ -352,6 +401,7 @@ CREATE TABLE IF NOT EXISTS oil_trade (
 VESSEL_REGISTRY = TableSchema(
     name="vessel_registry",
     partition_cols=[],
+    dedup_keys=["imo", "mmsi", "source"],
     version="0.1.0",
     description="Vessel registry and ownership data",
     raw_sql="""
@@ -375,6 +425,7 @@ CREATE TABLE IF NOT EXISTS vessel_registry (
 VESSEL_SAFETY = TableSchema(
     name="vessel_safety",
     partition_cols=[],
+    dedup_keys=["imo", "inspection_date", "source"],
     version="0.1.0",
     description="Vessel safety inspection records",
     raw_sql="""

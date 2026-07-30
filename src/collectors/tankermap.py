@@ -64,9 +64,14 @@ def get_port_calls(
     return result
 
 
-def _parse_vessels(data: dict[str, Any]) -> pl.DataFrame:
+def _parse_vessels(data: dict[str, Any] | list[dict[str, Any]]) -> pl.DataFrame:
     """Parse TankerMap vessel positions into ais_positions schema."""
-    vessels = data.get("vessels", data.get("data", []))
+    # The live endpoint returns a bare JSON array; older/other endpoints wrap
+    # the rows in a dict.
+    if isinstance(data, list):
+        vessels = data
+    else:
+        vessels = data.get("vessels", data.get("data", []))
     if not vessels:
         return pl.DataFrame()
 
@@ -91,14 +96,14 @@ def _parse_vessels(data: dict[str, Any]) -> pl.DataFrame:
             "vessel_type": v.get("type", v.get("vessel_type", "")),
             "latitude": v.get("lat", v.get("latitude")),
             "longitude": v.get("lon", v.get("longitude")),
-            "sog": v.get("sog", v.get("speed")),
-            "cog": v.get("cog", v.get("course")),
+            "sog": v.get("sog", v.get("speed", v.get("speed_knots"))),
+            "cog": v.get("cog", v.get("course", v.get("cog_degrees"))),
             "heading": v.get("heading"),
             "nav_status": v.get("status", v.get("nav_status")),
-            "draught": v.get("draught", v.get("draft")),
+            "draught": v.get("draught", v.get("draft", v.get("draught_meters"))),
             "destination": v.get("destination"),
             "eta": v.get("eta"),
-            "timestamp": v.get("timestamp", v.get("last_seen")),
+            "timestamp": v.get("timestamp", v.get("last_seen", v.get("observed_at"))),
         })
 
     if not records:

@@ -1,5 +1,175 @@
 # Session Notes
 
+## 2026-07-30 — Session 14: idempotent writes
+
+Session 13 left `write_raw` appending on every run — a scheduled daily job would
+have duplicated the whole dataset each time. Fixed, plus the two traps found
+while fixing it.
+
+### The mechanism
+
+`TableSchema.dedup_keys` declares the natural key per table. `write_raw` now
+dedups the incoming batch on that key, then does a `DELETE ... WHERE EXISTS`
+against the batch followed by `INSERT`, in one transaction.
+
+Why not `INSERT OR REPLACE`: partitioned tables carry no PRIMARY KEY, so DuckDB
+has no conflict target. Why not `CREATE OR REPLACE TABLE ... AS SELECT`: CTAS
+silently drops column defaults, so `ingested_at TIMESTAMP DEFAULT now()` would
+stop populating (this bit during the Session 13 manual dedup, and the repair was
+to rebuild each table from the `schema.py` DDL). Delete-then-insert never
+rewrites the table definition, so neither problem arises.
+
+`IS NOT DISTINCT FROM` rather than `=`, so a NULL key component matches itself.
+
+### Parquet no longer drifts from DuckDB
+
+Polars `write_parquet(partition_by=...)` **overwrites a partition directory
+wholesale** — verified: writing one row to `d=a` replaced the two rows already
+there. So writing only the batch discarded rows an earlier run had put in the
+same partition. JODI hits this directly: primary and secondary products share
+one `(period, source)` partition, so the secondary run erased the primary rows.
+
+`write_raw` now re-exports the touched partitions by querying them back out of
+DuckDB after the upsert, which makes the two stores identical by construction
+instead of by coincidence.
+
+### Two bugs found in verification, not in review
+
+1. **`ais_positions` key was wrong.** `(mmsi, timestamp, source)` looked
+   obvious, but axiomancer reports **no mmsi and no timestamp at all** — it
+   identifies vessels by `imo`. That key would have collapsed 59,107 rows into
+   one. Key is now `(mmsi, imo, timestamp, source, partition_date)`;
+   `partition_date` keeps successive daily snapshots apart.
+2. **A key column the source omits disabled dedup entirely.** The first fix
+   bailed out to append-only when a key column was missing from the batch, so
+   axiomancer still duplicated (59,075 → 118,150). An omitted column is NULL
+   once stored, so `write_raw` now supplies the NULL and dedups anyway.
+
+Both were caught by running real collectors twice against a scratch DB. Neither
+was visible in the unit tests, which used well-formed fixtures.
+
+### Verification
+
+Collectors run twice against live endpoints, scratch storage dir:
+
+| Table | Run 1 | Run 2 | Parquet |
+|-------|-------|-------|---------|
+| `chokepoint_transits` | 77,389 | 77,389 | 77,389 |
+| `chokepoint_status` | 6 | 6 | 6 |
+| `ais_positions` (axiomancer) | 59,071 | 59,071 | 59,071 |
+
+220 tests pass; the 4 `test_dashboard.py` failures are the pre-existing
+`_build_html` tuple bug being handled in a separate session. ruff and mypy clean.
+
+The three `tests/curation/test_dedup.py` tests planted their duplicates *through*
+`write_raw`, which can no longer produce any — they now insert duplicates
+directly. The curation functions themselves are still needed to clean DBs
+written before this change.
+
+### Live DB cleanup
+
+`marine_weather` 240 → 120. The 120 removed rows were byte-identical beyond the
+key (verified: 120 duplicate groups, 0 with differing measurements) — a repeated
+Session 13 test run. Its parquet tree was rewritten from the table to match.
+Backup at `storage/pipeline.db.bak-20260730`.
+
+**`ais_positions` was left alone — its "duplicates" are not duplicates.**
+Axiomancer emits bogus, non-unique IMO values: imo `30` covers both an unnamed
+vessel off ALAMEA and "FUME BLANC COMMODORE", and two different vessels both
+named "NIMITZ" sit 80 km apart under imo `568812`. Deleting either row of those
+pairs would discard a real observation.
+
+That finding changed the key: adding `vessel_name` separates 3 of the 5
+collisions, cutting per-run loss from 5 rows in 59k to 2. Position was tried and
+rejected — with lat/long in the key a re-run went 59,076 → 59,272, because
+axiomancer is a **live feed** and 196 vessels genuinely moved between two calls
+seconds apart. One row per vessel per day is the intended grain.
+
+The 2 residual collisions are two distinct vessels sharing both a junk IMO and a
+name; nothing in the feed can tell them apart.
+
+---
+
+## 2026-07-30 — Session 13
+
+### Starting state
+- Repo code-complete (16 collectors, schema, storage, CLI, tests) but **had collected zero data**
+- Every table in `storage/pipeline.db` empty, 0 parquet files, `source_tracking` empty
+- Only 11 of the 18 tables in `schema.py` existed in the DB
+- Goal: land real data to feed the combined data-lake at `C:\Users\zande\data-lake`
+- Priority tables: `chokepoint_transits`, `chokepoint_status`, `freight_rates`
+
+### Session plan
+- [x] Investigate why the pipeline persisted nothing
+- [x] Fix the systemic blockers (PR #1)
+- [x] Repair the individual broken no-auth collectors (PR #2)
+- [x] Record NO-GO verdicts for sources that cannot work
+- [x] Update session notes and task list
+
+### Root causes — why zero rows
+Five bugs, three of them silent:
+
+1. **`init_db()` was never called** anywhere in the collection flow. Only 11 of 18 tables existed; the priority tables and all `oil_*` tables were missing entirely.
+2. **`write_raw()` silently returned 0** when the target table did not exist — the insert-column list came back empty and it returned early. Runs were then recorded as `status='success', rows_written=0`. This is what hid the failure: the first diagnostic run logged `imf_portwatch … fetched=26261, written=0, success`.
+3. **IMF PortWatch date parsing** — the ArcGIS `date` field is an ISO string (`"2024-06-01"`), but the parser assumed epoch milliseconds, so every `transit_date` became `""` and the DATE cast failed.
+4. **Eagle Intelligence wrote to the wrong table** — `write_raw()` called without `table_name`, defaulting to `ais_positions`, where all chokepoint columns were dropped.
+5. **Phase 7 collectors silently unregistered** — `collect_all.py` imported names that do not exist (`collect_freight_rates`, `collect_dma_vessels`, …); the real entry point is `collect_data`. The `ImportError` was swallowed at debug level.
+
+A sixth surfaced while repairing collectors:
+
+6. **Schema drift** — `ais_positions` lacked `vessel_type`. `CREATE TABLE IF NOT EXISTS` never alters an existing table, so `write_raw` dropped the column on every insert. Migration `20260730001` added. Audited all 18 tables; this was the only drift.
+
+### Collector repairs
+| Source | Was | Now |
+|---|---|---|
+| imf_portwatch | 0 rows (missing table + date bug) | 77,389 |
+| eagle_intelligence | wrote to `ais_positions` | 6 |
+| axiomancer | HTTP 400 — API needs viewport bounds | 59,107 |
+| tankermap | `'list' object has no attribute 'get'` — returns a bare array | 5,000 |
+| jodi_oil | HTTP 404 — now a zipped CSV at a new path, all columns renamed | 1,648,728 |
+
+### Data-quality bugs found in JODI
+- Its `-` (not available), `x` (confidential) and `N/A` placeholders were coerced to `0.0` by a bare `except`, **turning non-reports into real-looking zeroes**. Now dropped, preserving the 274,536 genuine reported zeroes as distinct.
+- JODI publishes five units but `oil_trade` only has mass and volume columns; `KBD` (a rate) and `KL` (kilolitres) map to neither, so those rows persisted with both quantity columns null. Now skipped.
+- Combined: 6.89M → 1.65M rows, none empty.
+
+### Table state at session end
+| Table | Rows |
+|---|---|
+| `oil_trade` | 1,648,728 |
+| `chokepoint_transits` | 77,389 (2019-01-01 → 2026-07-26) |
+| `ais_positions` | 64,107 (axiomancer 59,107 + tankermap 5,000) |
+| `marine_weather` | 240 |
+| `chokepoint_status` | 6 |
+
+### Sources confirmed dead (NO-GO)
+`dma`, `barcelona_port`, `singapore_oceanx`, `fbx` all target endpoints that **return 404**; `equasis` needs a login and an IMO list. All five were listed as "✅ Collector built" despite never having been called successfully. Recurring tell: a `wp-json/<invented-namespace>/v1/<resource>` route on a WordPress marketing site (Barcelona and FBX both used it; neither exists).
+
+`freight_rates` therefore has **no working free source** — Drewry WCI 429s with HTML, the FBX `wp-json` route returns the WordPress page. It would need a registered/paid API.
+
+### Commits / PRs
+- `cbab028` — systemic collection fixes → [PR #1](https://github.com/Zanderl1987/ShippingDataPipeline/pull/1)
+- `62c9b1d` — collector repairs + `vessel_type` migration → [PR #2](https://github.com/Zanderl1987/ShippingDataPipeline/pull/2), stacked on #1
+- Merged `origin/main` into the branch mid-session; it was behind by the Session 12 doc commit, which touched `REMAINING_WORK.md`.
+
+### Issues encountered
+- `write_raw`'s silent `return 0` made a total failure look like success — changed to raise on a genuine column mismatch. This was the single most expensive bug of the session.
+- `apply_pending_migrations` swallows per-statement failures at `logger.debug` **and still records the migration as applied**, so a failed `ALTER` would look successful. Verified the new column empirically rather than trusting the log. Not fixed.
+- Partitioned inserts have **no dedup**; repeated test runs duplicated rows. Deduped `chokepoint_transits`/`chokepoint_status` by natural key and reloaded `oil_trade`.
+- `dashboard.py` `_build_html` returns a tuple → 4 pre-existing test failures. Unrelated to collection; spun out to its own task.
+
+### Test status
+**210 passed** (up from 205 — 5 new JODI cases for renamed columns, placeholder handling and unit routing). 4 failures remain, all the pre-existing `dashboard.py` tuple bug. `ruff` clean.
+
+### Next steps
+1. **Add dedup to partitioned inserts before enabling the daily schedule** — a weekly JODI run currently appends another 1.65M duplicate rows.
+2. Merge PR #1, then PR #2.
+3. Fix `apply_pending_migrations` swallowing failed statements while marking migrations applied.
+4. Research real endpoints for DMA (`web.ais.dk/aisdata/`) and Singapore MPA, or drop those collectors.
+5. Register remaining free API keys (GFW, VesselAPI, ShipLookup, UN Comtrade, BarentsWatch) to activate the key-gated collectors.
+
+---
+
 ## 2026-07-30 — Session 12
 
 ### Starting state
