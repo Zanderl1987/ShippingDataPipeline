@@ -8,8 +8,8 @@
 | Register for AISStream API key | Free via GitHub OAuth, needed for `aisstream.py` WebSocket | ✅ Done |
 | Hormuz Monitor | Listed as having free tier but registration yields only paid plans. NO-GO. | ❌ No free tier |
 | Set up `.env` with API keys | Added `EIA_API_KEY`, `AISSTREAM_API_KEY` | ✅ Done |
-| Set up GitHub secrets | Add API keys to repository secrets for Actions workflow | Not started |
-| Test GitHub Actions workflow | Verify workflow runs correctly on schedule | Pending |
+| Set up GitHub secrets | `EIA_API_KEY`, `AISSTREAM_API_KEY` set as repo secrets | ✅ Done |
+| Test GitHub Actions workflow | Ran twice — first failed on lint, second triggered after fix | ⏳ In progress |
 
 ## Phase 4 — Automation & Polish ✓ COMPLETE
 
@@ -30,7 +30,8 @@
 |------|---------|--------|
 | README usage guide | Install, configure, run collectors, query data | ✅ Done |
 | Module-level docstrings | All 37 source files | ✅ Done |
-| DATA_SOURCES.md update | Add new oil sources (EIA, JODI, PortWatch, TankerMap, Hormuz) | Not started |
+| DATA_SOURCES.md update | Add new oil sources (EIA, JODI, PortWatch, TankerMap, Hormuz) | ✅ Done |
+| DATA_SOURCES.md update | Add new collectors (Barcelona, DMA, Equasis, FBX, Singapore MPA) | Not started |
 
 ## Deferred / Low Priority
 
@@ -38,9 +39,12 @@
 |------|---------|--------|
 | OpenAIS integration | Self-hosted only, deferred | Blocked |
 | Baltic Exchange trial | 1-week free trial for freight rate data | Not started |
-| Danish Maritime Authority | European waters daily AIS files | Not started |
-| Singapore OCEANS-X | Transshipment hub data | Not started |
+| Danish Maritime Authority (DMA) | European waters daily AIS files | ✅ Collector built (`dma_collector.py`) |
+| Singapore OCEANS-X | Transshipment hub data | ✅ Collector built (`singapore_oceanx_collector.py`) |
+| Barcelona Port Authority | Port call data | ✅ Collector built (`barcelona_port_collector.py`) |
+| Equasis | Ship inspection data | ✅ Collector built (`equasis_collector.py`) |
+| FBX (Freightos Baltic Index) | Container freight rates | ✅ Collector built (`fbx_collector.py`) |
 
 ---
 
-*Last updated: 2026-07-27 (Session 11)*
+*Last updated: 2026-07-30 (Session 12)*

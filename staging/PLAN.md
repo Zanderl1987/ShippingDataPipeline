@@ -100,13 +100,25 @@ ShippingDataPipeline/
     │   │   ├── schema.py         # Table schemas (ais_positions, vessels, ports, marine_weather, weather, source_tracking)
     │   │   ├── reader.py         # Query + read dataset functions
     │   │   ├── writer.py         # Write raw + curated data
-    │   │   └── tracker.py        # Source tracking (checkpoints, timestamps)
+    │   │   ├── tracker.py        # Source tracking (checkpoints, timestamps)
+    │   │   ├── lineage.py       # Lineage event tracking
+    │   │   └── migrations.py    # Schema migration management
     │   ├── curation/             # Dedup, validation, enrichment (Phase 2)
     │   │   ├── __init__.py
     │   │   ├── dedup.py          # Deduplication functions
     │   │   ├── validation.py     # Data quality checks
     │   │   ├── enrichment.py     # Enrichment & curated tables
     │   │   └── pipeline.py       # Curation orchestrator
+    │   ├── monitoring/           # Scheduling, quality checks, notifications, dashboard
+    │   │   ├── __init__.py
+    │   │   ├── collect_all.py    # Collection orchestrator with staleness checks
+    │   │   ├── quality.py        # Data quality checks (row counts, null rates, staleness)
+    │   │   ├── notify.py         # Notification system (Slack/Discord, email, log file)
+    │   │   ├── dashboard.py      # Static HTML dashboard generator
+    │   │   ├── backfill.py       # Backfill scheduling logic
+    │   │   ├── schema_drift.py   # Schema drift detection
+    │   │   ├── duration.py       # Collection duration monitoring
+    │   │   └── freshness_sla.py  # Freshness SLA monitoring
     │   └── analytics/            # Analysis & reporting modules (Phase 3)
     │       ├── __init__.py
     │       ├── routes.py         # Vessel tracks, route segments, active vessels
@@ -176,9 +188,14 @@ ShippingDataPipeline/
 - [x] Vet & integrate **JODI-Oil** (global oil production, consumption, trade — free CSV)
 - [x] Vet & integrate **IMF PortWatch** (chokepoint transit counts + capacity — free ArcGIS API)
 - [x] Vet & integrate **TankerMap** (live tanker positions, port calls — free, no auth)
-- [x] Vet & integrate **Hormuz Monitor** (risk score, oil prices, VLCC rates — free tier)
+- [x] Vet & integrate **Hormuz Monitor** (risk score, oil prices, VLCC rates — free tier claimed; NO-GO, no free tier found)
 - [x] Add tanker-type filter to Axiomancer collector
 - [x] Integration tests for collector-to-storage flow
+- [x] Vet & integrate **Barcelona Port Authority** (port call data — free API, no auth)
+- [x] Vet & integrate **Danish Maritime Authority** (European waters daily AIS — free bulk download)
+- [x] Vet & integrate **Equasis** (ship inspection data — free, no auth, CC BY 4.0)
+- [x] Vet & integrate **FBX / Freightos Baltic Index** (container freight rates — free public index)
+- [x] Vet & integrate **Singapore MPA OCEANS-X** (transshipment hub data — free, no auth)
 
 ### Phase 3 — Analytics ✓ COMPLETE
 - [x] Build route mapping from AIS position sequences
@@ -222,9 +239,13 @@ ShippingDataPipeline/
 13. ✓ GitHub Actions workflow for scheduled collection
 14. ✓ Data quality monitoring (row counts, null rates, staleness)
 15. ✓ Notification system (Slack/Discord, email, log file)
-16. Set up API keys in `.env` for live testing
-17. Set up GitHub secrets for Actions workflow
-18. Documentation (module-level docstrings, README usage guide)
+16. ✓ Set up API keys in `.env` for live testing (EIA, AISStream done; others pending)
+17. ✓ Set up GitHub secrets for Actions workflow (EIA, AISStream done)
+18. ✓ Documentation (module-level docstrings, README usage guide)
+19. ✓ Fix ruff lint violations across all source files
+20. ⬜ Register remaining free API keys (GFW, VesselAPI, ShipLookup, UN Comtrade, BarentsWatch)
+21. ⬜ Update DATA_SOURCES.md with new collectors (Barcelona, DMA, Equasis, FBX, Singapore MPA)
+22. ⬜ Monitor GitHub Actions workflow for passing status
 
 ---
 
