@@ -75,6 +75,15 @@ MIGRATIONS: list[Migration] = [
         up_sql="ALTER TABLE source_tracking ADD COLUMN IF NOT EXISTS collected_at TIMESTAMP;",
         down_sql="",
     ),
+    Migration(
+        version="20260730001",
+        description="Add vessel_type column to ais_positions if missing",
+        # ais_positions predates vessel_type in schema.py. CREATE TABLE IF NOT
+        # EXISTS never alters an existing table, so the column was silently
+        # dropped from every write.
+        up_sql="ALTER TABLE ais_positions ADD COLUMN IF NOT EXISTS vessel_type VARCHAR;",
+        down_sql="",
+    ),
 ]
 
 

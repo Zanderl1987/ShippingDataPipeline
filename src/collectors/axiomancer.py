@@ -17,6 +17,11 @@ BASE_URL = "https://axiomoverwatch.io/api/v1"
 
 SOURCE = "axiomancer"
 
+# The API rejects a bounds-less request with HTTP 400
+# ("port or viewport bounds are required"), so a global snapshot must ask
+# for the whole world explicitly.
+WORLD_BBOX = (-180.0, -90.0, 180.0, 90.0)
+
 VESSEL_TYPE_MAP: dict[str, str] = {
     "bulk_carrier": "Bulk Carrier",
     "container": "Container Ship",
@@ -61,6 +66,9 @@ def fetch_positions_latest(
         params["south"] = south
         params["east"] = east
         params["north"] = north
+    else:
+        # Bounds are mandatory; fall back to a whole-world viewport.
+        params["west"], params["south"], params["east"], params["north"] = WORLD_BBOX
 
     url = f"{BASE_URL}/positions/latest"
     logger.info("Fetching positions from %s (params=%s)", url, params)

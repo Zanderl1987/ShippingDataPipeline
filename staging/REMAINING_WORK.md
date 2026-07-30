@@ -39,11 +39,16 @@
 |------|---------|--------|
 | OpenAIS integration | Self-hosted only, deferred | Blocked |
 | Baltic Exchange trial | 1-week free trial for freight rate data | Not started |
-| Danish Maritime Authority (DMA) | European waters daily AIS files | ✅ Collector built (`dma_collector.py`) |
-| Singapore OCEANS-X | Transshipment hub data | ✅ Collector built (`singapore_oceanx_collector.py`) |
-| Barcelona Port Authority | Port call data | ✅ Collector built (`barcelona_port_collector.py`) |
-| Equasis | Ship inspection data | ✅ Collector built (`equasis_collector.py`) |
-| FBX (Freightos Baltic Index) | Container freight rates | ✅ Collector built (`fbx_collector.py`) |
+| Danish Maritime Authority (DMA) | `www.dma.dk/api/vessels/search` → 404, endpoint does not exist. Real AIS is at `web.ais.dk/aisdata/` (daily zipped CSVs) — needs a rewrite, not a URL swap. | ⚠️ Built, source dead |
+| Singapore OCEANS-X | `www.mpa.gov.sg/api/vessel-traffic` → 404, endpoint does not exist. | ⚠️ Built, source dead |
+| Barcelona Port Authority | `www.portdebarcelona.cat/wp-json/openinfo/v1/*` → 404 (bare domain also has no DNS). | ⚠️ Built, source dead |
+| Equasis | Requires login plus an IMO list; logs "No IMO numbers configured". | ⚠️ Built, needs auth |
+| FBX (Freightos Baltic Index) | Drewry WCI → 429 + HTML; FBX `wp-json` route returns the WordPress page. No free source for `freight_rates`. | ⚠️ Built, source dead |
+
+> **"Collector built" is not evidence a source works.** All five rows above were
+> written against endpoints that had never been called successfully. Each returns
+> 0 rows, and because `collect_data()` swallows its own exceptions and returns 0,
+> the orchestrator reports them as `[OK]`. Verified 2026-07-30.
 
 ---
 
