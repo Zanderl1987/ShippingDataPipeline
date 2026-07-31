@@ -27,7 +27,17 @@ def print_table(df: pl.DataFrame, max_rows: int = 20) -> None:
         return
 
     display_df = df.head(max_rows)
-    print(display_df.to_pandas().to_string(index=False))
+    # polars renders its own table; to_pandas() would drag in pandas, which is
+    # not a declared dependency and is absent on CI.
+    with pl.Config(
+        tbl_formatting="ASCII_FULL_CONDENSED",
+        tbl_hide_dataframe_shape=True,
+        tbl_hide_column_data_types=True,
+        tbl_rows=max_rows,
+        tbl_cols=-1,
+        fmt_str_lengths=60,
+    ):
+        print(display_df)
 
     if df.height > max_rows:
         print(f"\n  ... and {df.height - max_rows} more rows")
