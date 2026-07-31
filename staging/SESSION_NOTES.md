@@ -6,7 +6,7 @@
 
 It had never once reached the collection step. Now green:
 [run 30592532564](https://github.com/Zanderl1987/ShippingDataPipeline/actions/runs/30592532564),
-**12 succeeded / 0 failed, 1,790,531 rows**. Merged as PR #4.
+**12 succeeded / 0 failed, 1,790,531 rows**. Merged as PR #4 (`c1ea0cd`).
 
 Four blockers, each only visible after clearing the one before it:
 
@@ -63,14 +63,47 @@ Two adjacent spots misreported the same failure:
   — a migration problem should not take down all collection — but a stale
   schema silently drops columns on write, so it is an `error` now.
 
-5 new tests in `tests/storage/test_migrations.py`. 231 pass overall.
+5 new tests in `tests/storage/test_migrations.py` (there were none before).
+231 pass overall. Merged as PR #5 (`0cce2e2`).
+
+### Audit: 4 collectors exist but are registered nowhere
+
+Checked `get_collectors()` against `src/collectors/` after the green run.
+**21 modules, 17 registered.** Four are never invoked by any scheduled run:
+
+| Module | Auth | Why it matters |
+|---|---|---|
+| `aisstream` | **key already registered** | AISSTREAM_API_KEY is in `.env` and in GitHub secrets, and `REMAINING_WORK.md` marks it Done — but the collector is not in the orchestrator, so it has never produced a row. Entry point is `collect_stream`, a WebSocket consumer, so it needs a bounded duration to work in a batch run. |
+| `noaa_marinecadastre` | **none** | Free bulk AIS download, no auth, simply not wired up. |
+| `seafarer_index` | none apparent | Unvetted — spike before wiring. |
+| `barentswatch` | needs token | Blocked on the key, but *also* unregistered — the key alone would not make it run. |
+
+The aisstream case is the instructive one: a key was registered, marked done,
+and produces nothing. Registering a credential is not the same as wiring the
+collector.
 
 ### Still true after all this
 - The 5 dead collectors still report `[OK]` with 0 rows and burn ~124s per run.
   A green pipeline does not mean they work.
 - **CI checks out a fresh repo each run**, so `storage/pipeline.db` starts empty
   and survives only as a 30-day artifact. The daily job accumulates no history
-  anywhere persistent. Where the data-lake's copy actually lives is undecided.
+  anywhere persistent, and **the idempotent-write work buys nothing on CI** —
+  there is never anything to deduplicate against. It matters only for the local
+  DB. Where the data-lake's copy lives is still undecided.
+- `storage/pipeline.db.bak-20260730` (25 MB) is the manual backup taken before
+  the `marine_weather` dedup cleanup. Delete when satisfied.
+- `origin/master` still exists deliberately — only copy of `us_itc.py` and
+  `wto.py`.
+
+### Task list after this session
+
+Done: dedup on partitioned inserts (#1), migration runner (#3), workflow green
+(#4), dashboard tuple bug (#8).
+
+Open: freight_rates strategy (#2, **needs a decision from Zander**), dead
+collectors (#5), `origin/master` salvage (#6), API keys (#7), orphaned
+collectors (#9), DB persistence (#10, **needs a decision**), DATA_SOURCES.md
+NO-GO writeups (#11).
 
 ---
 

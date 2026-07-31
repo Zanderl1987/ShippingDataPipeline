@@ -38,7 +38,7 @@ Re-running a collector is now a no-op. Verified against live endpoints:
 | Task | Details | Status |
 |------|---------|--------|
 | Register for EIA API key | Free at eia.gov/open, needed for `eia_petroleum.py` | ✅ Done |
-| Register for AISStream API key | Free via GitHub OAuth, needed for `aisstream.py` WebSocket | ✅ Done |
+| Register for AISStream API key | Key registered — **but `aisstream` is not in `get_collectors()`, so it has never run**. See orphaned-collectors task. | ⚠️ Key done, collector unwired |
 | Hormuz Monitor | Listed as having free tier but registration yields only paid plans. NO-GO. | ❌ No free tier |
 | Set up `.env` with API keys | Added `EIA_API_KEY`, `AISSTREAM_API_KEY` | ✅ Done |
 | Set up GitHub secrets | `EIA_API_KEY`, `AISSTREAM_API_KEY` set as repo secrets | ✅ Done |
@@ -64,7 +64,7 @@ Re-running a collector is now a no-op. Verified against live endpoints:
 | README usage guide | Install, configure, run collectors, query data | ✅ Done |
 | Module-level docstrings | All 37 source files | ✅ Done |
 | DATA_SOURCES.md update | Add new oil sources (EIA, JODI, PortWatch, TankerMap, Hormuz) | ✅ Done |
-| DATA_SOURCES.md update | Add new collectors (Barcelona, DMA, Equasis, FBX, Singapore MPA) — document these as **NO-GO**, not as working sources; their endpoints 404 (see Deferred) | Not started |
+| DATA_SOURCES.md update | Add Barcelona, DMA, Equasis, FBX, Singapore MPA **and TradingEconomics** as **NO-GO**, not as working sources | Not started |
 
 ## Deferred / Low Priority
 
@@ -86,4 +86,4 @@ Re-running a collector is now a no-op. Verified against live endpoints:
 
 ---
 
-*Last updated: 2026-07-30 (Session 13)*
+*Last updated: 2026-07-31 (Session 15)*
