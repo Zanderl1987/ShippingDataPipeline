@@ -18,8 +18,8 @@ The pipeline had collected **zero rows** until Session 13. Six bugs fixed across
 | Fix jodi_oil | Moved to zipped CSV, every column renamed | ✅ Done — 1,648,728 rows |
 | Add `ais_positions.vessel_type` | Schema drift: `CREATE TABLE IF NOT EXISTS` never alters | ✅ Done — migration `20260730001` |
 | Dedup on partitioned inserts | `TableSchema.dedup_keys` + delete-then-insert upsert; parquet partitions re-exported from DuckDB so the two stores can't drift | ✅ Done — collectors verified idempotent |
-| Fix migration runner swallowing failures | `apply_pending_migrations` logs failed statements at `debug` and still marks the migration applied | Not started |
-| Fix `dashboard.py` `_build_html` | Returns a tuple → `write_text` TypeError, 4 test failures | ⏳ In progress (separate session) |
+| Fix migration runner swallowing failures | A failed statement now aborts the migration, is logged at `error`, and is left unrecorded so it retries | ✅ Done |
+| Fix `dashboard.py` `_build_html` | Stray trailing comma made the return a tuple → `write_text` TypeError | ✅ Done |
 
 Re-running a collector is now a no-op. Verified against live endpoints:
 `chokepoint_transits` 77,389 → 77,389, `chokepoint_status` 6 → 6,
@@ -42,7 +42,7 @@ Re-running a collector is now a no-op. Verified against live endpoints:
 | Hormuz Monitor | Listed as having free tier but registration yields only paid plans. NO-GO. | ❌ No free tier |
 | Set up `.env` with API keys | Added `EIA_API_KEY`, `AISSTREAM_API_KEY` | ✅ Done |
 | Set up GitHub secrets | `EIA_API_KEY`, `AISSTREAM_API_KEY` set as repo secrets | ✅ Done |
-| Test GitHub Actions workflow | Ran twice — first failed on lint, second triggered after fix | ⏳ In progress |
+| Test GitHub Actions workflow | **First green run 2026-07-31** — 12 succeeded / 0 failed, 1,790,531 rows. Previously 9 runs, 9 failures, never reached collection | ✅ Done |
 
 ## Phase 4 — Automation & Polish ✓ COMPLETE
 

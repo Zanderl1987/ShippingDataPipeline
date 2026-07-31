@@ -1,5 +1,79 @@
 # Session Notes
 
+## 2026-07-31 — Session 15: first green workflow run
+
+### The daily workflow had never succeeded — 9 runs, 9 failures
+
+It had never once reached the collection step. Now green:
+[run 30592532564](https://github.com/Zanderl1987/ShippingDataPipeline/actions/runs/30592532564),
+**12 succeeded / 0 failed, 1,790,531 rows**. Merged as PR #4.
+
+Four blockers, each only visible after clearing the one before it:
+
+1. **`mypy src/` — 27 errors.** The gate order is ruff → mypy → pytest, and mypy
+   failed every time. **The type checker had been naming the dashboard bug all
+   along** (`got "tuple[str, str]", expected "str"`) — the failing gate buried
+   its own signal. Two of the 27 were real bugs: `lineage.py` annotated two
+   functions `-> DuckDBPyConnection` when both return polars DataFrames, and
+   `notify.py` posted a `str | None` webhook URL with no guard.
+2. **`pytest -x`** would have stopped on the dashboard failure regardless. Root
+   cause was a stray trailing comma in `_build_html`, splitting the return into
+   a 2-tuple. `sdp dashboard` had been broken.
+3. **Unset API keys counted as failures.** The no-key branch logged
+   `"Skipping %s"` but returned `success=False`, while the staleness branch
+   three lines below used the existing `skipped=True`. Since hormuz has no free
+   tier at all, this alone would have kept the run permanently red.
+4. **`eia_petroleum` HTTP 400 — three independent causes.** Found by querying
+   EIA's route listing; my first hypothesis (missing `data[]`) was wrong.
+   All four dataset paths were v1-style series ids, not valid v2 routes
+   (`pet-st` → `stoc/wstk`, `pet-wdi` → `sum/sndw`,
+   `pet-mcr-impt-nus-pt2-d` → `move/impcus`, `pet-wiup` → `pnp/wiup`);
+   **v2 rejects the v1 `units` parameter on every route**; and `data[0]=value`
+   is required. All three parsers also read a row shape the API doesn't emit —
+   two silently defaulted `area` to `"US"` for every row.
+5. **`ModuleNotFoundError: pandas`** in the status report. `print_table` called
+   `.to_pandas()` purely to pretty-print; pandas is not a declared dependency
+   and only ever worked on machines that had it incidentally.
+
+**Data-correctness change worth remembering:** EIA publishes the same
+measurement in both `MBBL` and `MBBL/D` as separate rows, and `unit` was not in
+the `oil_inventories` dedup key — one of each pair was being silently discarded.
+Monthly imports went 282 → 500 rows. Same shape as the axiomancer IMO collision:
+a dedup key that looks obviously right until checked against what the source
+actually emits.
+
+### Migration runner no longer lies
+
+`apply_pending_migrations` swallowed per-statement failures at `logger.debug`
+and inserted the `schema_migrations` row anyway, so a failed `ALTER` looked
+permanently successful and would never be retried. That is the mechanism by
+which `ais_positions.vessel_type` drifted unnoticed.
+
+A statement failure now aborts the migration: logged at `error`, **not**
+recorded, and processing stops so later migrations don't run against a
+half-migrated schema. Because it stays unrecorded, a fixed migration applies on
+the next run — there is a test for exactly that.
+
+Two adjacent spots misreported the same failure:
+
+- `sdp migrate` printed "Schema is already up to date" when a migration had
+  *failed*, because it only checked whether anything was applied. It now
+  re-checks for pending migrations and exits 1.
+- `init_db` logged migration failure at `warning`. Still deliberately non-fatal
+  — a migration problem should not take down all collection — but a stale
+  schema silently drops columns on write, so it is an `error` now.
+
+5 new tests in `tests/storage/test_migrations.py`. 231 pass overall.
+
+### Still true after all this
+- The 5 dead collectors still report `[OK]` with 0 rows and burn ~124s per run.
+  A green pipeline does not mean they work.
+- **CI checks out a fresh repo each run**, so `storage/pipeline.db` starts empty
+  and survives only as a 30-day artifact. The daily job accumulates no history
+  anywhere persistent. Where the data-lake's copy actually lives is undecided.
+
+---
+
 ## 2026-07-30 — Session 14b: merge, branch cleanup, TradingEconomics spike
 
 ### Merged
