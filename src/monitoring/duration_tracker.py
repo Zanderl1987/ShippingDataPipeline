@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class DurationTracker:
         self.min_samples = min_samples
         self._durations: dict[str, list[float]] = defaultdict(list)
 
-    def record(self, source: str, duration_seconds: float) -> dict | None:
+    def record(self, source: str, duration_seconds: float) -> dict[str, Any] | None:
         """Record a duration and check for anomaly.
 
         Args:

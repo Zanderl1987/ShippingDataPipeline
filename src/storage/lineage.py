@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 import duckdb
+import polars as pl
 
 from src.storage.writer import get_connection
 
@@ -162,7 +163,7 @@ class LineageTracker:
         source: str | None = None,
         event_type: str | None = None,
         limit: int = 50,
-    ) -> duckdb.DuckDBPyConnection:
+    ) -> pl.DataFrame:
         conn = self._get_conn()
         conditions = []
         params: list[Any] = []
@@ -189,7 +190,7 @@ class LineageTracker:
             params,
         ).pl()
 
-    def get_lineage_summary(self) -> duckdb.DuckDBPyConnection:
+    def get_lineage_summary(self) -> pl.DataFrame:
         conn = self._get_conn()
         return conn.execute(
             """

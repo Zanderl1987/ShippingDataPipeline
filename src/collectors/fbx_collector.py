@@ -30,7 +30,8 @@ def fetch_drewry_wci() -> dict[str, Any]:
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_fbx_latest() -> dict[str, Any]:
@@ -40,7 +41,8 @@ def fetch_fbx_latest() -> dict[str, Any]:
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_fbx_history() -> dict[str, Any]:
@@ -50,7 +52,8 @@ def fetch_fbx_history() -> dict[str, Any]:
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def _parse_drewry(data: dict[str, Any]) -> pl.DataFrame:

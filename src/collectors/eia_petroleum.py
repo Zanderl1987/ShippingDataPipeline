@@ -27,18 +27,19 @@ def _get_api_key() -> str:
 
 def get_petroleum_series(
     *,
-    data: str = "pet-st",
+    data: str = "stoc/wstk",
     frequency: str = "weekly",
-    units: str = "MBBL",
     facets: dict[str, list[str]] | None = None,
     length: int = 500,
 ) -> dict[str, Any]:
     """Fetch petroleum time-series data from EIA API v2.
 
     Args:
-        data: Dataset path (e.g. "pet-st" for stocks, "pet-pnp-inpt" for refinery input).
-        frequency: "weekly", "monthly", or "annual".
-        units: Unit code (MBBL = thousand barrels, etc.).
+        data: v2 route under /petroleum (e.g. "stoc/wstk" for weekly stocks).
+            Discover valid routes by GETting the parent path, e.g.
+            https://api.eia.gov/v2/petroleum/stoc/?api_key=...
+        frequency: "weekly", "monthly", or "annual". Valid values vary per
+            route — pnp/unc is monthly/annual only, for instance.
         facets: Optional dict of facet filters (e.g. {"product": ["EPC0"], "du": ["NUS"]}).
         length: Max rows to return.
 
@@ -49,7 +50,9 @@ def get_petroleum_series(
     params: dict[str, Any] = {
         "api_key": _get_api_key(),
         "frequency": frequency,
-        "units": units,
+        # v2 requires naming the column(s) to return, and rejects the v1-style
+        # `units` parameter with HTTP 400. Units come back on each row instead.
+        "data[0]": "value",
         "length": length,
         "sort[0][column]": "period",
         "sort[0][direction]": "desc",
@@ -69,9 +72,8 @@ def get_petroleum_series(
 def get_weekly_stocks() -> dict[str, Any]:
     """Get weekly US crude oil and petroleum product stocks."""
     return get_petroleum_series(
-        data="pet-st",
+        data="stoc/wstk",
         frequency="weekly",
-        units="MBBL",
         length=200,
     )
 
@@ -79,9 +81,8 @@ def get_weekly_stocks() -> dict[str, Any]:
 def get_weekly_supply() -> dict[str, Any]:
     """Get weekly US petroleum supply (production, refinery input, imports/exports)."""
     return get_petroleum_series(
-        data="pet-wdi",
+        data="sum/sndw",
         frequency="weekly",
-        units="MBBL/D",
         length=200,
     )
 
@@ -89,9 +90,8 @@ def get_weekly_supply() -> dict[str, Any]:
 def get_monthly_imports_by_country() -> dict[str, Any]:
     """Get monthly US crude oil imports by country of origin."""
     return get_petroleum_series(
-        data="pet-mcr-impt-nus-pt2-d",
+        data="move/impcus",
         frequency="monthly",
-        units="MBBL",
         length=500,
     )
 
@@ -99,11 +99,25 @@ def get_monthly_imports_by_country() -> dict[str, Any]:
 def get_refinery_utilization() -> dict[str, Any]:
     """Get weekly US refinery utilization rate."""
     return get_petroleum_series(
-        data="pet-wiup",
+        data="pnp/wiup",
         frequency="weekly",
-        units="PCT",
         length=200,
     )
+
+
+def _normalize_period(period: str) -> str:
+    """Coerce an EIA period to an ISO date the DATE column will accept.
+
+    v2 returns "2026-07-24" for weekly data but "2026-04" for monthly, and a
+    bare year-month will not cast to DATE.
+    """
+    if len(period) == 8 and period.isdigit():
+        return f"{period[:4]}-{period[4:6]}-{period[6:8]}"
+    if len(period) == 6 and period.isdigit():
+        return f"{period[:4]}-{period[4:6]}-01"
+    if len(period) == 7 and period[4] == "-":
+        return f"{period}-01"
+    return period
 
 
 def _parse_eia_response(
@@ -120,31 +134,15 @@ def _parse_eia_response(
 
     records: list[dict[str, Any]] = []
     for row in records_raw:
-        product_name = ""
-        facets = row.get("facets", [])
-        if facets:
-            if isinstance(facets, list):
-                product_name = " | ".join(str(f) for f in facets if f)
-            elif isinstance(facets, str):
-                product_name = facets
-
-        area = row.get("area", [])
-        area_name = ""
-        area_code = ""
-        if isinstance(area, list) and area:
-            area_name = area[0]
-            area_code = area[0]
-        elif isinstance(area, str):
-            area_name = area
-            area_code = area
-
+        # v2 rows are flat: product-name / area-name / duoarea, not the
+        # "facets" and "area" lists this parser originally assumed.
         records.append({
             "period": row.get("period", ""),
-            "product": product_name,
-            "area": area_name,
-            "area_code": area_code,
+            "product": row.get("product-name") or row.get("product", ""),
+            "area": row.get("area-name", ""),
+            "area_code": row.get("duoarea", ""),
             "value": row.get("value"),
-            "unit": row.get("units", default_unit),
+            "unit": row.get("units") or default_unit,
             "frequency": frequency,
         })
 
@@ -179,30 +177,15 @@ def _parse_eia_supply_response(
 
     records: list[dict[str, Any]] = []
     for row in records_raw:
-        product = row.get("product", ["unknown"])
-        if isinstance(product, list) and product:
-            product = product[0]
-
-        area = row.get("area", ["US"])
-        if isinstance(area, list) and area:
-            area = area[0]
-        elif isinstance(area, str):
-            pass
-        else:
-            area = "US"
-
-        period = row.get("period", "")
-        report_date = period
-        if len(period) == 8 and period.isdigit():
-            report_date = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
-        elif len(period) == 6 and period.isdigit():
-            report_date = f"{period[:4]}-{period[4:6]}-01"
+        product = row.get("product-name") or row.get("product") or "unknown"
+        area = row.get("area-name") or row.get("duoarea") or "US"
+        report_date = _normalize_period(row.get("period", ""))
 
         records.append({
             "report_date": report_date,
             "product": product,
             "area": area,
-            "area_code": area,
+            "area_code": row.get("duoarea", "") or area,
             "stock_type": "supply",
             "value_thousand_bbl": row.get("value"),
             "unit": row.get("units", default_unit),
@@ -236,26 +219,15 @@ def _parse_eia_stocks_response(data: dict[str, Any]) -> pl.DataFrame:
 
     records: list[dict[str, Any]] = []
     for row in records_raw:
-        product = row.get("product", ["unknown"])
-        if isinstance(product, list) and product:
-            product = product[0]
-
-        area = row.get("du", ["US"])
-        if isinstance(area, list) and area:
-            area = area[0]
-
-        period = row.get("period", "")
-        report_date = period
-        if len(period) == 8 and period.isdigit():
-            report_date = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
-        elif len(period) == 6 and period.isdigit():
-            report_date = f"{period[:4]}-{period[4:6]}-01"
+        product = row.get("product-name") or row.get("product") or "unknown"
+        area = row.get("area-name") or row.get("duoarea") or "US"
+        report_date = _normalize_period(row.get("period", ""))
 
         records.append({
             "report_date": report_date,
             "product": product,
             "area": area,
-            "area_code": area,
+            "area_code": row.get("duoarea", "") or area,
             "stock_type": "commercial",
             "value_thousand_bbl": row.get("value"),
             "unit": row.get("units", "MBBL"),

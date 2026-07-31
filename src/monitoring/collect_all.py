@@ -318,10 +318,15 @@ def run_collector(
         key_value = getattr(settings, collector.requires_key, None)
         if not key_value:
             logger.info("Skipping %s (no API key)", collector.name)
+            # An unregistered key is a configuration state, not a pipeline
+            # failure — the same category as the staleness skip below. Some
+            # sources can never be configured (hormuz has no free tier at all),
+            # so failing on this would keep the run permanently red.
             return CollectionResult(
                 source=collector.name,
-                success=False,
-                error=f"No API key: {collector.requires_key}",
+                success=True,
+                skipped=True,
+                error=f"Skipped (no API key: {collector.requires_key})",
             )
 
     # Check staleness unless forced

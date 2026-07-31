@@ -5,6 +5,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from functools import partial
 
 from src.monitoring.collect_all import CollectorDef
 from src.monitoring.notify import Notifier, notify_collection_error
@@ -36,36 +37,36 @@ def _get_backfill_adapters() -> dict[str, Callable[..., list[Callable[[], int]]]
 
     def _gfw_adapter(start: date, end: date) -> list[Callable[[], int]]:
         from src.collectors.global_fishing_watch import collect_events
-        fns = []
+        fns: list[Callable[[], int]] = []
         current = start
         while current <= end:
             next_day = current + timedelta(days=1)
             s, e = current.isoformat(), next_day.isoformat()
-            fns.append(lambda s=s, e=e: collect_events(start_date=s, end_date=e))
+            fns.append(partial(collect_events, start_date=s, end_date=e))
             current = next_day
         return fns
     adapters["global_fishing_watch"] = _gfw_adapter
 
     def _imf_adapter(start: date, end: date) -> list[Callable[[], int]]:
         from src.collectors.imf_portwatch import collect_chokepoint_transits
-        fns = []
+        fns: list[Callable[[], int]] = []
         current = start
         while current <= end:
             next_day = current + timedelta(days=1)
             s, e = current.isoformat(), next_day.isoformat()
-            fns.append(lambda s=s, e=e: collect_chokepoint_transits(start_date=s, end_date=e))
+            fns.append(partial(collect_chokepoint_transits, start_date=s, end_date=e))
             current = next_day
         return fns
     adapters["imf_portwatch"] = _imf_adapter
 
     def _vesselapi_adapter(start: date, end: date) -> list[Callable[[], int]]:
         from src.collectors.vesselapi import collect_port_events
-        fns = []
+        fns: list[Callable[[], int]] = []
         current = start
         while current <= end:
             next_day = current + timedelta(days=1)
             s, e = current.isoformat(), next_day.isoformat()
-            fns.append(lambda s=s, e=e: collect_port_events(time_from=s, time_to=e, limit=50))
+            fns.append(partial(collect_port_events, time_from=s, time_to=e, limit=50))
             current = next_day
         return fns
     adapters["vesselapi"] = _vesselapi_adapter
@@ -74,19 +75,20 @@ def _get_backfill_adapters() -> dict[str, Callable[..., list[Callable[[], int]]]
         from src.collectors.open_meteo import collect_marine
         total_days = (end - start).days + 1
         return [
-            lambda td=total_days: collect_marine(
-                latitude=1.264, longitude=103.82, past_days=td
+            partial(
+                collect_marine,
+                latitude=1.264, longitude=103.82, past_days=total_days,
             )
         ]
     adapters["open_meteo"] = _open_meteo_adapter
 
     def _comtrade_adapter(start: date, end: date) -> list[Callable[[], int]]:
         from src.collectors.un_comtrade import collect_trade_data
-        fns = []
+        fns: list[Callable[[], int]] = []
         current = start.replace(day=1)
         while current <= end:
             period = current.strftime("%Y%m")
-            fns.append(lambda p=period: collect_trade_data(reporter_code=156, period=p))
+            fns.append(partial(collect_trade_data, reporter_code=156, period=period))
             if current.month == 12:
                 current = current.replace(year=current.year + 1, month=1)
             else:

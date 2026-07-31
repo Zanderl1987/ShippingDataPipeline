@@ -131,8 +131,12 @@ class TestRunCollector:
         mock_notifier = MagicMock()
 
         result = run_collector(collector, mock_tracker, mock_notifier)
-        assert result.success is False
-        assert "No API key" in result.error
+        # An unregistered key is a configuration state, not a pipeline failure —
+        # some sources (hormuz) can never be configured, so counting this as a
+        # failure would keep the scheduled run permanently red.
+        assert result.success is True
+        assert result.skipped is True
+        assert "no API key" in result.error
 
     def test_run_collector_error(self) -> None:
         """Test collector error handling."""

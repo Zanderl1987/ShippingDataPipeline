@@ -37,7 +37,8 @@ def fetch_vessel_traffic(date_str: str | None = None) -> dict[str, Any]:
         timeout=90,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_port_calls(page: int = 1, limit: int = 100) -> dict[str, Any]:
@@ -52,7 +53,8 @@ def fetch_port_calls(page: int = 1, limit: int = 100) -> dict[str, Any]:
         timeout=90,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_strait_movements() -> dict[str, Any]:
@@ -62,7 +64,8 @@ def fetch_strait_movements() -> dict[str, Any]:
         timeout=90,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_anchorage_status() -> dict[str, Any]:
@@ -72,7 +75,8 @@ def fetch_anchorage_status() -> dict[str, Any]:
         timeout=90,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_all_port_calls(max_pages: int = 20) -> list[dict[str, Any]]:

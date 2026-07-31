@@ -37,7 +37,8 @@ def fetch_vessel_calls(page: int = 1, per_page: int = 100) -> dict[str, Any]:
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_all_vessel_calls(max_pages: int = 20) -> list[dict[str, Any]]:
@@ -70,7 +71,8 @@ def fetch_traffic_stats() -> dict[str, Any]:
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def fetch_cargo_volumes() -> dict[str, Any]:
@@ -80,7 +82,8 @@ def fetch_cargo_volumes() -> dict[str, Any]:
         timeout=60,
         source=SOURCE,
     )
-    return resp.json()
+    data: dict[str, Any] = resp.json()
+    return data
 
 
 def _parse_vessel_calls(records: list[dict[str, Any]]) -> pl.DataFrame:
