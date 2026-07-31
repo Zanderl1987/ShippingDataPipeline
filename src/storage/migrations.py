@@ -141,13 +141,17 @@ def apply_pending_migrations(conn: duckdb.DuckDBPyConnection | None = None) -> l
                 migration.description,
             )
             try:
+                # A statement failure must abort the migration. Swallowing it
+                # and recording the version anyway makes a failed ALTER look
+                # permanently successful, so it is never retried — which is how
+                # ais_positions.vessel_type drifted unnoticed.
+                #
+                # Note: splitting on ";" is naive and would break on a semicolon
+                # inside a string literal. No migration needs that yet.
                 for statement in migration.up_sql.split(";"):
                     statement = statement.strip()
                     if statement:
-                        try:
-                            conn.execute(statement)
-                        except Exception as stmt_err:
-                            logger.debug("Statement skipped: %s", stmt_err)
+                        conn.execute(statement)
 
                 conn.execute(
                     "INSERT INTO schema_migrations (version, description) VALUES (?, ?)",
@@ -158,8 +162,11 @@ def apply_pending_migrations(conn: duckdb.DuckDBPyConnection | None = None) -> l
 
             except Exception as e:
                 logger.error(
-                    "Migration %s failed: %s. Stopping.",
+                    "Migration %s (%s) failed: %s. Not recording it as applied; "
+                    "it will be retried on the next run. Stopping here so later "
+                    "migrations do not run against a half-migrated schema.",
                     migration.version,
+                    migration.description,
                     e,
                 )
                 break

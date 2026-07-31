@@ -41,7 +41,12 @@ def init_db() -> duckdb.DuckDBPyConnection:
         from src.storage.migrations import apply_pending_migrations
         apply_pending_migrations(conn)
     except Exception as e:
-        logging.getLogger(__name__).warning("Migration runner failed: %s", e)
+        # Deliberately non-fatal: a migration problem should not take down all
+        # collection. But it means the schema may be stale, which silently
+        # drops columns on write, so it is an error rather than a warning.
+        logging.getLogger(__name__).error(
+            "Migration runner failed: %s. Schema may be out of date.", e
+        )
     return conn
 
 

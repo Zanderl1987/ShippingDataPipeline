@@ -277,7 +277,11 @@ def cmd_migrate(args: argparse.Namespace) -> None:
     """Apply pending schema migrations."""
     print_header("Schema Migration")
 
-    from src.storage.migrations import apply_pending_migrations, get_current_version
+    from src.storage.migrations import (
+        apply_pending_migrations,
+        get_current_version,
+        get_schema_status,
+    )
 
     version_before = get_current_version()
     print(f"  Current version: {version_before or 'none'}")
@@ -288,7 +292,18 @@ def cmd_migrate(args: argparse.Namespace) -> None:
         print(f"\n  Applied {len(applied)} migration(s):")
         for v in applied:
             print(f"    - {v}")
-    else:
+
+    # A migration that fails is deliberately not recorded, so it stays pending.
+    # Reporting "up to date" here would repeat the misreporting this command
+    # exists to surface.
+    still_pending = [s for s in get_schema_status() if s["status"] == "pending"]
+    if still_pending:
+        print(f"\n  {len(still_pending)} migration(s) still pending — see the log:")
+        for s in still_pending:
+            print(f"    - {s['version']}: {s['description']}")
+        raise SystemExit(1)
+
+    if not applied:
         print("\n  Schema is already up to date.")
 
 
