@@ -228,67 +228,62 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError:
         logger.warning("eia_petroleum collector not available")
 
-    # ── Phase 7: New shipping data sources ──────────────────────────────────
+    # dma, fbx, barcelona_port, singapore_oceanx, equasis were removed here
+    # 2026-08-03: all five target endpoints confirmed dead (404 / login-wall)
+    # per staging/SESSION_NOTES.md Session 15 audit — they were reporting
+    # false [OK] with 0 rows on every run. See US_DOMESTIC_FREIGHT_SOURCES.md
+    # equivalent audit note in PIPELINE_STATUS_AND_TASKS.md for revisit criteria.
+
+    # ── Previously-orphaned collectors, wired in 2026-08-03 ─────────────────
+    # (built and tested, but never registered here — see Session 15 audit)
 
     try:
-        from src.collectors.dma_collector import collect_data as collect_dma
+        from src.collectors.noaa_marinecadastre import collect_bulk_download
+        _prev_month = date.today().replace(day=1) - timedelta(days=1)
         collectors.append(
             CollectorDef(
-                name="dma",
-                collect_fn=collect_dma,
+                name="noaa_marinecadastre",
+                collect_fn=lambda: collect_bulk_download(
+                    year=_prev_month.year, month=_prev_month.month
+                ),
                 schedule="weekly",
             )
         )
     except ImportError as e:
-        logger.warning("dma collector not available: %s", e)
+        logger.warning("noaa_marinecadastre collector not available: %s", e)
 
     try:
-        from src.collectors.fbx_collector import collect_data as collect_fbx
+        from src.collectors.seafarer_index import collect_ships
         collectors.append(
             CollectorDef(
-                name="fbx",
-                collect_fn=collect_fbx,
+                name="seafarer_index",
+                collect_fn=collect_ships,
                 schedule="weekly",
             )
         )
     except ImportError as e:
-        logger.warning("fbx collector not available: %s", e)
+        logger.warning("seafarer_index collector not available: %s", e)
+    # collect_ports intentionally not wired: the ports endpoint returns
+    # HTTP 502 (server-side outage), confirmed live 2026-08-03. Revisit
+    # if the upstream API recovers.
 
     try:
-        from src.collectors.barcelona_port_collector import collect_data as collect_barcelona
+        from src.collectors.barentswatch import collect_latest_positions
         collectors.append(
             CollectorDef(
-                name="barcelona_port",
-                collect_fn=collect_barcelona,
+                name="barentswatch",
+                collect_fn=collect_latest_positions,
+                requires_key="barentswatch_token",
                 schedule="daily",
             )
         )
     except ImportError as e:
-        logger.warning("barcelona_port collector not available: %s", e)
+        logger.warning("barentswatch collector not available: %s", e)
 
-    try:
-        from src.collectors.singapore_oceanx_collector import collect_data as collect_singapore
-        collectors.append(
-            CollectorDef(
-                name="singapore_oceanx",
-                collect_fn=collect_singapore,
-                schedule="daily",
-            )
-        )
-    except ImportError as e:
-        logger.warning("singapore_oceanx collector not available: %s", e)
-
-    try:
-        from src.collectors.equasis_collector import collect_data as collect_equasis
-        collectors.append(
-            CollectorDef(
-                name="equasis",
-                collect_fn=collect_equasis,
-                schedule="weekly",
-            )
-        )
-    except ImportError as e:
-        logger.warning("equasis collector not available: %s", e)
+    # aisstream (collect_stream) intentionally not wired: it needs an
+    # explicit geographic bounding-box choice (which waters to subscribe
+    # to) before it can run — an arbitrary pick would burn free-tier API
+    # quota on the wrong region. Needs a decision, not a default.
 
     return collectors
 

@@ -33,26 +33,26 @@ MOCK_SHIPS = [
         "mmsi": 355000000,
         "name": "TEST CARRIER",
         "type": "Bulk Carrier",
-        "flag": "PA",
-        "callsign": "TEST1",
-        "length": 229,
-        "beam": 32,
+        "flag_iso3": "PAN",
         "gross_tonnage": 43000,
-        "deadweight": 81600,
+        "dwt": 81600,
         "year_built": 2014,
+        "owner_slug": "test-owner",
+        "manager_slug": "test-manager",
+        "dimensions": {"loa_m": 229, "beam_m": 32, "draft_m": 14},
     },
     {
         "imo": 1234567,
         "mmsi": 636000000,
         "name": "TEST TANKER",
         "type": "Crude Oil Tanker",
-        "flag": "LR",
-        "callsign": "A1B2C3",
-        "length": 333,
-        "beam": 60,
+        "flag_iso3": "LBR",
         "gross_tonnage": 160000,
-        "deadweight": 300000,
+        "dwt": 300000,
         "year_built": 2020,
+        "owner_slug": "test-owner-2",
+        "manager_slug": "test-manager-2",
+        "dimensions": {"loa_m": 333, "beam_m": 60, "draft_m": 22},
     },
 ]
 
@@ -87,9 +87,19 @@ def test_parse_ships() -> None:
     assert "vessel_name" in df.columns
     assert "vessel_type" in df.columns
     assert "flag" in df.columns
+    assert "length_m" in df.columns
+    assert "beam_m" in df.columns
+    assert "deadweight_tonnage" in df.columns
+    assert "owner_name" in df.columns
+    assert "manager_name" in df.columns
     assert "source" in df.columns
     assert df[0, "vessel_name"] == "TEST CARRIER"
     assert df[0, "imo"] == 9876543
+    assert df[0, "flag"] == "PAN"
+    assert df[0, "length_m"] == 229
+    assert df[0, "beam_m"] == 32
+    assert df[0, "deadweight_tonnage"] == 81600
+    assert df[0, "owner_name"] == "test-owner"
     assert df[0, "source"] == "seafarer_index"
 
 

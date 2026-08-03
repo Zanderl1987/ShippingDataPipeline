@@ -52,24 +52,38 @@ def fetch_ports() -> list[dict[str, Any]]:
 
 
 def _parse_ships(data: list[dict[str, Any]]) -> pl.DataFrame:
-    """Parse ship registry into a Polars DataFrame."""
+    """Parse ship registry into a Polars DataFrame.
+
+    Live schema nests loa_m/beam_m under a "dimensions" struct and uses
+    flag_iso3/dwt/owner_slug/manager_slug rather than the flatter names
+    the vessels table expects.
+    """
     if not data:
         return pl.DataFrame()
 
-    df = pl.DataFrame(data)
+    # infer_schema_length=None: the live feed has ~1000 rows with sparse/
+    # optional fields (e.g. wikidata_qid), and polars' default inference
+    # sample can miss a column's true type, raising a ComputeError later.
+    df = pl.DataFrame(data, infer_schema_length=None)
+
+    if "dimensions" in df.columns:
+        df = df.with_columns(
+            pl.col("dimensions").struct.field("loa_m").alias("length_m"),
+            pl.col("dimensions").struct.field("beam_m").alias("beam_m"),
+        ).drop("dimensions")
 
     col_map = {
         "imo": "imo",
         "mmsi": "mmsi",
         "name": "vessel_name",
         "type": "vessel_type",
-        "flag": "flag",
+        "flag_iso3": "flag",
         "callsign": "callsign",
-        "length": "length_m",
-        "beam": "beam_m",
         "gross_tonnage": "gross_tonnage",
-        "deadweight": "deadweight_tonnage",
+        "dwt": "deadweight_tonnage",
         "year_built": "year_built",
+        "owner_slug": "owner_name",
+        "manager_slug": "manager_name",
     }
 
     rename_map = {k: v for k, v in col_map.items() if k in df.columns and k != v}
