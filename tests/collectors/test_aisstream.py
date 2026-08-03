@@ -14,7 +14,7 @@ from src.collectors.aisstream import (
 def mock_position_message() -> dict:
     return {
         "MessageType": "PositionReport",
-        "Metadata": {
+        "MetaData": {
             "MMSI": 259000420,
             "ShipName": "AUGUSTSON",
             "latitude": 66.02695,
@@ -49,7 +49,7 @@ def mock_position_message() -> dict:
 def mock_ship_static_message() -> dict:
     return {
         "MessageType": "ShipStaticData",
-        "Metadata": {
+        "MetaData": {
             "MMSI": 259000420,
             "ShipName": "AUGUSTSON",
         },
@@ -86,9 +86,10 @@ class TestParsePositionReport:
         assert rec["cog"] == 308
         assert rec["heading"] == 235
         assert rec["vessel_name"] == "AUGUSTSON"
+        assert rec["timestamp"] == "2026-07-23 18:22:32"
 
     def test_returns_none_for_empty(self) -> None:
-        rec = _parse_position_report({"Message": {}, "Metadata": {}})
+        rec = _parse_position_report({"Message": {}, "MetaData": {}})
         assert rec is None
 
     def test_returns_none_for_non_position(self) -> None:
@@ -110,7 +111,7 @@ class TestParseShipStatic:
         assert rec["draught"] == 4.5
 
     def test_returns_none_for_empty(self) -> None:
-        rec = _parse_ship_static({"Message": {}, "Metadata": {}})
+        rec = _parse_ship_static({"Message": {}, "MetaData": {}})
         assert rec is None
 
     def test_handles_missing_dimension(self) -> None:
@@ -122,7 +123,7 @@ class TestParseShipStatic:
                     "Name": "TEST",
                 }
             },
-            "Metadata": {"ShipName": "TEST"},
+            "MetaData": {"ShipName": "TEST"},
         }
         rec = _parse_ship_static(msg)
         assert rec is not None
@@ -149,7 +150,28 @@ class TestAISStreamIntegration:
         assert rec is not None
         expected_fields = [
             "mmsi", "latitude", "longitude", "sog", "cog",
-            "heading", "nav_status", "vessel_name", "timestamp_raw",
+            "heading", "nav_status", "vessel_name", "timestamp",
         ]
         for field in expected_fields:
             assert field in rec
+
+
+class TestParseTimeUtc:
+    def test_nanosecond_precision(self) -> None:
+        # Real live value seen from AISStream 2026-08-03 -- 9-digit fractional
+        # seconds and a " +0000 UTC" suffix both broke DuckDB's TIMESTAMP cast
+        # before this was truncated/stripped.
+        from src.collectors.aisstream import _parse_time_utc
+
+        result = _parse_time_utc("2026-08-03 07:05:39.672011812 +0000 UTC")
+        assert result == "2026-08-03 07:05:39.672011"
+
+    def test_no_fractional_seconds(self) -> None:
+        from src.collectors.aisstream import _parse_time_utc
+
+        assert _parse_time_utc("2026-07-23 18:22:32 UTC") == "2026-07-23 18:22:32"
+
+    def test_none(self) -> None:
+        from src.collectors.aisstream import _parse_time_utc
+
+        assert _parse_time_utc(None) is None

@@ -280,10 +280,20 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("barentswatch collector not available: %s", e)
 
-    # aisstream (collect_stream) intentionally not wired: it needs an
-    # explicit geographic bounding-box choice (which waters to subscribe
-    # to) before it can run — an arbitrary pick would burn free-tier API
-    # quota on the wrong region. Needs a decision, not a default.
+    try:
+        from src.collectors.aisstream import CHOKEPOINT_BBOXES, collect_stream
+        collectors.append(
+            CollectorDef(
+                name="aisstream",
+                collect_fn=lambda: collect_stream(
+                    bbox=CHOKEPOINT_BBOXES, duration_seconds=120
+                ),
+                requires_key="aisstream_api_key",
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.warning("aisstream collector not available: %s", e)
 
     return collectors
 

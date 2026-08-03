@@ -18,6 +18,17 @@ logger = logging.getLogger(__name__)
 SOURCE = "aisstream"
 WSS_URL = "wss://stream.aisstream.io/v0/stream"
 
+# Mirrors the pipeline's existing chokepoint focus (imf_portwatch's
+# CHOKEPOINT_NAMES / chokepoint_transits table already tracks these same 4
+# straits) rather than an arbitrary region -- chosen 2026-08-03 to keep AIS
+# coverage coherent with the rest of the pipeline's geographic scope.
+CHOKEPOINT_BBOXES: list[list[list[float]]] = [
+    [[25.5, 55.0], [27.0, 57.0]],      # Strait of Hormuz
+    [[1.0, 100.0], [3.0, 104.5]],      # Strait of Malacca / Singapore Strait
+    [[29.8, 32.2], [31.5, 32.7]],      # Suez Canal
+    [[8.8, -80.2], [9.5, -79.4]],      # Panama Canal
+]
+
 
 def _get_api_key() -> str:
     """Get AISStream API key from settings."""
@@ -27,11 +38,34 @@ def _get_api_key() -> str:
     return key
 
 
+def _parse_time_utc(value: str | None) -> str | None:
+    """Convert AISStream's MetaData.time_utc into a DuckDB-parseable timestamp.
+
+    The raw value is a Go time.Time string with nanosecond precision, e.g.
+    "2026-08-03 07:05:39.672011812 +0000 UTC" -- DuckDB's TIMESTAMP cast
+    rejects both the trailing "+0000 UTC" zone literal and the >6-digit
+    fractional seconds. Confirmed live 2026-08-03 (ConversionException).
+    """
+    if not value:
+        return None
+    parts = value.split()
+    if len(parts) < 2:
+        return None
+    date_time = f"{parts[0]} {parts[1]}"
+    if "." in date_time:
+        head, frac = date_time.split(".", 1)
+        date_time = f"{head}.{frac[:6]}"
+    return date_time
+
+
 def _parse_position_report(message: dict[str, Any]) -> dict[str, Any] | None:
     """Parse a PositionReport AIS message into a flat record."""
     try:
         ais_msg = message.get("Message", {}).get("PositionReport", {})
-        metadata = message.get("Metadata", {})
+        # AISStream's top-level metadata key is "MetaData" (capital D) -- using
+        # "Metadata" silently returned {} for every message, so vessel_name and
+        # the real report timestamp were always lost. Confirmed live 2026-08-03.
+        metadata = message.get("MetaData", {})
 
         if not ais_msg:
             return None
@@ -45,7 +79,10 @@ def _parse_position_report(message: dict[str, Any]) -> dict[str, Any] | None:
             "heading": ais_msg.get("TrueHeading"),
             "nav_status": str(ais_msg.get("NavigationalStatus", "")),
             "vessel_name": metadata.get("ShipName"),
-            "timestamp_raw": ais_msg.get("Timestamp"),
+            # ais_msg["Timestamp"] is just the UTC second-of-minute (0-59) per
+            # the AIS spec, not a usable absolute time -- MetaData.time_utc is
+            # the real report timestamp.
+            "timestamp": _parse_time_utc(metadata.get("time_utc")),
         }
     except (KeyError, TypeError):
         return None
@@ -55,7 +92,7 @@ def _parse_ship_static(message: dict[str, Any]) -> dict[str, Any] | None:
     """Parse a ShipStaticData AIS message into a flat record."""
     try:
         ais_msg = message.get("Message", {}).get("ShipStaticData", {})
-        metadata = message.get("Metadata", {})
+        metadata = message.get("MetaData", {})
 
         if not ais_msg:
             return None
