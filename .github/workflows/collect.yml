@@ -20,6 +20,7 @@ env:
   SDP_DATA_DIR: ./data
   SDP_STORAGE_DIR: ./storage
   SDP_LOG_LEVEL: INFO
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
 jobs:
   collect:
@@ -67,6 +68,10 @@ jobs:
 
       - name: Run data quality checks
         run: uv run python -m src.monitoring.quality
+
+      - name: Sync to HuggingFace
+        if: env.HF_TOKEN != ''
+        run: uv run python upload_huggingface.py
 
       - name: Generate status report
         run: uv run python -m src.analytics.reports overview > status_report.txt
