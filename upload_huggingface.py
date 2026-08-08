@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
@@ -163,7 +163,7 @@ def main(repo_name: str = "shipping-data-pipeline", private: bool = False) -> No
         n_tables=len(stats),
         n_rows=total_rows,
         total_size_mb=total_size_mb,
-        generated_date=datetime.now(datetime.UTC).strftime("%Y-%m-%d"),
+        generated_date=datetime.now(UTC).strftime("%Y-%m-%d"),
         first_table=stats[0][0],
         table_rows=table_rows,
     )
