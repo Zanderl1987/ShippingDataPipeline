@@ -17,17 +17,16 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
+import duckdb
 from dotenv import load_dotenv
+from huggingface_hub import HfApi, login
 
 load_dotenv(Path(__file__).parent / ".env")
 
-import duckdb
-from huggingface_hub import HfApi, login
-
-from src.config import settings
+from src.config import settings  # noqa: E402  (needs env vars from load_dotenv)
 
 EXPORT_DIR = Path(__file__).parent / "storage" / "parquet" / "hf_export"
 
@@ -164,7 +163,7 @@ def main(repo_name: str = "shipping-data-pipeline", private: bool = False) -> No
         n_tables=len(stats),
         n_rows=total_rows,
         total_size_mb=total_size_mb,
-        generated_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        generated_date=datetime.now(datetime.UTC).strftime("%Y-%m-%d"),
         first_table=stats[0][0],
         table_rows=table_rows,
     )
