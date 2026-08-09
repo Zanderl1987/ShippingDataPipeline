@@ -117,6 +117,21 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Depth** | Historical (rolling window), daily files |
 | **Verdict** | **GO** — European waters coverage. Daily file delivery, free. |
 
+### 1.9 Digitraffic (Baltic Sea AIS) `meri.digitraffic.fi`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Baltic Sea AIS — live positions, vessel metadata, Finnish port calls; global port/location reference (SSN locations) |
+| **Access** | **Open data, free** (Fintraffic / Finnish Transport Infrastructure Agency) |
+| **Auth** | None |
+| **Rate Limit** | None documented; reasonable use |
+| **Depth** | Live snapshot only (no long historical) |
+| **Docs** | https://meri.digitraffic.fi/swagger/ (OpenAPI 3.0) |
+| **Endpoints** | `/api/ais/v1/locations` (GeoJSON, ~1,020 live positions), `/api/ais/v1/vessels` (~890 vessels), `/api/port-call/v1/port-calls` (~200 Finnish port calls), `/api/port-call/v1/ports` (18,660 global SSN locations, 12,256 with coordinates) |
+| **Collector** | `src/collectors/digitraffic.py` — collect_locations, collect_vessels, collect_port_calls, collect_ports |
+| **Tables** | `ais_positions`, `vessels`, `port_calls`, `ports` |
+| **Verdict** | **GO** — verified live 2026-08-09. No auth, open swagger. |
+
 ---
 
 ## 2. Port Call Data
@@ -242,6 +257,37 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Format** | Structured JSON — route codes, origin/destination, rate in USD, container type, published date |
 | **Verdict** | **PROBE** — Convenient wrapper around FBX data, but costs per run. Only worth it if FBX scraping is ToS-prohibited. |
 
+### 3.5 FRED (St. Louis Fed) `fred.stlouisfed.org`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | 800K+ US/global economic series. Freight-relevant series are mostly **US domestic** (trucking PPI, Cass Freight Index, rail intermodal) — **no Baltic Dry / container ocean-rate series** (verified 2026-08-09: `baltic`, `container freight rate`, `shipping index` searches return only NASDAQ Baltic stock indices, rail/truck PPIs, shipbuilding IPIs). Has WTI/Brent oil (backup for OilPriceAPI) and LNG. |
+| **Access** | **Free with API key** (no credit card) |
+| **Auth** | `api_key` query param (free registration at fredaccount.stlouisfed.org) |
+| **Rate Limit** | Generous (120 calls/min recommended cap) |
+| **Depth** | Varies; many series decades long |
+| **Verdict** | **GO for oil benchmarks (backup)** — but **NOT for `freight_rates`**; it carries no ocean container/Baltic dry-bulk rates. Useful redundancy for `oil_prices` (WTI/Brent) at zero marginal cost once the free key is registered. |
+
+### 3.6 SeaRates Freight Index API `docs.searates.com`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Container freight index per trade lane (e.g. Shanghai-Rotterdam), FCL/LCL, wet/dry bulk per-mt/m3 |
+| **Access** | **Paid** (marketing page: "request a quote") |
+| **Auth** | API key |
+| **Verdict** | **NO-GO** — `freight-index.searates.com` does not resolve (no DNS, verified 2026-08-09) and the API is commercial. |
+
+### 3.7 FreightPulse `freightpulsehq.com`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Real-time ocean container route rates (e.g. Shanghai→LA 40ft), port congestion index, US diesel, trucking rates |
+| **Access** | **Free plan — 100 API calls/month, all endpoints, no credit card** |
+| **Auth** | `X-API-Key` |
+| **Rate Limit** | Free: 100 calls/month |
+| **Depth** | Free: current values only (paid unlocks history) |
+| **Verdict** | **PROBE** — Free tier is tiny (100 calls/mo) but covers exactly the `freight_rates` gap (per-route container $/40ft) and port congestion. Worth a free key to validate coverage + cadence before committing. |
+
 ---
 
 ## 4. Vessel Registry / Identity
@@ -301,6 +347,60 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Format** | Web + CSV export |
 | **Verdict** | **PROBE** — Free but requires registration. Good for safety/quality data enrichment; evaluate if CSV export is automated. |
 
+### 4.6 UN/LOCODE official (UNECE) `unece.org`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | The **canonical** global code for ports and other trade/transport locations — 103K+ locations, 249 countries, UN/LOCODE, coordinates, subdivision, function classifier, status |
+| **Access** | **Free, open data** — ODC-PDDL (public domain) |
+| **Auth** | None |
+| **Depth** | Full code list, released biannually (2025-1 is current) |
+| **Format** | CSV (3 parts), TXT, MS Access `.mdb`, XML, TTL |
+| **Download** | `https://opensource.unicc.org/un/unece/uncefact/vocab-locode/-/jobs/artifacts/2025-1/download?job=package-release` (zip, ~13.5 MB; verified HTTP 200 2026-08-09). Legacy mirrors at `service.unece.org/trade/locode/loc242csv.zip` return 403. |
+| **Coordinates** | DDMM format (`4230N 00131E`) — parse to decimal degrees |
+| **Verdict** | **GO** — verified live 2026-08-09, 116,533 rows across the 3 CSV parts. **This is the authoritative replacement for the `ports` table**, which currently holds only 12,256 rows derived from Digitraffic's `ssnLocations` (a subset with a non-standard source). Use UN/LOCODE for the `ports` reference. |
+
+### 4.7 EU Fleet Register `vessel-register.oceans-and-fisheries.ec.europa.eu`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | All EU-flagged fishing vessels — CFR, UVI/IMO, IRCS, flag, GT, LOA, power, latest event |
+| **Access** | **Free** |
+| **Auth** | None (web search) but results are captcha-gated; export button present |
+| **Format** | Web UI with "Export Data"; no clean REST API found |
+| **Verdict** | **NO-GO** (for merchant fleet) — this register covers **fishing** vessels only, so it doesn't fit `vessel_registry` (which targets commercial ships). Captcha on results is a scraping blocker. Keep as niche fishing-fleet reference only. |
+
+### 4.8 THETIS-MRV `mrv.emsa.europa.eu` (EMSA ship emissions)
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Verified CO₂, CH₄, N₂O emissions + fuel consumption + efficiency metrics per ship/year (EU MRV regulation), ~87K records 2018-2024 |
+| **Access** | **Free, public** (official EMSA portal; login for bulk) |
+| **Auth** | Portal login required for the Excel downloads |
+| **Community API** | `https://thetis-mrv-api.vercel.app` — docs load (FastAPI) but data endpoints currently 500 (broken backend, verified 2026-08-09) |
+| **Verdict** | **PROBE** — official data is a genuinely valuable emissions source for `vessel_registry`-adjacent analytics, but the free path is manual (portal login → per-year Excel). No existing table targets it; needs a schema decision before building. |
+
+### 4.9 Paris MoU Port State Control `parismou.org`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | PSC inspection results for the Paris MoU region (Europe + North Atlantic) — inspections, detentions, bannings, deficiencies, KPIs, risk profiles |
+| **Access** | **Free, public web** — but **bulk XML requires an account request** (manual form: Paris MoU Data Request Application Form → login → automated download) |
+| **Auth** | Account (manual request, free) |
+| **Format** | Web UI (JS SPA, no public JSON API — verified 2026-08-09, `parismou.org/inspection-search` is a Drupal SPA with no `/jsonapi`), bulk XML with account |
+| **Verdict** | **PROBE** — the manual account request is friction, but this is the **authoritative** `vessel_safety` dataset for European waters. Bulk XML (once granted) is the right integration path; the SPA has no API to scrape. |
+| **Alt API** | `mou.mrl.dev` — community PSC aggregation API (`/api/inspections`, `/api/detentions`, covers Paris/Tokyo/Indian Ocean MoU + USCG). **Free but requires HTTP Basic credentials** — 401 without them (verified 2026-08-09). One-off community project; availability uncertain. |
+
+### 4.10 Tokyo MoU PSC `tokyo-mou.org`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | PSC inspection/detention data for Asia-Pacific region |
+| **Access** | **Free, public web** |
+| **Auth** | None (web) |
+| **Format** | Web only; search pages 404 under the guessed URLs (verified 2026-08-09) |
+| **Verdict** | **PROBE** — inspect the actual search UI path before ruling out; no API confirmed. Lower priority than Paris MoU (which is already PROBE). |
+
 ---
 
 ## 5. Trade Flow Data
@@ -339,7 +439,31 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Access** | **Free, no auth** — Open source |
 | **Rate Limit** | 10,000 requests/day (free) |
 | **Depth** | Historical from 1940 (ERA5 reanalysis) |
-| **Verdict** | **GO** — Essential ancillary data for route analysis, delay correlation. No auth. |
+| **Endpoints** | `api.open-meteo.com/v1/forecast` (weather), `marine-api.open-meteo.com/v1/marine` (waves/currents) |
+| **Collector** | `src/collectors/open_meteo.py` — collect_marine, collect_weather |
+| **Tables** | `marine_weather`, `weather` |
+| **Verdict** | **GO** — Essential ancillary data for route analysis, delay correlation. No auth. Both collectors wired daily at Singapore (1.264, 103.82). |
+
+### 6.3 NOAA ERDDAP `coastwatch.pfeg.noaa.gov/erddap`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Thousands of gridded/tabular oceanographic datasets — significant wave height, sea surface temperature, currents, wind, sea ice (GFS/CFSR/WW3/AVISO feeds) |
+| **Access** | **Free, no auth** |
+| **Auth** | None |
+| **Rate Limit** | Reasonable use |
+| **Depth** | Varies by dataset; many multi-decade |
+| **Format** | JSON, CSV, NetCDF, GeoJSON (REST `tabledap`/`griddap`) |
+| **Verdict** | **GO** (ancillary) — verified live 2026-08-09 (`coastwatch.pfeg.noaa.gov/erddap/info/index.json` + wave-height search return JSON). Strong complement to Open-Meteo for `marine_weather` (SST, actual current vectors, WW3 wave fields) at chokepoint/port coordinates. No auth, so zero signup friction. |
+
+### 6.4 Copernicus Marine Service `data.marine.copernicus.eu`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | CMEMS — global ocean analyses/forecasts: waves, currents, SST, sea ice, sea level |
+| **Access** | **Free with registration** (motu API + FTP/HTTP downloads) |
+| **Auth** | Free account |
+| **Verdict** | **PROBE** — richer/more authoritative than Open-Meteo marine, but heavier (NetCDF, registration, quota per product). Worth it only if Open-Meteo marine depth proves insufficient. Low priority given Open-Meteo + NOAA ERDDAP already cover the table. |
 
 ### 6.2 Port of Barcelona Weather API
 
@@ -438,6 +562,22 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 | **Auth** | API key (paid registration) |
 | **Verdict** | **NO-GO** — free tier claimed but registration yields only paid plans. Collector preserved for future use if access changes. |
 
+### 8.6 OilPriceAPI `oilpriceapi.com`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Oil price benchmarks (BRENT, WTI, DUBAI, Urals, OPEC basket, natural gas, coal, carbon, FX). Plan-gated freight indices (Baltic Dry/Capesize, SCFI, Drewry WCI) |
+| **Access** | **Free-tier** — 200 requests/month after 7-day 10,000-req trial |
+| **Auth** | API key — header `Authorization: Token <key>` (env `OILPRICEAPI_KEY`) |
+| **Rate Limit** | Free: 200 req/month (120 req/hour on demo) |
+| **Depth** | Latest values (source-timestamped); historical behind paid plan |
+| **Format** | REST JSON |
+| **Endpoints** | `/v1/prices/latest?by_code=CODE`, `/v1/prices/past_week`, `/v1/prices/marine-fuels`, `/v1/prices/futures` |
+| **Collector** | `src/collectors/oilpriceapi.py` — collect_oil_prices (daily), collect_freight_indices (weekly) |
+| **Tables** | `oil_prices` (brent/wti/dubai), `freight_rates` (indices when available) |
+| **Docs** | https://docs.oilpriceapi.com |
+| **Verdict** | **GO for oil benchmarks** — verified live 2026-08-09, BRENT/WTI/DUBAI map 1:1 to `oil_prices`. Freight indices are plan-gated on free keys; tolerated, may yield 0 rows. |
+
 ---
 
 ## 9. Aggregated / Derived Datasets
@@ -516,7 +656,24 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 | FreightPulse | Returns HTML landing page, API may not be live. |
 | emissions.dev | 401 without valid key, needs registration. |
 | Hormuz Monitor | Listed as having free tier but registration yields only paid plans. Collector kept for future use. |
+| Danish Maritime Authority AIS (`web.ais.dk/aisdata/`) | SSL cert hostname mismatch; `verify=False` → `RemoteDisconnected`. Probed 2026-08-09. |
+| OECD maritime CO₂ emissions | Landing page 403; SDMX `GetData/MARITIME_CO2` endpoints 404. Probed 2026-08-09. |
+| ICC IMB Piracy Reporting Centre | Piracy reports map-gated, no public API. Probed 2026-08-09. |
+| NGI LNG Daily | Paid subscription, no free tier. Probed 2026-08-09. |
+| Signal Ocean | `api.signal-ocean.com` does not resolve (no DNS). Probed 2026-08-09. |
+| UP Indices (UPI) | Freemium — API requires a paid plan. Probed 2026-08-09. |
+| Digitraffic `ports` (1.9) | Previously unwired (a stale comment in `collect_all.py` blamed an HTTP 502 from 2026-08-03). **Recovered 2026-08-09** — endpoint returns 200; `ssnLocations` gives 12,256 ports with coordinates. Wired as `digitraffic_ports`. |
+| Open-Meteo `weather` (6.1) | Previously 0 rows though `collect_weather` was written. **Recovered 2026-08-09** — `collect_weather` was never registered in `get_collectors()` (orphaned-collector pattern, like aisstream). Wired as `open_meteo_weather`. |
+| OEC API (Observatory of Economic Complexity) | `api.oec.world` returns **403 Forbidden** on all versions (v2/v3/tesseract) regardless of UA/Accept headers. Probed 2026-08-09. NO-GO as a `trade_flow` alternative to UN Comtrade. |
+| SeaRates Freight Index | `freight-index.searates.com` does not resolve (no DNS). API is commercial anyway. Probed 2026-08-09. |
+| Straits.live Hormuz API | `straits.live/api` returns 403 Forbidden (WAF). Probed 2026-08-09. |
+| THETIS-MRV community API (`thetis-mrv-api.vercel.app`) | Docs load (200) but all data endpoints return **500** (broken Supabase backend). Probed 2026-08-09. |
+| `mou.mrl.dev` PSC API | 401 Unauthorized without HTTP Basic credentials; one-off community project. Probed 2026-08-09. |
+| Paris MoU inspection search | JS SPA, no `/jsonapi` or public JSON API; bulk requires a manual data-request account. Probed 2026-08-09. |
+| Tokyo MoU PSC search | Guessed URLs return 404; no API confirmed. Probed 2026-08-09. |
+| EU Fleet Register | Fishing vessels only (not merchant `vessel_registry`); captcha-gated results. Probed 2026-08-09. |
+| FRED for `freight_rates` | Free API key, but carries **no** ocean container/Baltic dry-bulk rates — only US domestic trucking/rail indices. Verified 2026-08-09. GO only as an `oil_prices` backup (WTI/Brent). |
 
 ---
 
-*Vetted: 2026-07-20. Re-verify any source before building — APIs change, free tiers get removed, and keys expire.*
+*Vetted: 2026-07-20. Updated: 2026-08-09 (Session 16 — added Digitraffic + OilPriceAPI, 6 new dead ends, recovered ports + weather wiring; Session 16b — new-source sweep: UN/LOCODE official, NOAA ERDDAP, FRED, FreightPulse, THETIS-MRV, Paris MoU, 10 new dead ends). Re-verify any source before building — APIs change, free tiers get removed, and keys expire.*

@@ -8,6 +8,7 @@ build/
 venv/
 data/
 storage/*.db
+storage/*.db.bak-*
 storage/*.wal
 storage/parquet/
 .ruff_cache/

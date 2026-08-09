@@ -1,5 +1,164 @@
 # Session Notes
 
+## 2026-08-09 — Session 16: two new free sources (Digitraffic + OilPriceAPI), vessels table unblocked
+
+### Mission
+
+Freeze-frame `freight_rates`, `oil_prices`, `port_calls`, `ports`, `vessel_registry`,
+`vessels`, `weather`, `trade_flow`, `vessel_safety` — the tables still landing 0
+rows. Research new free sources, vet them with live probes, wire the survivors in.
+
+### Vetted and rejected (live probes, verdicts recorded in `DATA_SOURCES.md`)
+
+| Source | Probe result | Verdict |
+|---|---|---|
+| **Digitraffic** `meri.digitraffic.fi` | `/api/ais/v1/locations` (GeoJSON, ~1,020 features), `/api/ais/v1/vessels` (~890), `/api/port-call/v1/port-calls` (~200), `/api/port-call/v1/ports` (5 MB) all 200, open swagger, no auth | ✅ **GO** |
+| **OilPriceAPI** `api.oilpriceapi.com` | Demo `/v1/demo/prices` returns 37 commodities; BRENT/WTI/DUBAI map 1:1 to `oil_prices` columns. Auth `Authorization: Token`, free tier 200 req/mo after 7-day trial. Freight indices (BDI/BCI/SCFI/WCI) **not in the demo catalog** — plan-gated | ✅ **GO for oil benchmarks**; freight tolerated |
+| Danish Maritime Authority AIS `web.ais.dk/aisdata/` | SSL cert hostname mismatch; `verify=False` → `RemoteDisconnected` | ❌ NO-GO |
+| OECD maritime CO₂ | Page 403; SDMX `GetData/MARITIME_CO2` 404 | ❌ NO-GO |
+| ICC IMB piracy | Map-gated, no public API | ❌ NO-GO |
+| NGI LNG Daily | Paid, no free tier | ❌ NO-GO |
+| Signal Ocean | `api.signal-ocean.com` no DNS | ❌ NO-GO |
+| UP Indices (UPI) | Freemium, API paid-only | ❌ NO-GO |
+
+### The interesting find: `vessels` was unblocked, not just filled
+
+Writing Digitraffic vessel rows hit `ConstraintException: PRIMARY KEY or UNIQUE
+constraint violation`. The live `vessels` table still carried `imo BIGINT
+PRIMARY KEY` + `imo NOT NULL` from an **old schema that schema.py no longer
+declares** — `CREATE TABLE IF NOT EXISTS` never alters an existing table, and
+the migration runner only ever *added* columns. Every vessel-writing collector
+(gfw, shiplookup, vesselapi, seafarer_index) had been silently blocked by this
+since before Session 15; that is why `vessels` stayed at 0 rows while four
+collectors claimed to target it.
+
+DuckDB cannot `DROP CONSTRAINT`, so migration `202608090001` rebuilds the
+(empty) table to match schema.py — data-preserving (`INSERT ... SELECT`) in
+case a table ever holds rows. Same drift mechanism as the
+`ais_positions.vessel_type` fix in Session 15: **`CREATE TABLE IF NOT EXISTS`
+never alters; schema changes need migrations, and this one was never written.**
+
+### Wired in
+
+| Collector | Table(s) | Schedule | Notes |
+|---|---|---|---|
+| `digitraffic` (`collect_locations`) | `ais_positions` | daily | joins vessel metadata by MMSI for name/IMO/draught (dm→m) |
+| `digitraffic_vessels` | `vessels` | weekly | ~890 rows |
+| `digitraffic_port_calls` | `port_calls` | weekly | ~200 Finnish calls |
+| `oilpriceapi_oil` | `oil_prices` | daily | BRENT/WTI/DUBAI, 3 reqs/run |
+| `oilpriceapi_freight` | `freight_rates` | weekly | plan-gated, may return 0 |
+
+OilPriceAPI needs a new key: `OILPRICEAPI_API_KEY` (config field
+`oilpriceapi_api_key`, `.env.example`, README, `requires_key` in the two
+CollectorDefs). No key → the orchestrator skips them cleanly like the other
+key-required sources.
+
+### Verification
+
+- Live run: `ais_positions` +1,023 (digitraffic), `vessels` +890, `port_calls`
+  +201 (6 deduped on the port-call natural key).
+- DB after: `ais_positions` sources now axiomancer 59,107 / tankermap 5,000 /
+  digitraffic 1,024 / aisstream 33; `vessels` 890; `port_calls` 201.
+- Gate: `ruff` + `mypy src/` clean (54 files), **262 tests pass** (28 new:
+  `tests/collectors/test_digitraffic.py`, `tests/collectors/test_oilpriceapi.py`).
+
+### Caveats
+
+- `freight_rates` is still at 0 until a paid OilPriceAPI key proves the freight
+  indices; the collector tolerates their absence by design.
+- Whole-repo `ruff check .` still flags **pre-existing** `upload_huggingface.py`
+  E402/UP017 issues from main — untouched this session.
+- `uv run` churns `uv.lock` on this machine (newer uv re-resolves); reverted —
+  no dependency was added.
+
+### Task list after this session
+
+Done: Digitraffic + OilPriceAPI collectors (#1), wire-in (#2), vessels
+constraint migration (#3), tests (#4), docs (#5).
+
+Open: `ports` (Digitraffic payload exists, no collector wired), remaining 0-row
+tables (`weather`, `marine_weather`, `trade_flow`, `oil_inventories`,
+`vessel_registry`, `vessel_safety`), freight_rates paid key decision, CI secrets
+for `OILPRICEAPI_API_KEY`, decide whether to fix pre-existing
+`upload_huggingface.py` lint failures.
+
+### Session 16 continued: `ports` and `weather` wired
+
+Picked up the open items from the session above. Two zero-row tables now land:
+
+| Table | What | Root cause / fix |
+|-------|------|------------------|
+| `ports` | 12,256 rows | The `/api/port-call/v1/ports` endpoint's `ssnLocations` is a **global** port/location reference — 18,660 named locations with UN/LOCODEs (12,256 have coordinates). A stale comment in `collect_all.py` blamed an HTTP 502 from 2026-08-03 and kept `collect_ports` unwired; the endpoint returns 200 today. `_parse_ports` drops coordinate-less features, derives `country_code` from the locode prefix. Fits the `ports` PK table via `INSERT OR REPLACE`. |
+| `weather` | 72 rows | Same orphaned-collector pattern as aisstream: `collect_weather` existed in `open_meteo.py` but was never registered in `get_collectors()`. Now wired as `open_meteo_weather` (daily, Singapore). |
+
+Verified idempotent (re-runs keep 12,256 and 72). Gate: ruff + mypy clean,
+**268 tests pass** (6 new in `tests/collectors/test_digitraffic.py`).
+
+**Root causes confirmed, not bugs**: the remaining 0-row tables are all
+key-gated — `oil_inventories` (EIA `collect_weekly_stocks` wired, but
+`EIA_API_KEY` is not in the local `.env`), `trade_flow` (UN Comtrade
+`un_comtrade_api_key`), `oil_prices`/`freight_rates` (OilPriceAPI key). The
+NO-GO sources are the only targets for `vessel_registry` (DMA, dead) and
+`vessel_safety` (Equasis, auth-gated). `marine_weather` is wired and key-free;
+its 120 rows date from 2026-08-03 and the next daily run refreshes it.
+
+Open after this: obtain the three API keys (`EIA_API_KEY`, `UN_COMTRADE_API_KEY`,
+`OILPRICEAPI_API_KEY`) to finish the key-gated tables; CI secrets for those;
+`upload_huggingface.py` pre-existing lint failures still untouched.
+
+### Session 16b: new free-source sweep
+
+Probed ~20 new candidates for the unfilled tables, live. Verdicts recorded in
+`staging/DATA_SOURCES.md`; signups added to the task list.
+
+**✅ GO — no signup needed:**
+
+- **UN/LOCODE official (UNECE)** — the standout. Canonical global port/location
+  reference: **116,533 rows** across 3 CSV parts, no auth, ODC-PDDL (public
+  domain). Verified live 2026-08-09
+  (`opensource.unicc.org/.../vocab-locode/-/jobs/artifacts/2025-1/download?job=package-release`,
+  zip ~13.5 MB). Coordinates come in DDMM format (`4230N 00131E`) — parse to
+  decimal. **Should replace the Digitraffic-derived `ports` table** (12,256 rows,
+  non-canonical subset). Note: the older `service.unece.org/trade/locode/loc242csv.zip`
+  mirror returns 403; the GitLab-artifact URL is the working path.
+- **NOAA ERDDAP** — oceanographic data (SST, significant wave height, WW3
+  fields, currents), no auth. Verified live (`coastwatch.pfeg.noaa.gov/erddap/info/index.json`
+  + wave-height search → JSON). Complements Open-Meteo for `marine_weather`.
+
+**✅ GO — needs free key (on task list):**
+
+- **FRED** (St. Louis Fed) — WTI/Brent as an `oil_prices` backup. Free API key.
+  **Verified it has NO ocean container/Baltic dry-bulk rates** (searches return
+  only NASDAQ Baltic stock indices, US trucking/rail PPIs, shipbuilding IPIs) —
+  so it cannot fill `freight_rates`.
+
+**⚠️ PROBE — free key / manual account:**
+
+- **FreightPulse** — free plan 100 calls/mo, no credit card; per-route container
+  rates (Shanghai→LA 40ft) + port congestion. Only lead found for the
+  `freight_rates` gap. Register key to validate coverage/cadence.
+- **Paris MoU** — authoritative `vessel_safety` (PSC inspections/detentions,
+  Europe + N Atlantic). Bulk XML requires a **manual account request form**;
+  the public inspection-search is a JS SPA with no JSON API (no `/jsonapi`).
+- **THETIS-MRV** (EMSA ship CO₂/fuel/efficiency, ~87K records 2018-2024) —
+  valuable emissions data, but no existing table targets it; free path is
+  portal login → per-year Excel.
+
+**❌ New dead ends (10, recorded in DATA_SOURCES.md):** OEC API (`api.oec.world`
+403 on all versions), SeaRates Freight Index (no DNS), Straits.live Hormuz (403
+WAF), THETIS-MRV community API (`thetis-mrv-api.vercel.app` data endpoints 500 —
+broken backend, docs load), `mou.mrl.dev` PSC API (401 without Basic creds,
+one-off project), Paris MoU inspection search (SPA, no API), Tokyo MoU PSC
+(guessed URLs 404), EU Fleet Register (fishing vessels only — not merchant
+`vessel_registry`; captcha-gated), FRED-for-`freight_rates` (no ocean rates).
+
+Open after this: wire UN/LOCODE → `ports` (replaces Digitraffic-derived rows);
+wire NOAA ERDDAP → `marine_weather` enrichment; register FRED + FreightPulse
+keys; request Paris MoU account. No code written this session — probes and
+vetting only.
+
+---
+
 ## 2026-07-31 — Session 15: first green workflow run
 
 ### The daily workflow had never succeeded — 9 runs, 9 failures

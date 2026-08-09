@@ -99,11 +99,18 @@ def get_collectors() -> list[CollectorDef]:
         logger.debug("eagle_intelligence collector not available: %s", e)
 
     try:
-        from src.collectors.open_meteo import collect_marine
+        from src.collectors.open_meteo import collect_marine, collect_weather
         collectors.append(
             CollectorDef(
                 name="open_meteo",
                 collect_fn=lambda: collect_marine(latitude=1.264, longitude=103.82),  # Singapore
+                schedule="daily",
+            )
+        )
+        collectors.append(
+            CollectorDef(
+                name="open_meteo_weather",
+                collect_fn=lambda: collect_weather(latitude=1.264, longitude=103.82),  # Singapore
                 schedule="daily",
             )
         )
@@ -263,9 +270,50 @@ def get_collectors() -> list[CollectorDef]:
         )
     except ImportError as e:
         logger.warning("seafarer_index collector not available: %s", e)
-    # collect_ports intentionally not wired: the ports endpoint returns
-    # HTTP 502 (server-side outage), confirmed live 2026-08-03. Revisit
-    # if the upstream API recovers.
+
+    try:
+        from src.collectors.digitraffic import (
+            collect_locations,
+        )
+        from src.collectors.digitraffic import (
+            collect_port_calls as collect_digitraffic_port_calls,
+        )
+        from src.collectors.digitraffic import (
+            collect_ports as collect_digitraffic_ports,
+        )
+        from src.collectors.digitraffic import (
+            collect_vessels as collect_digitraffic_vessels,
+        )
+        collectors.append(
+            CollectorDef(
+                name="digitraffic",
+                collect_fn=collect_locations,
+                schedule="daily",
+            )
+        )
+        collectors.append(
+            CollectorDef(
+                name="digitraffic_vessels",
+                collect_fn=collect_digitraffic_vessels,
+                schedule="weekly",
+            )
+        )
+        collectors.append(
+            CollectorDef(
+                name="digitraffic_port_calls",
+                collect_fn=collect_digitraffic_port_calls,
+                schedule="weekly",
+            )
+        )
+        collectors.append(
+            CollectorDef(
+                name="digitraffic_ports",
+                collect_fn=collect_digitraffic_ports,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("digitraffic collector not available: %s", e)
 
     try:
         from src.collectors.barentswatch import collect_latest_positions
@@ -294,6 +342,30 @@ def get_collectors() -> list[CollectorDef]:
         )
     except ImportError as e:
         logger.warning("aisstream collector not available: %s", e)
+
+    try:
+        from src.collectors.oilpriceapi import (
+            collect_freight_indices,
+            collect_oil_prices,
+        )
+        collectors.append(
+            CollectorDef(
+                name="oilpriceapi_oil",
+                collect_fn=collect_oil_prices,
+                requires_key="oilpriceapi_api_key",
+                schedule="daily",
+            )
+        )
+        collectors.append(
+            CollectorDef(
+                name="oilpriceapi_freight",
+                collect_fn=collect_freight_indices,
+                requires_key="oilpriceapi_api_key",
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("oilpriceapi collector not available: %s", e)
 
     return collectors
 

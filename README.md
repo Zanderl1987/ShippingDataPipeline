@@ -47,8 +47,9 @@ API keys are configured via environment variables or `.env` file:
 | `BARENTSWATCH_TOKEN` | BarentsWatch | No (free registration) |
 | `EIA_API_KEY` | EIA Petroleum | No (free registration) |
 | `HORMUZ_API_KEY` | Hormuz Monitor | No (free tier) |
+| `OILPRICEAPI_API_KEY` | OilPriceAPI | No (free tier) |
 
-**Sources that require no auth:** Axiomancer, Open-Meteo, Eagle Intelligence, IMF PortWatch, TankerMap, JODI-Oil
+**Sources that require no auth:** Axiomancer, Open-Meteo, Eagle Intelligence, IMF PortWatch, TankerMap, JODI-Oil, Digitraffic
 
 ## CLI Commands
 
@@ -81,7 +82,7 @@ sdp collect --force
 sdp status --warnings-only
 ```
 
-## Data Sources (16 collectors)
+## Data Sources (19 collectors)
 
 ### AIS Tracking (No Auth)
 | Collector | Data | Schedule |
@@ -89,6 +90,7 @@ sdp status --warnings-only
 | Axiomancer | Global AIS positions, tanker filter | Daily |
 | Open-Meteo | Marine weather forecasts | Daily |
 | Eagle Intelligence | Chokepoint risk scores (6 straits) | Daily |
+| Digitraffic | Baltic Sea AIS positions + vessels + port calls (Finnish ports) | Daily / Weekly |
 
 ### AIS Tracking (Free Registration)
 | Collector | Data | Auth |
@@ -113,6 +115,7 @@ sdp status --warnings-only
 | IMF PortWatch | Chokepoint transits + capacity | None (ArcGIS) |
 | TankerMap | Live tanker positions, port calls | None |
 | Hormuz Monitor | Risk scores, oil prices, VLCC rates | API key |
+| OilPriceAPI | Oil price benchmarks + freight indices | API key |
 
 ## Project Structure
 
@@ -131,6 +134,8 @@ src/
 │   ├── imf_portwatch.py   # Chokepoint transits
 │   ├── tankermap.py       # Tanker positions
 │   ├── hormuz_monitor.py  # Risk + oil prices
+│   ├── digitraffic.py     # Baltic AIS + vessels + port calls
+│   ├── oilpriceapi.py     # Oil benchmarks + freight indices
 │   └── ...
 ├── storage/               # DuckDB + Parquet storage
 │   ├── schema.py          # 14 table definitions
@@ -191,8 +196,9 @@ Go to your repo → Settings → Secrets and variables → Actions → New repos
 | `GFW_API_TOKEN` | Your GFW token |
 | `EIA_API_KEY` | Your EIA API key |
 | `HORMUZ_API_KEY` | Your Hormuz Monitor key |
+| `OILPRICEAPI_API_KEY` | Your OilPriceAPI key |
 
-Sources without auth (Axiomancer, Open-Meteo, Eagle Intelligence, PortWatch, TankerMap, JODI-Oil) run without secrets.
+Sources without auth (Axiomancer, Open-Meteo, Eagle Intelligence, PortWatch, TankerMap, JODI-Oil, Digitraffic) run without secrets.
 
 ## Notifications
 

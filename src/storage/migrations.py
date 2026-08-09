@@ -84,6 +84,40 @@ MIGRATIONS: list[Migration] = [
         up_sql="ALTER TABLE ais_positions ADD COLUMN IF NOT EXISTS vessel_type VARCHAR;",
         down_sql="",
     ),
+    Migration(
+        version="202608090001",
+        description="Rebuild vessels without the stale imo PRIMARY KEY constraint",
+        # The live vessels table still carries `imo BIGINT PRIMARY KEY` from an
+        # old schema. Every vessel-writing collector (gfw, shiplookup, vesselapi,
+        # seafarer_index) hit a ConstraintException on insert because many
+        # vessels have no IMO, so the table stayed at 0 rows. DuckDB cannot
+        # DROP CONSTRAINT, so rebuild the empty table to match schema.py
+        # (dedup keys imo/mmsi/source, no PRIMARY KEY). Any rows already in the
+        # table are preserved through the rebuild.
+        up_sql="""
+            CREATE OR REPLACE TABLE vessels_rebuild (
+                imo             BIGINT,
+                mmsi            BIGINT,
+                vessel_name     VARCHAR,
+                vessel_type     VARCHAR,
+                flag            VARCHAR,
+                callsign        VARCHAR,
+                length_m        DOUBLE,
+                beam_m          DOUBLE,
+                gross_tonnage   DOUBLE,
+                deadweight_tonnage DOUBLE,
+                year_built      INTEGER,
+                owner_name      VARCHAR,
+                manager_name    VARCHAR,
+                source          VARCHAR,
+                ingested_at     TIMESTAMP DEFAULT now()
+            );
+            INSERT INTO vessels_rebuild SELECT * FROM vessels;
+            DROP TABLE IF EXISTS vessels;
+            ALTER TABLE vessels_rebuild RENAME TO vessels;
+        """,
+        down_sql="",
+    ),
 ]
 
 

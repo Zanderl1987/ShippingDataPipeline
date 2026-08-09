@@ -30,6 +30,7 @@ class Settings:
     barentswatch_token: str | None = None
     eia_api_key: str | None = None
     hormuz_api_key: str | None = None
+    oilpriceapi_api_key: str | None = None
 
     slack_webhook_url: str | None = None
     discord_webhook_url: str | None = None
@@ -55,6 +56,7 @@ class Settings:
             barentswatch_token=os.getenv("BARENTSWATCH_TOKEN"),
             eia_api_key=os.getenv("EIA_API_KEY"),
             hormuz_api_key=os.getenv("HORMUZ_API_KEY"),
+            oilpriceapi_api_key=os.getenv("OILPRICEAPI_API_KEY"),
             slack_webhook_url=os.getenv("SLACK_WEBHOOK_URL"),
             discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL"),
             smtp_host=os.getenv("SMTP_HOST"),
