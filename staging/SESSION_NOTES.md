@@ -1,5 +1,60 @@
 # Session Notes
 
+## 2026-08-10 — Session 17: deps, gate cleanup, two real bug fixes, data refresh
+
+### Mission
+
+"Update all 5 data pipelines" pass: sync deps (`uv sync` + `uv sync --extra dev`),
+get ruff/mypy/tests green, fix known issues, refresh stale data.
+
+### Two real bugs found and fixed
+
+1. **Staleness crash — `datetime.date` vs `datetime.datetime`.** `sdp quality` /
+   `sdp status` crashed with `unsupported operand type(s) for -: 'datetime.datetime'
+   and 'datetime.date'`. DuckDB returns `date` for DATE columns but the monitors
+   compared against `datetime.now()`. Fixed in three places:
+   - `src/monitoring/freshness_sla.py::check_all` — coerce date→datetime (first fix,
+     didn't stop the crash; the real crash was elsewhere).
+   - **`src/monitoring/quality.py:140`** — `hours_stale = (now - latest)` where
+     `latest` is a `date`; now coerced via `datetime.combine(latest, time.min)`.
+   - `src/monitoring/alerts.py:219` — same pattern in the freshness loop; same fix.
+   Lesson: three modules all made the same date/datetime assumption independently —
+   grep for `now - `/`datetime - date` anywhere a DuckDB DATE column feeds a
+   staleness calc next time this crops up.
+2. **`ais_positions.flag` was being dropped on write.** Axiomancer emits a `flag`
+   column; `write_raw` filters to schema columns, and `ais_positions` had no `flag`
+   column, so every write logged "Dropping columns not in ais_positions: {'flag'}".
+   Added `flag VARCHAR` to the table in `src/storage/schema.py` + migration
+   `202608100001` ("Add flag column to ais_positions if missing") in
+   `src/storage/migrations.py`; applied (pending → `[]`). Verified live after the
+   refresh: `flag` present in `ais_positions` columns.
+
+### Gate + data refresh
+
+- `uv sync` + `uv sync --extra dev` (uv 0.11.15); no dependency changes.
+- **268 tests pass**, `ruff check .` clean, `mypy src/` clean (54 files). The mypy
+  no-any-return error in `src/collectors/jodi_oil.py:72` (`return str(resp.text)`)
+  fixed.
+- Refreshed the 5 stale sources: **axiomancer, eagle_intelligence, imf_portwatch,
+  tankermap, jodi_oil = 1,789,777 rows in 115s**.
+- `sdp status` now runs clean end-to-end (no staleness crash).
+- After refresh: `ais_positions` = axiomancer 117,510 (2026-08-10) / tankermap 10,000 /
+  digitraffic 1,024 / aisstream 33; `flag` column confirmed captured.
+- Committed + pushed: `3228b29` (6 files: jodi_oil.py, alerts.py, freshness_sla.py,
+  quality.py, migrations.py, schema.py). Remote `main` at `3228b29`, 0/0.
+
+### Notes for next session
+
+- `sdp` console script still not installed (non-package `src/` layout) — CLI runs via
+  `uv run python -m src.analytics.reports`.
+- Axiomancer "recently collected" skip on re-run means flag capture was verified against
+  the schema + prior rows, not a fresh forced write — a `--force` run would re-confirm
+  end-to-end.
+- Unchanged open items: `EIA_API_KEY`, `UN_COMTRADE_API_KEY`, `OILPRICEAPI_API_KEY`
+  still absent from local `.env` (key-gated tables stay at 0); pre-existing
+  `upload_huggingface.py` ruff E402/UP017 untouched.
+
+---
 ## 2026-08-09 — Session 16: two new free sources (Digitraffic + OilPriceAPI), vessels table unblocked
 
 ### Mission
