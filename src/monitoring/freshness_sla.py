@@ -16,7 +16,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from src.storage.tracker import SourceTracker
@@ -157,6 +157,8 @@ class FreshnessSLA:
                 last_dt = datetime.fromisoformat(last_collection)
             else:
                 last_dt = last_collection
+                if isinstance(last_dt, date) and not isinstance(last_dt, datetime):
+                    last_dt = datetime.combine(last_dt, datetime.min.time())
 
             staleness = (datetime.now() - last_dt).total_seconds() / 3600
             violation = self.check_source(source, staleness)

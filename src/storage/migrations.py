@@ -118,6 +118,16 @@ MIGRATIONS: list[Migration] = [
         """,
         down_sql="",
     ),
+    Migration(
+        version="202608100001",
+        description="Add flag column to ais_positions if missing",
+        # axiomancer reports each vessel's flag (registration country) on its
+        # position feed, but ais_positions predates the flag column in
+        # schema.py. CREATE TABLE IF NOT EXISTS never alters an existing table,
+        # so the column was silently dropped from every write.
+        up_sql="ALTER TABLE ais_positions ADD COLUMN IF NOT EXISTS flag VARCHAR;",
+        down_sql="",
+    ),
 ]
 
 

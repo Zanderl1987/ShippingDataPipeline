@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 import duckdb
 
@@ -137,7 +137,10 @@ def get_table_quality(
                         last_update = latest
 
                     if latest:
-                        hours_stale = (now - latest).total_seconds() / 3600
+                        latest_dt = latest
+                        if isinstance(latest_dt, date) and not isinstance(latest_dt, datetime):
+                            latest_dt = datetime.combine(latest_dt, datetime.min.time())
+                        hours_stale = (now - latest_dt).total_seconds() / 3600
                         if hours_stale > stale_threshold_hours:
                             stale_sources.append(
                                 StaleSource(

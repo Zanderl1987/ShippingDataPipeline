@@ -69,7 +69,7 @@ def download_csv(url: str) -> str:
             with zf.open(names[0]) as member:
                 return member.read().decode("utf-8", errors="replace")
 
-    return resp.text
+    return str(resp.text)
 
 
 def get_primary_data() -> str:

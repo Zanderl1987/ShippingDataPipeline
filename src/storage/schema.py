@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS ais_positions (
     imo             BIGINT,
     vessel_name     VARCHAR,
     vessel_type     VARCHAR,
+    flag            VARCHAR,
     latitude        DOUBLE,
     longitude       DOUBLE,
     sog             DOUBLE,

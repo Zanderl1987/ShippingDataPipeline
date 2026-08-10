@@ -209,12 +209,14 @@ def check_all_monitoring(
         if last_collection is None:
             continue
 
-        from datetime import datetime
+        from datetime import date, datetime
 
         if isinstance(last_collection, str):
             last_dt = datetime.fromisoformat(last_collection)
         else:
             last_dt = last_collection
+            if isinstance(last_dt, date) and not isinstance(last_dt, datetime):
+                last_dt = datetime.combine(last_dt, datetime.min.time())
 
         staleness_hours = (datetime.now() - last_dt).total_seconds() / 3600
         if staleness_hours > 168:  # > 7 days
