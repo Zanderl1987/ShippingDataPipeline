@@ -451,6 +451,173 @@ CREATE TABLE IF NOT EXISTS vessel_safety (
 """,
 )
 
+PORT_VOLUMES = TableSchema(
+    name="port_volumes",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["port_code", "period_date", "source"],
+    version="0.1.0",
+    description="Monthly container throughput by port (TEU)",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS port_volumes (
+    period              VARCHAR,
+    period_date         DATE,
+    port_code           VARCHAR,
+    loaded_imports_teu  DOUBLE,
+    empty_imports_teu   DOUBLE,
+    total_imports_teu   DOUBLE,
+    loaded_exports_teu  DOUBLE,
+    empty_exports_teu   DOUBLE,
+    total_exports_teu   DOUBLE,
+    total_teu           DOUBLE,
+    prior_year_change_pct DOUBLE,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+SUPPLY_CHAIN_INDEX = TableSchema(
+    name="supply_chain_index",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["index_date", "source"],
+    version="0.1.0",
+    description="Global supply chain pressure index readings",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS supply_chain_index (
+    index_date          DATE,
+    gscpi_index         DOUBLE,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+MARITIME_FREIGHT = TableSchema(
+    name="maritime_freight",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["time_period", "geo", "direction", "unit", "source"],
+    version="0.1.0",
+    description="EU maritime freight throughput by port and direction",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS maritime_freight (
+    time_period         VARCHAR,
+    geo                 VARCHAR,
+    geo_label           VARCHAR,
+    direction           VARCHAR,
+    direction_label     VARCHAR,
+    unit                VARCHAR,
+    unit_label          VARCHAR,
+    value               DOUBLE,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+SANCTIONS = TableSchema(
+    name="sanctions",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["entity_id", "name", "source"],
+    version="0.1.0",
+    description="OFAC Specially Designated Nationals (SDN) list entries",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS sanctions (
+    entity_id           VARCHAR,
+    name                VARCHAR,
+    aliases             VARCHAR,
+    entity_type         VARCHAR,
+    programs            VARCHAR,
+    country             VARCHAR,
+    title               VARCHAR,
+    vessel_flag         VARCHAR,
+    vessel_type         VARCHAR,
+    vessel_tonnage      VARCHAR,
+    gross_registered_tonnage VARCHAR,
+    call_sign           VARCHAR,
+    imo_number          VARCHAR,
+    remarks             VARCHAR,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+STORM_EVENTS = TableSchema(
+    name="storm_events",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["event_id", "source"],
+    version="0.1.0",
+    description="NOAA Storm Events Database details (severe weather with damage)",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS storm_events (
+    event_id            VARCHAR,
+    event_type          VARCHAR,
+    begin_date          TIMESTAMP,
+    end_date            TIMESTAMP,
+    state               VARCHAR,
+    county              VARCHAR,
+    latitude            DOUBLE,
+    longitude           DOUBLE,
+    injuries_direct     INTEGER,
+    injuries_indirect   INTEGER,
+    deaths_direct       INTEGER,
+    deaths_indirect     INTEGER,
+    damage_property_millions DOUBLE,
+    damage_crops_millions DOUBLE,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+PORT_METRICS = TableSchema(
+    name="port_metrics",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["metric_period", "metric_name", "category", "source"],
+    version="0.1.0",
+    description="Port-level throughput metrics (Singapore MPA)",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS port_metrics (
+    metric_period       VARCHAR,
+    metric_year         INTEGER,
+    metric_name         VARCHAR,
+    category            VARCHAR,
+    value               DOUBLE,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+AIR_CARGO = TableSchema(
+    name="air_cargo",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["cargo_year", "cargo_month", "carrier_code", "origin", "dest", "source"],
+    version="0.1.0",
+    description="BTS T-100 air cargo freight tonnage by carrier and route",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS air_cargo (
+    cargo_year          INTEGER,
+    cargo_month         INTEGER,
+    carrier_code        VARCHAR,
+    carrier_name        VARCHAR,
+    origin              VARCHAR,
+    dest                VARCHAR,
+    freight_pounds      DOUBLE,
+    passengers          DOUBLE,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 SCHEMA_MIGRATIONS = TableSchema(
     name="schema_migrations",
     partition_cols=[],
@@ -505,6 +672,13 @@ ALL_TABLES: list[TableSchema] = [
     OIL_TRADE,
     VESSEL_REGISTRY,
     VESSEL_SAFETY,
+    PORT_VOLUMES,
+    SUPPLY_CHAIN_INDEX,
+    MARITIME_FREIGHT,
+    SANCTIONS,
+    STORM_EVENTS,
+    PORT_METRICS,
+    AIR_CARGO,
     SOURCE_TRACKING,
     SCHEMA_MIGRATIONS,
     LINEAGE_EVENTS,

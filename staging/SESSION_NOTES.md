@@ -1,5 +1,110 @@
 # Session Notes
 
+## 2026-08-12 — Session 18: seven new keyless sources (todos 1-2)
+
+### Mission
+
+Build every new data source from the 2026-08-12 research report into the four
+pipelines, keyless only. Shipping first: todo #1 (port_la, GSCPI,
+eurostat_maritime) and todo #2 (new keyless sources).
+
+### Todo #1 done — three collectors rewired + verified live
+
+| Source | Verdict | Collector | Live rows in repo `./storage` |
+|---|---|---|---|
+| Port of LA monthly TEUs | ✅ GO | `port_la.py` (SOURCE `port_la`) | `port_volumes` 207 |
+| NY Fed GSCPI | ✅ GO | `gscpi.py` (SOURCE `nyfed_gscpi`) | `supply_chain_index` 347 |
+| Eurostat maritime freight | ✅ GO | `eurostat_maritime.py` (SOURCE `eurostat_maritime`) | `maritime_freight` 95,487 |
+
+- `port_la.py`: Socrata `data.lacity.org` `tsuv-4rgh` (2009-2016, 93 rows) +
+  per-year POLA pages (2017-2026, 114 rows). Fixed `&nbsp;` entities
+  (`html.unescape`); Nov 2020 typo `889.,748.15` handled via fallback total =
+  imports + exports. Testable helper `parse_year_page_html(html, year)`.
+- `gscpi.py`: wide `gscpi_interactive_data.csv` from newyorkfed.org; last
+  non-empty vintage per row.
+- `eurostat_maritime.py`: generic 5-dim JSON-stat flattener (dims
+  freq/direct/unit/rep_mar/time; `freq` dropped), labels carried.
+- **Gotcha**: collectors run from the repo root. `Settings.from_env()` defaults
+  `storage_dir=./storage`, so running from `C:\Users\zande` writes to a stray
+  pre-existing store there (removed own source dirs + deleted rows from its
+  `pipeline.db` after an accidental run).
+
+### Todo #2 — four new keyless sources built + live
+
+| Source | Verdict | Collector | Table | Live rows |
+|---|---|---|---|---|
+| OFAC SDN list | ✅ GO | `ofac_sanctions.py` (SOURCE `ofac_sdn`) | `sanctions` | 19,200 |
+| Singapore MPA (data.gov.sg datastore) | ✅ GO | `singapore_mpa.py` (SOURCE `singapore_mpa`) | `port_metrics` | 563 |
+| NOAA NCEI Storm Events SWDI | ✅ GO | `noaa_storms.py` (SOURCE `noaa_storms`) | `storm_events` | 165,416 |
+| BTS T-100 Market (air cargo) | ✅ GO | `bts_air_cargo.py` (SOURCE `bts_t100`) | `air_cargo` | 94,005 |
+
+- 4 new table schemas added to `schema.py` (before `SOURCE_TRACKING`):
+  `SANCTIONS` (dedup entity_id,name,source), `STORM_EVENTS` (dedup
+  event_id,source), `PORT_METRICS` (dedup metric_period,metric_name,category,
+  source), `AIR_CARGO` (dedup cargo_year,cargo_month,carrier_code,origin,dest,
+  source).
+- **data.gov.sg** `datastore_search` is keyless but rate-limited (4/10s); 2.5s
+  sleep + retry on 429. Resource IDs: vessel_calls
+  `d_60410de1bc1e63ddcf51a619081b11b3`, vessel_arrivals
+  `d_8392e9bea6ca351a38f67172ccdf6a6a`, registered_vessels
+  `d_56f64b2d5a31eb0ee465cc51e83ac60a`. `package_list`/catalog are
+  Cloudflare-blocked. **`PORT_METRICS` dedup key changed from metric_year to
+  metric_period** after a first run collapsed 91 monthly rows (monthly
+  `registered_vessels` rows all share the year).
+- **BTS T-100** is an ASP.NET WebForms flow: GET the field-select page
+  (`gnoyr_VQ={FIL|GDJ}`, ROT13 param), harvest `__VIEWSTATE` etc., POST with
+  `cboPeriod=All`, per-field checkboxes (**no `chkAllVars`** — full field set is
+  10x larger). FIL = Domestic, GDJ = International (US carriers). Selected
+  fields YEAR/MONTH/FREIGHT/PASSENGERS/UNIQUE_CARRIER/UNIQUE_CARRIER_NAME/
+  ORIGIN/DEST → ZIP→CSV (latin-1). 2026 months 1-4 available.
+- **NOAA storm files**: per-year gz at
+  `ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/`, names embed a compile
+  date (`StormEvents_details-ftp_v1.0_d{year}_c{date}.csv.gz`), so the listing
+  is parsed. **Two traps**: (1) `requests` does NOT auto-decompress the stored
+  `.gz` — the first run decoded gzip bytes as UTF-8 and wrote 232,354 garbage
+  rows with null `event_id` (caught by the dedup collapse of 232,353/232,354);
+  fixed with `gzip.decompress`. (2) details CSVs contain embedded newlines
+  inside narrative fields — `csv.DictReader(io.StringIO(content, newline=""))`
+  handles them. Damage strings `50.00K`/`5.00M`/`1.0B` → USD millions.
+  Default `years_back=3` (2024-2026).
+
+### Probed this session
+
+| Source | Probe result | Verdict |
+|---|---|---|
+| OFAC | `sdn.csv` 200, 12 positional cols, `-0-` = missing | ✅ GO |
+| Singapore MPA | datastore_search 200 keyless | ✅ GO |
+| NOAA SWDI | listing + per-year gz 200 | ✅ GO |
+| BTS T-100 | ASP.NET form POST returns ZIP | ✅ GO |
+| Port of Long Beach | Akamai/WAF 403 even with Chrome UA; `data.polb.com` DNS fails | ❌ NO-GO |
+| UNCTAD datacentre | SPA; `unctadstat-api.unctad.org/datamart-api` returns 400 "The path field is required"; microfrontend has no greppable chunk refs; bulk CSV only via UI | ⏸️ DEFERRED |
+
+### Verification
+
+- 30 collectors registered in `collect_all.py` (26 → 30, no dup names), all 7
+  new SOURCEs present.
+- Full DB (`storage/pipeline.db`): port_volumes 207, supply_chain_index 347,
+  maritime_freight 95,487, sanctions 19,200, port_metrics 563, storm_events
+  165,416 (0 null keys), air_cargo 94,005 (0 null keys).
+- Gates: **304 tests pass** (16 todo-1 tests from earlier today + 20 new:
+  `test_ofac_sanctions.py`, `test_singapore_mpa.py`, `test_noaa_storms.py`,
+  `test_bts_air_cargo.py`), ruff clean (line-length 100), mypy --strict clean
+  on all 7 source collectors. `# noqa: E501` on test CSV fixtures was rejected
+  (it corrupts the fixture data) — fixtures use string concatenation instead.
+
+### Notes for next session
+
+- BTS default year is `date.today().year`; 2026 data ends at month 4. When 2027
+  starts, the collector still works (it requests the current year).
+- `noaa_storms` `years_back=3` is a rolling window; a one-off full backfill
+  (1950+) needs the constant raised temporarily.
+- OFAC sdn.csv ships no header — parser keys by position and skips a header if
+  present; `-0-` → NULL.
+- Remaining todos (freight-rail, consumer, financial) still pending. UNCTAD can
+  be revisited via the MFE reverse-engineering route if the table needs it.
+
+---
+
 ## 2026-08-10 — Session 17: deps, gate cleanup, two real bug fixes, data refresh
 
 ### Mission

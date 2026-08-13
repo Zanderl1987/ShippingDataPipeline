@@ -367,6 +367,94 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("oilpriceapi collector not available: %s", e)
 
+    # ── Port volumes / macro indices (no-auth, Tier-1 pattern-reuse) ──────
+
+    try:
+        from src.collectors.port_la import collect_port_la_data
+        collectors.append(
+            CollectorDef(
+                name="port_la",
+                collect_fn=collect_port_la_data,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("port_la collector not available: %s", e)
+
+    try:
+        from src.collectors.gscpi import collect_gscpi_data
+        collectors.append(
+            CollectorDef(
+                name="nyfed_gscpi",
+                collect_fn=collect_gscpi_data,
+                schedule="monthly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("gscpi collector not available: %s", e)
+
+    try:
+        from src.collectors.eurostat_maritime import collect_eurostat_maritime_data
+        collectors.append(
+            CollectorDef(
+                name="eurostat_maritime",
+                collect_fn=collect_eurostat_maritime_data,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("eurostat_maritime collector not available: %s", e)
+
+    # ── Sanctions / disruption / port benchmarks (no-auth) ────────────────
+
+    try:
+        from src.collectors.ofac_sanctions import collect_ofac_sanctions_data
+        collectors.append(
+            CollectorDef(
+                name="ofac_sdn",
+                collect_fn=collect_ofac_sanctions_data,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.warning("ofac_sanctions collector not available: %s", e)
+
+    try:
+        from src.collectors.noaa_storms import collect_noaa_storms_data
+        collectors.append(
+            CollectorDef(
+                name="noaa_storms",
+                collect_fn=collect_noaa_storms_data,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("noaa_storms collector not available: %s", e)
+
+    try:
+        from src.collectors.singapore_mpa import collect_singapore_mpa_data
+        collectors.append(
+            CollectorDef(
+                name="singapore_mpa",
+                collect_fn=collect_singapore_mpa_data,
+                schedule="monthly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("singapore_mpa collector not available: %s", e)
+
+    try:
+        from src.collectors.bts_air_cargo import collect_bts_air_cargo_data
+        collectors.append(
+            CollectorDef(
+                name="bts_t100",
+                collect_fn=collect_bts_air_cargo_data,
+                schedule="monthly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("bts_air_cargo collector not available: %s", e)
+
     return collectors
 
 
