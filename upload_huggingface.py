@@ -77,6 +77,15 @@ import pandas as pd
 df = pd.read_parquet("path/to/parquet/file.parquet")
 ```
 
+## Engineering & data quality
+
+- **304 tests**, run through a CI pipeline (lint → type check → test → collect → quality
+  gate) that also runs the daily collection itself.
+- **Deduplication and lineage tracking**: raw per-partition exports land in DuckDB, then a
+  dedup/curation layer resolves the canonical table published here; source-tracking and
+  lineage-event tables record where each row came from (kept internal, not part of this
+  public export).
+
 ## Build Info
 
 - **Generated**: {generated_date}
