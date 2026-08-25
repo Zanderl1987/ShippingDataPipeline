@@ -184,6 +184,8 @@ CREATE TABLE IF NOT EXISTS ports (
     longitude       DOUBLE,
     timezone        VARCHAR,
     region          VARCHAR,
+    function_class  VARCHAR,
+    status          VARCHAR,
     source          VARCHAR,
     ingested_at     TIMESTAMP DEFAULT now()
 );

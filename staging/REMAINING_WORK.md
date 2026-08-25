@@ -31,7 +31,7 @@ Re-running a collector is now a no-op. Verified against live endpoints:
 |-------|------|--------|
 | `chokepoint_transits` | 77,389 (2019-01-01 → 2026-07-26) | IMF PortWatch |
 | `chokepoint_status` | 6 | Eagle Intelligence |
-| `freight_rates` | 0 | OilPriceAPI indices (BDI/BCI/SCFI/WCI) wired weekly, but plan-gated — expect 0 until a paid key. Container per-route rates still need a source. |
+| `freight_rates` | 0 | OilPriceAPI indices (BDI/BCI/SCFI/WCI) wired weekly, but plan-gated — expect 0 until a paid key. Container per-route rates still need a source. **NYFI collector added (`nyfi`, weekly) — awaiting free NYSHEX account key (`NYSHEX_API_KEY`).** |
 
 ## Zero-row tables now landing data (Session 16, 2026-08-09)
 
@@ -118,11 +118,17 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 | OilPriceAPI | `api.oilpriceapi.com` `/v1/prices/latest`, `/v1/prices/marine-fuels` | `Authorization: Token` (env `OILPRICEAPI_KEY`) | ✅ GO for oil benchmarks; freight indices plan-gated |
 | UN/LOCODE official | `opensource.unicc.org/.../vocab-locode/-/jobs/artifacts/2025-1/download?job=package-release` (zip with 3 CSVs) | None | ✅ GO — verified live 2026-08-09, 116,533 rows. Canonical `ports` reference; replace Digitraffic-derived 12,256-row `ports` table. |
 
-## New working sources (Session 16b sweep, 2026-08-09)
+## New collectors (Session 17, 2026-08-24)
 
+| Collector | What | Status |
+|-----------|------|--------|
+| `unlocode` (`unlocode_ports`, ondemand) | Downloads the UNECE UN/LOCODE release zip (~13.5 MB), parses the 3 comma-delimited CSV parts (12 positional columns, no header; country header lines skipped), converts DDMM[N/S] DDDMM[E/W] coordinates to decimal degrees, and loads **all** rows into `ports` keyed by `unlocode` PK (`INSERT OR REPLACE` overwrites the Digitraffic-derived subset). `function_class` (class '1' = port) and `status` are preserved per row via migration `202608240001`. | ✅ BUILT — zip re-verified live 2026-08-24 (ranged GET 206, 13.5 MB). |
+| `nyfi` (`nyfi`, weekly) | NYSHEX NYFI container-freight index → `freight_rates`. Auth `Authorization: ApiKey <key>` (env `NYSHEX_API_KEY`, free account). Parser written defensively against the documented schema (timeframe YYYY-WW, publishDate, indices[] with lane/value/unit); raw sample logged at DEBUG. | ✅ BUILT — endpoint live (401 without key, as expected). Awaiting free NYSHEX account key. |
+
+## New working sources (Session 16b sweep, 2026-08-09)
 | Source | What | Auth | Status |
 |--------|------|------|--------|
-| UN/LOCODE official (UNECE) | Canonical global port/location reference, 116K rows | None | ✅ GO — verified live. Replaces Digitraffic-derived `ports`. |
+| UN/LOCODE official (UNECE) | Canonical global port/location reference, 116K rows | None | ✅ GO — verified live. **BUILT 2026-08-24** (`src/collectors/unlocode.py`, wired as `unlocode_ports`); replaces Digitraffic-derived `ports`. |
 | NOAA ERDDAP | Oceanographic gridded/tabular data (SST, wave height, currents, WW3) | None | ✅ GO — verified live. Complements Open-Meteo for `marine_weather`. |
 | FRED | Oil benchmarks (WTI/Brent) — backup for `oil_prices` | Free API key | ✅ GO (needs signup) |
 | FreightPulse | Per-route container rates (Shanghai→LA 40ft) + port congestion | Free API key (100 calls/mo) | ⚠️ PROBE (needs signup) |
@@ -144,4 +150,4 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 
 ---
 
-*Last updated: 2026-08-09 (Session 16b — new-source sweep)*
+*Last updated: 2026-08-24 (Session 17 — UN/LOCODE + NYFI collectors built)*

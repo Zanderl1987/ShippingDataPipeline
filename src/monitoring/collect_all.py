@@ -367,6 +367,31 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("oilpriceapi collector not available: %s", e)
 
+    try:
+        from src.collectors.nyfi import collect_nyfi
+        collectors.append(
+            CollectorDef(
+                name="nyfi",
+                collect_fn=collect_nyfi,
+                requires_key="nyshex_api_key",
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("nyfi collector not available: %s", e)
+
+    try:
+        from src.collectors.unlocode import collect_ports as collect_unlocode_ports
+        collectors.append(
+            CollectorDef(
+                name="unlocode_ports",
+                collect_fn=collect_unlocode_ports,
+                schedule="ondemand",
+            )
+        )
+    except ImportError as e:
+        logger.warning("unlocode collector not available: %s", e)
+
     # ── Port volumes / macro indices (no-auth, Tier-1 pattern-reuse) ──────
 
     try:

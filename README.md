@@ -48,6 +48,7 @@ API keys are configured via environment variables or `.env` file:
 | `EIA_API_KEY` | EIA Petroleum | No (free registration) |
 | `HORMUZ_API_KEY` | Hormuz Monitor | No (free tier) |
 | `OILPRICEAPI_API_KEY` | OilPriceAPI | No (free tier) |
+| `NYSHEX_API_KEY` | NYSHEX NYFI index | No (free account) |
 
 **Sources that require no auth:** Axiomancer, Open-Meteo, Eagle Intelligence, IMF PortWatch, TankerMap, JODI-Oil, Digitraffic
 

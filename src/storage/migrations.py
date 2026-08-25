@@ -128,6 +128,19 @@ MIGRATIONS: list[Migration] = [
         up_sql="ALTER TABLE ais_positions ADD COLUMN IF NOT EXISTS flag VARCHAR;",
         down_sql="",
     ),
+    Migration(
+        version="202608240001",
+        description="Add function_class and status columns to ports",
+        # The UN/LOCODE collector (unlocode.py) loads the full UNECE code list
+        # keyed by unlocode, carrying each location's function classifier
+        # ('1' = port) and status code. ports predates both columns; without
+        # this migration write_raw would silently drop them on every insert.
+        up_sql="""
+            ALTER TABLE ports ADD COLUMN IF NOT EXISTS function_class VARCHAR;
+            ALTER TABLE ports ADD COLUMN IF NOT EXISTS status VARCHAR;
+        """,
+        down_sql="",
+    ),
 ]
 
 

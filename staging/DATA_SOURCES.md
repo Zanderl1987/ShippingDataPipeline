@@ -288,6 +288,18 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Depth** | Free: current values only (paid unlocks history) |
 | **Verdict** | **PROBE** — Free tier is tiny (100 calls/mo) but covers exactly the `freight_rates` gap (per-route container $/40ft) and port congestion. Worth a free key to validate coverage + cadence before committing. |
 
+### 3.8 NYSHEX NYFI `nyshex.com`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | New York Container Index (NYFI) — weekly container-freight composite by trade lane/sub-index |
+| **Access** | **Free account** (registration required) |
+| **Auth** | API key — header `Authorization: ApiKey <key>` (env `NYSHEX_API_KEY`) |
+| **Depth** | Published weekly readings (startDate/endDate ISO8601 window) |
+| **Format** | REST JSON — timeframe (YYYY-WW), publishDate, indices[] per lane |
+| **Collector** | `src/collectors/nyfi.py` — collect_nyfi (weekly) → `freight_rates` (source `nyfi`) |
+| **Verdict** | **GO** — endpoint verified live 2026-08-24 (401 without key, as expected). Collector built; awaiting a free NYSHEX account key to validate the actual response shape. |
+
 ---
 
 ## 4. Vessel Registry / Identity
@@ -358,7 +370,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Format** | CSV (3 parts), TXT, MS Access `.mdb`, XML, TTL |
 | **Download** | `https://opensource.unicc.org/un/unece/uncefact/vocab-locode/-/jobs/artifacts/2025-1/download?job=package-release` (zip, ~13.5 MB; verified HTTP 200 2026-08-09). Legacy mirrors at `service.unece.org/trade/locode/loc242csv.zip` return 403. |
 | **Coordinates** | DDMM format (`4230N 00131E`) — parse to decimal degrees |
-| **Verdict** | **GO** — verified live 2026-08-09, 116,533 rows across the 3 CSV parts. **This is the authoritative replacement for the `ports` table**, which currently holds only 12,256 rows derived from Digitraffic's `ssnLocations` (a subset with a non-standard source). Use UN/LOCODE for the `ports` reference. |
+| **Verdict** | **GO — BUILT** — verified live 2026-08-09 (re-verified 2026-08-24: ranged GET 206, 13.5 MB), 116,533 rows across the 3 CSV parts. **Collector built 2026-08-24** (`src/collectors/unlocode.py`, wired as `unlocode_ports`); loads the full code list into `ports` keyed by `unlocode` PK, overwriting the Digitraffic-derived subset. Note: the release CSVs are **comma-delimited** (12 positional columns, no header row) despite the legacy pipe-delimited UNECE convention. This is the authoritative replacement for the Digitraffic `ssnLocations`-derived `ports` subset. |
 
 ### 4.7 EU Fleet Register `vessel-register.oceans-and-fisheries.ec.europa.eu`
 
