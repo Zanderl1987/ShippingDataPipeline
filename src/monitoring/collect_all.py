@@ -480,6 +480,18 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("bts_air_cargo collector not available: %s", e)
 
+    try:
+        from src.collectors.freightpulse import collect_port_congestion
+        collectors.append(
+            CollectorDef(
+                name="freightpulse",
+                collect_fn=collect_port_congestion,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.warning("freightpulse collector not available: %s", e)
+
     return collectors
 
 

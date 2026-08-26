@@ -597,6 +597,38 @@ CREATE TABLE IF NOT EXISTS port_metrics (
 """,
 )
 
+PORT_CONGESTION = TableSchema(
+    name="port_congestion",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["snapshot_date", "port_code", "source"],
+    version="0.1.0",
+    description="Real-time port congestion metrics (FreightPulse)",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS port_congestion (
+    snapshot_date           DATE,
+    port_code               VARCHAR,
+    port_name               VARCHAR,
+    country                 VARCHAR,
+    region                  VARCHAR,
+    latitude                DOUBLE,
+    longitude               DOUBLE,
+    capacity_teu            DOUBLE,
+    congestion_index        DOUBLE,
+    congestion_level        VARCHAR,
+    vessels_at_anchor       INTEGER,
+    vessels_at_berth        INTEGER,
+    avg_wait_time_hours     DOUBLE,
+    avg_berth_time_hours    DOUBLE,
+    container_dwell_days    DOUBLE,
+    trend                   VARCHAR,
+    change_week             INTEGER,
+    source                  VARCHAR,
+    partition_date          DATE,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 AIR_CARGO = TableSchema(
     name="air_cargo",
     partition_cols=["partition_date", "source"],
@@ -681,6 +713,7 @@ ALL_TABLES: list[TableSchema] = [
     STORM_EVENTS,
     PORT_METRICS,
     AIR_CARGO,
+    PORT_CONGESTION,
     SOURCE_TRACKING,
     SCHEMA_MIGRATIONS,
     LINEAGE_EVENTS,

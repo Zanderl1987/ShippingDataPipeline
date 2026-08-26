@@ -129,6 +129,37 @@ MIGRATIONS: list[Migration] = [
         down_sql="",
     ),
     Migration(
+        version="202608260001",
+        description="Add port_congestion table for FreightPulse data",
+        up_sql="""
+            CREATE TABLE IF NOT EXISTS port_congestion (
+                snapshot_date           DATE,
+                port_code               VARCHAR,
+                port_name               VARCHAR,
+                country                 VARCHAR,
+                region                  VARCHAR,
+                latitude                DOUBLE,
+                longitude               DOUBLE,
+                capacity_teu            DOUBLE,
+                congestion_index        DOUBLE,
+                congestion_level        VARCHAR,
+                vessels_at_anchor       INTEGER,
+                vessels_at_berth        INTEGER,
+                avg_wait_time_hours     DOUBLE,
+                avg_berth_time_hours    DOUBLE,
+                container_dwell_days    DOUBLE,
+                trend                   VARCHAR,
+                change_week             INTEGER,
+                source                  VARCHAR,
+                partition_date          DATE,
+                ingested_at             TIMESTAMP DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_pc_snapshot ON port_congestion(snapshot_date);
+            CREATE INDEX IF NOT EXISTS idx_pc_port ON port_congestion(port_code);
+        """,
+        down_sql="DROP TABLE IF EXISTS port_congestion;",
+    ),
+    Migration(
         version="202608240001",
         description="Add function_class and status columns to ports",
         # The UN/LOCODE collector (unlocode.py) loads the full UNECE code list
