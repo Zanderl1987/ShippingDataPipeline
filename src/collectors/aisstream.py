@@ -232,7 +232,7 @@ def collect_stream(
             df_ves = df_ves.with_columns(
                 pl.lit(SOURCE).alias("source"),
             )
-            count = write_raw("vessels", df_ves)
+            count = write_raw("vessels", df_ves, table_name="vessels")
             total_rows += count
             logger.info("Wrote %d vessel records from AISStream", count)
 
