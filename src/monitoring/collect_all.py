@@ -492,6 +492,42 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("freightpulse collector not available: %s", e)
 
+    try:
+        from src.collectors.freightpulse_rates import collect_freight_rates
+        collectors.append(
+            CollectorDef(
+                name="freightpulse_rates",
+                collect_fn=collect_freight_rates,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.warning("freightpulse_rates collector not available: %s", e)
+
+    try:
+        from src.collectors.freightpulse_fuel import collect_fuel_prices
+        collectors.append(
+            CollectorDef(
+                name="freightpulse_fuel",
+                collect_fn=collect_fuel_prices,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.warning("freightpulse_fuel collector not available: %s", e)
+
+    try:
+        from src.collectors.freightpulse_disruptions import collect_disruptions
+        collectors.append(
+            CollectorDef(
+                name="freightpulse_disruptions",
+                collect_fn=collect_disruptions,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.warning("freightpulse_disruptions collector not available: %s", e)
+
     return collectors
 
 

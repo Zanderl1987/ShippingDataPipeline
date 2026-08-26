@@ -160,6 +160,66 @@ MIGRATIONS: list[Migration] = [
         down_sql="DROP TABLE IF EXISTS port_congestion;",
     ),
     Migration(
+        version="202608260002",
+        description="Add fuel_prices table for marine bunker and road diesel prices",
+        up_sql="""
+            CREATE TABLE IF NOT EXISTS fuel_prices (
+                snapshot_date           DATE,
+                diesel_national_avg     DOUBLE,
+                diesel_change_week      DOUBLE,
+                diesel_east_coast       DOUBLE,
+                diesel_midwest          DOUBLE,
+                diesel_gulf_coast       DOUBLE,
+                diesel_rocky_mountain   DOUBLE,
+                diesel_west_coast       DOUBLE,
+                diesel_california       DOUBLE,
+                gasoline_regular        DOUBLE,
+                gasoline_midgrade       DOUBLE,
+                gasoline_premium        DOUBLE,
+                gasoline_national_avg   DOUBLE,
+                bunker_rotterdam        DOUBLE,
+                bunker_singapore        DOUBLE,
+                bunker_houston          DOUBLE,
+                diesel_30d_avg          DOUBLE,
+                diesel_90d_avg          DOUBLE,
+                diesel_yoy_change       DOUBLE,
+                source                  VARCHAR,
+                partition_date          DATE,
+                ingested_at             TIMESTAMP DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_fp_snapshot ON fuel_prices(snapshot_date);
+        """,
+        down_sql="DROP TABLE IF EXISTS fuel_prices;",
+    ),
+    Migration(
+        version="202608260003",
+        description="Add supply_chain_disruptions table for active disruption alerts",
+        up_sql="""
+            CREATE TABLE IF NOT EXISTS supply_chain_disruptions (
+                snapshot_date           DATE,
+                disruption_id           VARCHAR,
+                disruption_type         VARCHAR,
+                severity                VARCHAR,
+                title                   VARCHAR,
+                description             VARCHAR,
+                affected_regions        VARCHAR,
+                affected_routes         VARCHAR,
+                transit_delay_days      INTEGER,
+                rate_increase_pct       DOUBLE,
+                capacity_reduction_pct  DOUBLE,
+                started_at              VARCHAR,
+                expected_resolution     VARCHAR,
+                status                  VARCHAR,
+                source                  VARCHAR,
+                partition_date          DATE,
+                ingested_at             TIMESTAMP DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_scd_id ON supply_chain_disruptions(disruption_id);
+            CREATE INDEX IF NOT EXISTS idx_scd_type ON supply_chain_disruptions(disruption_type);
+        """,
+        down_sql="DROP TABLE IF EXISTS supply_chain_disruptions;",
+    ),
+    Migration(
         version="202608240001",
         description="Add function_class and status columns to ports",
         # The UN/LOCODE collector (unlocode.py) loads the full UNECE code list

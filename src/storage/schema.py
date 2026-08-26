@@ -629,6 +629,69 @@ CREATE TABLE IF NOT EXISTS port_congestion (
 """,
 )
 
+FUEL_PRICES = TableSchema(
+    name="fuel_prices",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["snapshot_date", "source"],
+    version="0.1.0",
+    description="Road diesel, retail gasoline, and marine bunker fuel prices (FreightPulse)",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS fuel_prices (
+    snapshot_date           DATE,
+    diesel_national_avg     DOUBLE,
+    diesel_change_week      DOUBLE,
+    diesel_east_coast       DOUBLE,
+    diesel_midwest          DOUBLE,
+    diesel_gulf_coast       DOUBLE,
+    diesel_rocky_mountain   DOUBLE,
+    diesel_west_coast       DOUBLE,
+    diesel_california       DOUBLE,
+    gasoline_regular        DOUBLE,
+    gasoline_midgrade       DOUBLE,
+    gasoline_premium        DOUBLE,
+    gasoline_national_avg   DOUBLE,
+    bunker_rotterdam        DOUBLE,
+    bunker_singapore        DOUBLE,
+    bunker_houston          DOUBLE,
+    diesel_30d_avg          DOUBLE,
+    diesel_90d_avg          DOUBLE,
+    diesel_yoy_change       DOUBLE,
+    source                  VARCHAR,
+    partition_date          DATE,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+SUPPLY_CHAIN_DISRUPTIONS = TableSchema(
+    name="supply_chain_disruptions",
+    partition_cols=["partition_date", "source"],
+    dedup_keys=["snapshot_date", "disruption_id", "source"],
+    version="0.1.0",
+    description="Active supply chain disruption alerts (FreightPulse)",
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS supply_chain_disruptions (
+    snapshot_date           DATE,
+    disruption_id           VARCHAR,
+    disruption_type         VARCHAR,
+    severity                VARCHAR,
+    title                   VARCHAR,
+    description             VARCHAR,
+    affected_regions        VARCHAR,
+    affected_routes         VARCHAR,
+    transit_delay_days      INTEGER,
+    rate_increase_pct       DOUBLE,
+    capacity_reduction_pct  DOUBLE,
+    started_at              VARCHAR,
+    expected_resolution     VARCHAR,
+    status                  VARCHAR,
+    source                  VARCHAR,
+    partition_date          DATE,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 AIR_CARGO = TableSchema(
     name="air_cargo",
     partition_cols=["partition_date", "source"],
@@ -712,6 +775,8 @@ ALL_TABLES: list[TableSchema] = [
     SANCTIONS,
     STORM_EVENTS,
     PORT_METRICS,
+    FUEL_PRICES,
+    SUPPLY_CHAIN_DISRUPTIONS,
     AIR_CARGO,
     PORT_CONGESTION,
     SOURCE_TRACKING,
