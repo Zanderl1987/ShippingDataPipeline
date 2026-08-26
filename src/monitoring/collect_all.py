@@ -118,6 +118,18 @@ def get_collectors() -> list[CollectorDef]:
         logger.debug("open_meteo collector not available: %s", e)
 
     try:
+        from src.collectors.erddap_marine import collect_erddap_marine
+        collectors.append(
+            CollectorDef(
+                name="erddap_marine",
+                collect_fn=collect_erddap_marine,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.debug("erddap_marine collector not available: %s", e)
+
+    try:
         from src.collectors.imf_portwatch import collect_chokepoint_transits
         collectors.append(
             CollectorDef(
