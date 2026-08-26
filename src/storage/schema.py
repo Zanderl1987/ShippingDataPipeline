@@ -753,6 +753,31 @@ CREATE TABLE IF NOT EXISTS lineage_events (
 """,
 )
 
+CARRIERS = TableSchema(
+    name="carriers",
+    partition_cols=["snapshot_date"],
+    dedup_keys=["snapshot_date", "carrier_code"],
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS carriers (
+    snapshot_date           DATE NOT NULL,
+    carrier_name            VARCHAR,
+    carrier_code            VARCHAR NOT NULL,
+    carrier_type            VARCHAR NOT NULL,
+    country                 VARCHAR,
+    fleet_size              BIGINT,
+    fleet_size_unit         VARCHAR,
+    vehicle_count           BIGINT,
+    reliability_score       DOUBLE,
+    market_share_pct        DOUBLE,
+    on_time_performance_pct DOUBLE,
+    avg_delay_hours         DOUBLE,
+    customer_rating         DOUBLE,
+    source                  VARCHAR NOT NULL DEFAULT 'freightpulse_carriers',
+    ingested_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+""",
+)
+
 ALL_TABLES: list[TableSchema] = [
     AIS_POSITIONS,
     VESSELS,
@@ -779,6 +804,7 @@ ALL_TABLES: list[TableSchema] = [
     SUPPLY_CHAIN_DISRUPTIONS,
     AIR_CARGO,
     PORT_CONGESTION,
+    CARRIERS,
     SOURCE_TRACKING,
     SCHEMA_MIGRATIONS,
     LINEAGE_EVENTS,

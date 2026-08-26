@@ -528,6 +528,18 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("freightpulse_disruptions collector not available: %s", e)
 
+    try:
+        from src.collectors.freightpulse_carriers import collect_carriers
+        collectors.append(
+            CollectorDef(
+                name="freightpulse_carriers",
+                collect_fn=collect_carriers,
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.warning("freightpulse_carriers collector not available: %s", e)
+
     return collectors
 
 

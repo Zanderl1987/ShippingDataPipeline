@@ -232,6 +232,32 @@ MIGRATIONS: list[Migration] = [
         """,
         down_sql="",
     ),
+    Migration(
+        version="202608260004",
+        description="Add carriers table for FreightPulse carrier performance data",
+        up_sql="""
+            CREATE TABLE IF NOT EXISTS carriers (
+                snapshot_date           DATE NOT NULL,
+                carrier_name            VARCHAR,
+                carrier_code            VARCHAR NOT NULL,
+                carrier_type            VARCHAR NOT NULL,
+                country                 VARCHAR,
+                fleet_size              BIGINT,
+                fleet_size_unit         VARCHAR,
+                vehicle_count           BIGINT,
+                reliability_score       DOUBLE,
+                market_share_pct        DOUBLE,
+                on_time_performance_pct DOUBLE,
+                avg_delay_hours         DOUBLE,
+                customer_rating         DOUBLE,
+                source                  VARCHAR NOT NULL DEFAULT 'freightpulse_carriers',
+                ingested_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_carriers_snapshot ON carriers(snapshot_date);
+            CREATE INDEX IF NOT EXISTS idx_carriers_code ON carriers(carrier_code);
+        """,
+        down_sql="DROP TABLE IF EXISTS carriers;",
+    ),
 ]
 
 
