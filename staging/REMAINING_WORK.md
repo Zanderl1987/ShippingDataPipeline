@@ -125,6 +125,24 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 | `unlocode` (`unlocode_ports`, ondemand) | Downloads the UNECE UN/LOCODE release zip (~13.5 MB), parses the 3 comma-delimited CSV parts (12 positional columns, no header; country header lines skipped), converts DDMM[N/S] DDDMM[E/W] coordinates to decimal degrees, and loads **all** rows into `ports` keyed by `unlocode` PK (`INSERT OR REPLACE` overwrites the Digitraffic-derived subset). `function_class` (class '1' = port) and `status` are preserved per row via migration `202608240001`. | ✅ BUILT — zip re-verified live 2026-08-24 (ranged GET 206, 13.5 MB). |
 | `nyfi` (`nyfi`, weekly) | NYSHEX NYFI container-freight index → `freight_rates`. Auth `Authorization: ApiKey <key>` (env `NYSHEX_API_KEY`, free account). Parser written defensively against the documented schema (timeframe YYYY-WW, publishDate, indices[] with lane/value/unit); raw sample logged at DEBUG. | ✅ BUILT — endpoint live (401 without key, as expected). Awaiting free NYSHEX account key. |
 
+## New collectors (Session 18, 2026-08-26)
+
+| Collector | What | Status |
+|-----------|------|--------|
+| `freightpulse` (`freightpulse`, daily) | FreightPulse port congestion — no auth required, GET `/api/v1/port-congestion` returns 114 global ports with congestion index, vessel counts, wait times, berth utilization, container dwell days, trend analysis. Snapshot date from `data.timestamp` (ISO8601). New `port_congestion` table partitioned by `(partition_date, source)`, dedup keys `(snapshot_date, port_code, source)`. Migration `202608260001`. | ✅ BUILT — 20 tests, 366/366 suite pass. |
+| `aisstream` (`aisstream`, daily) — verified | Already built in prior session. WebSocket at `wss://stream.aisstream.io/v0/stream`, 4 chokepoint bounding boxes, 120s collection window, writes to `ais_positions` + `vessels`. API key in `.env`. | ✅ BUILT + WIRED — first live run pending. |
+
+## Data source vetting (Session 18, 2026-08-26)
+
+| Source | Verdict | Notes |
+|--------|---------|-------|
+| USACE Waterborne Commerce Statistics | ❌ NO-GO | navigationdatacenter.us behind login wall; USACE digital library PDFs only; navdata-test API transport error |
+| AISstream.io | ✅ GO | Free API key, WebSocket, global real-time AIS. Collector already built. |
+| FreightPulse Port Congestion | ✅ GO — BUILT | Free REST API, no auth, 114 ports. Collector built 2026-08-26. |
+| FreightPulse Freight Rates | ⏳ TO PROBE | `/api/v1/freight-rates` — could fill the container per-route rate gap in `freight_rates` |
+| FreightPulse Fuel Prices | ⏳ TO PROBE | `/api/v1/fuel-prices` — bunker fuel (VLSFO/HSFO) by region |
+| FreightPulse Disruptions | ⏳ TO PROBE | `/api/v1/disruptions` — active supply chain disruptions |
+
 ## New working sources (Session 16b sweep, 2026-08-09)
 | Source | What | Auth | Status |
 |--------|------|------|--------|
@@ -150,4 +168,4 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 
 ---
 
-*Last updated: 2026-08-24 (Session 17 — UN/LOCODE + NYFI collectors built)*
+*Last updated: 2026-08-26 (Session 18 — FreightPulse built, AISStream verified wired, data source vetting sweep)*

@@ -27,7 +27,8 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Depth** | No historical — live stream only (must persist to store) |
 | **Docs** | https://aisstream.io/documentation |
 | **SDK** | OpenAPI 3.0 models + Python lib: https://github.com/aisstream/ais-message-models |
-| **Verdict** | **GO** — Free tier viable for live tracking. Must persist to Parquet on receipt. |
+| **Collector** | `src/collectors/aisstream.py` — collect_stream (daily, 120s window) → `ais_positions` + `vessels` |
+| **Verdict** | **GO — BUILT** — collector built and wired, API key in `.env`. First live run pending (Session 18). |
 
 ### 1.2 AISHub `aishub.net`
 
@@ -283,10 +284,12 @@ Each source is categorized by data type and rated across the axes that matter fo
 |-------|--------|
 | **Data** | Real-time ocean container route rates (e.g. Shanghai→LA 40ft), port congestion index, US diesel, trucking rates |
 | **Access** | **Free plan — 100 API calls/month, all endpoints, no credit card** |
-| **Auth** | `X-API-Key` |
+| **Auth** | `X-API-Key` (not required for basic calls — unauthenticated GET returns full data) |
 | **Rate Limit** | Free: 100 calls/month |
 | **Depth** | Free: current values only (paid unlocks history) |
-| **Verdict** | **PROBE** — Free tier is tiny (100 calls/mo) but covers exactly the `freight_rates` gap (per-route container $/40ft) and port congestion. Worth a free key to validate coverage + cadence before committing. |
+| **Endpoints** | `GET /api/v1/port-congestion` (114 ports, congestion index + vessel counts + dwell days + trend), `/api/v1/freight-rates`, `/api/v1/fuel-prices`, `/api/v1/disruptions`, `/api/v1/carriers` |
+| **Collector** | `src/collectors/freightpulse.py` — collect_port_congestion (daily) → `port_congestion` |
+| **Verdict** | **GO — BUILT** — port congestion collector built 2026-08-26 (20 tests, 366/366 suite pass). No auth required for the basic call. Freight rates + fuel prices + disruptions still to probe. |
 
 ### 3.8 NYSHEX NYFI `nyshex.com`
 
@@ -665,7 +668,7 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 | VT Explorer | Paid credit model. Defer. |
 | MarineTraffic APIs (free) | Most endpoints behind paid tier. Free tier too restrictive. |
 | Sinay.ai | 401 without API key, registration required. |
-| FreightPulse | Returns HTML landing page, API may not be live. |
+| FreightPulse | ~~Returns HTML landing page, API may not be live.~~ **RECOVERED 2026-08-26** — port congestion API is live and returns full JSON without auth. Moved to Section 3.7 as BUILT. |
 | emissions.dev | 401 without valid key, needs registration. |
 | Hormuz Monitor | Listed as having free tier but registration yields only paid plans. Collector kept for future use. |
 | Danish Maritime Authority AIS (`web.ais.dk/aisdata/`) | SSL cert hostname mismatch; `verify=False` → `RemoteDisconnected`. Probed 2026-08-09. |
