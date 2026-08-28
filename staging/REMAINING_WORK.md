@@ -157,7 +157,7 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 
 | Task | Details | Status |
 |------|---------|--------|
-| Register FRED API key | Free at fredaccount.stlouisfed.org — needed as `oil_prices` backup (WTI/Brent) | ⛔ Not started |
+| Register FRED API key | Free at fredaccount.stlouisfed.org — needed as `oil_prices` backup (WTI/Brent). Collector `fred_oil.py` built ahead of the key (Session 23) — SKIPs cleanly until it lands, then needs one live run to verify the parser against a real response. | ⛔ Not started |
 | Register FreightPulse key | Free plan, 100 calls/mo, no credit card. Current 5 collectors send no auth header at all — code needs updating to wire `FREIGHTPULSE_API_KEY` in once registered. Also still blocked on the HTTPS outage, see [[freightpulse-tls-nogo]]/Session 19 below. User registering directly. | ⏳ In progress (user) |
 | Register NYSHEX key (`NYSHEX_API_KEY`) | Free account for NYFI container-freight index → `freight_rates`. `nyfi` collector already built and wired (Session 17), just needs the key. User applied, awaiting response. | ⏳ Pending (awaiting NYSHEX response) |
 | Request Paris MoU data account | Manual form → bulk XML for `vessel_safety` | ⛔ Not started |
@@ -214,6 +214,17 @@ No new GO for `vessel_registry`/`vessel_safety` this round — Paris MoU (manual
 | Tests | 9 new tests (`test_census_trade.py`): export/import parsing, malformed-value rows dropped not crashed, missing-key `ValueError`, invalid `flow_code`, `collect_trade_data` with mocked fetch/write, default-period computation. | ✅ 439/439 pass, ruff clean |
 | **Not live-verified** | `CENSUS_API_KEY` is not yet registered, so **only the metadata (field names, endpoint paths, response shape) is confirmed live** — the actual authenticated JSON body has never been seen. Same caution as the phantom-endpoint lesson in [[phantom-endpoint-collectors]]: "collector built" is not "collector works." Run `collect_trade_data()` for real the first time the key lands, before trusting its output. | ⚠️ Needs first live run once keyed |
 
+## Session 23 (2026-08-28) — FRED oil price collector built ahead of the key
+
+| Task | Details | Status |
+|------|---------|--------|
+| Confirm real series IDs before building | FRED requires a key for `series/observations`, but a keyless request 400s with a real error message ("Variable api_key is not set") rather than 404ing, confirming the endpoint route is real. `DCOILWTICO` (WTI) and `DCOILBRENTEU` (Brent) both resolve to real public series pages, checked keylessly. | ✅ Confirmed via keyless probes |
+| Build `fred_oil.py` | `collect_oil_prices(start_date=..., end_date=...)` — fetches both series, **merges them into one row per date** before writing (same pattern as `oilpriceapi.py`'s `_parse_oil_prices`): `oil_prices` dedups on `(price_date, source)`, so two separate single-column writes for the same date/source would each overwrite the other's row. Handles FRED's `"."` missing-observation marker. Defaults to the last 30 days. | ✅ Built |
+| Add `FRED_API_KEY` to config | `src/config.py`: `fred_api_key` field + env read. | ✅ Done |
+| Wire into orchestrator | `collect_all.py`: `fred_oil`, daily, `requires_key="fred_api_key"` — SKIPs cleanly (confirmed via `get_collectors()`, 41 collectors registered) until the key is set. | ✅ Wired |
+| Tests | 6 new tests (`test_fred_oil.py`): multi-series merge, unknown series ignored, missing-marker (`"."`) dropped without producing an all-null row, missing-key `ValueError`, `collect_oil_prices` with mocked fetch/write. | ✅ 445/445 pass, ruff clean |
+| **Not live-verified** | `FRED_API_KEY` is not yet registered — only the endpoint route and series existence are confirmed live, not the authenticated response body. FRED's JSON shape has been stable and documented for over a decade, but verify against a real response the first time a key is available, same caution as `census_trade.py`. | ⚠️ Needs first live run once keyed |
+
 ---
 
-*Last updated: 2026-08-28 (Session 22 — Census trade collector built ahead of the key registration; unverified against live data)*
+*Last updated: 2026-08-28 (Session 23 — FRED oil price collector built ahead of the key registration; unverified against live data)*

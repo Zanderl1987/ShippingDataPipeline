@@ -235,6 +235,19 @@ def get_collectors() -> list[CollectorDef]:
         logger.debug("census_trade collector not available: %s", e)
 
     try:
+        from src.collectors.fred_oil import collect_oil_prices as collect_fred_oil_prices
+        collectors.append(
+            CollectorDef(
+                name="fred_oil",
+                collect_fn=collect_fred_oil_prices,
+                requires_key="fred_api_key",
+                schedule="daily",
+            )
+        )
+    except ImportError as e:
+        logger.debug("fred_oil collector not available: %s", e)
+
+    try:
         from src.collectors.hormuz_monitor import collect_oil_prices
         collectors.append(
             CollectorDef(

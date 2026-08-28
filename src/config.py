@@ -37,6 +37,7 @@ class Settings:
     oilpriceapi_api_key: str | None = None
     nyshex_api_key: str | None = None
     census_api_key: str | None = None
+    fred_api_key: str | None = None
 
     slack_webhook_url: str | None = None
     discord_webhook_url: str | None = None
@@ -65,6 +66,7 @@ class Settings:
             oilpriceapi_api_key=os.getenv("OILPRICEAPI_API_KEY"),
             nyshex_api_key=os.getenv("NYSHEX_API_KEY"),
             census_api_key=os.getenv("CENSUS_API_KEY"),
+            fred_api_key=os.getenv("FRED_API_KEY"),
             slack_webhook_url=os.getenv("SLACK_WEBHOOK_URL"),
             discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL"),
             smtp_host=os.getenv("SMTP_HOST"),

@@ -267,7 +267,9 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Auth** | `api_key` query param (free registration at fredaccount.stlouisfed.org) |
 | **Rate Limit** | Generous (120 calls/min recommended cap) |
 | **Depth** | Varies; many series decades long |
-| **Verdict** | **GO for oil benchmarks (backup)** — but **NOT for `freight_rates`**; it carries no ocean container/Baltic dry-bulk rates. Useful redundancy for `oil_prices` (WTI/Brent) at zero marginal cost once the free key is registered. |
+| **Series** | `DCOILWTICO` (WTI, daily) and `DCOILBRENTEU` (Brent, daily) — both confirmed real, live series via their public (keyless) series pages 2026-08-28 |
+| **Collector** | `src/collectors/fred_oil.py` — `collect_oil_prices(start_date=..., end_date=...)`, built 2026-08-28 ahead of the key. Merges both series into one row per date (`oil_prices`' dedup key is `(price_date, source)`, so writing WTI and Brent as separate single-column batches would each overwrite the other). **Not live-verified** — `FRED_API_KEY` not yet registered, so only the endpoint/error format and series existence are confirmed live, not the authenticated response body. Same caution as `census_trade.py`. |
+| **Verdict** | **GO for oil benchmarks (backup) — BUILT, pending key.** — but **NOT for `freight_rates`**; it carries no ocean container/Baltic dry-bulk rates. Wired into `collect_all.py` as `fred_oil` (daily, `requires_key="fred_api_key"`, SKIPs cleanly until set). |
 
 ### 3.6 SeaRates Freight Index API `docs.searates.com`
 
