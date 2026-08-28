@@ -414,9 +414,17 @@ Each source is categorized by data type and rated across the axes that matter fo
 |-------|--------|
 | **Data** | PSC inspection/detention data for Asia-Pacific region |
 | **Access** | **Free, public web** |
-| **Auth** | None (web) |
-| **Format** | Web only; search pages 404 under the guessed URLs (verified 2026-08-09) |
-| **Verdict** | **PROBE** — inspect the actual search UI path before ruling out; no API confirmed. Lower priority than Paris MoU (which is already PROBE). |
+| **Auth** | None documented, but the real search app is session-gated in practice (see below) |
+| **Format** | The real PSC database is a live jQuery/AJAX SPA at `apcis.tmou.org` (found via `tokyo-mou.org/inspections-detentions/psc-database/`'s outbound link, not a guessed URL). Its own JS reveals a real search endpoint, `POST apcis.tmou.org/public/?action=getships`, with rich filter params (`imo`, `flag`, `authority`, `class`, `From`/`Till`, `result`). Live-tested 2026-08-28: a plain POST, with or without a warmed session cookie, returns `<script>window.location.reload();</script>` instead of data — the SPA needs an undocumented multi-step session bootstrap (likely a `getTabByLinkUid` call first). Responses are HTML fragments, not JSON, even once working. |
+| **Verdict** | **PROBE — real, not dead, but session-gated.** Upgraded from the old "guessed URLs 404" verdict (that was checking the wrong host — `tokyo-mou.org` itself, not `apcis.tmou.org`). Not pursued further to avoid reverse-engineering an undocumented SPA session flow; worth a dedicated session if `vessel_safety` becomes a priority. |
+
+### 4.11 IMO GISIS `gisis.imo.org`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | IMO's own ship particulars / company / survey database |
+| **Access** | Even the "Public" module requires login — every path tried (`/Public/`, `/Public/SHIPS/Default.aspx`) redirects to `Login.aspx` |
+| **Verdict** | **NO-GO for bulk** — same shape as Equasis: a per-vessel lookup tool behind a login, not a bulk registry export. Didn't create an account to test further (standing decision: account creation on the user's behalf is out of scope regardless of how it's asked). |
 
 ---
 
