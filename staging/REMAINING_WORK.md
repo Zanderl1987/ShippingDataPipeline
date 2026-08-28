@@ -161,6 +161,7 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 | Register FreightPulse key | Free plan, 100 calls/mo, no credit card. Current 5 collectors send no auth header at all — code needs updating to wire `FREIGHTPULSE_API_KEY` in once registered. Also still blocked on the HTTPS outage, see [[freightpulse-tls-nogo]]/Session 19 below. User registering directly. | ⏳ In progress (user) |
 | Register NYSHEX key (`NYSHEX_API_KEY`) | Free account for NYFI container-freight index → `freight_rates`. `nyfi` collector already built and wired (Session 17), just needs the key. User applied, awaiting response. | ⏳ Pending (awaiting NYSHEX response) |
 | Request Paris MoU data account | Manual form → bulk XML for `vessel_safety` | ⛔ Not started |
+| Register US Census API key (`CENSUS_API_KEY`) | Free, instant signup at `api.census.gov/data/key_signup.html` — needed for `api.census.gov/data/timeseries/intltrade` as a US-side `trade_flow` supplement/fallback to UN Comtrade (see Session 20 / DATA_SOURCES.md 5.3). No collector built yet — needs one once the key lands. User registering directly. | ⏳ In progress (user) |
 
 > **"Collector built" is not evidence a source works.** All five rows above were
 > written against endpoints that had never been called successfully. Each returns
