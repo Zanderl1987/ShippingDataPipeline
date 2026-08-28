@@ -158,7 +158,8 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 | Task | Details | Status |
 |------|---------|--------|
 | Register FRED API key | Free at fredaccount.stlouisfed.org — needed as `oil_prices` backup (WTI/Brent) | ⛔ Not started |
-| Register FreightPulse key | Free plan, 100 calls/mo, no credit card — probe per-route container rates for `freight_rates` | ⛔ Not started |
+| Register FreightPulse key | Free plan, 100 calls/mo, no credit card. Current 5 collectors send no auth header at all — code needs updating to wire `FREIGHTPULSE_API_KEY` in once registered. Also still blocked on the HTTPS outage, see [[freightpulse-tls-nogo]]/Session 19 below. User registering directly. | ⏳ In progress (user) |
+| Register NYSHEX key (`NYSHEX_API_KEY`) | Free account for NYFI container-freight index → `freight_rates`. `nyfi` collector already built and wired (Session 17), just needs the key. User applied, awaiting response. | ⏳ Pending (awaiting NYSHEX response) |
 | Request Paris MoU data account | Manual form → bulk XML for `vessel_safety` | ⛔ Not started |
 
 > **"Collector built" is not evidence a source works.** All five rows above were
