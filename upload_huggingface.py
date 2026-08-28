@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -27,6 +30,9 @@ from huggingface_hub import HfApi, login
 load_dotenv(Path(__file__).parent / ".env")
 
 from src.config import settings  # noqa: E402  (needs env vars from load_dotenv)
+from src.storage.schema import ALL_TABLES  # noqa: E402
+
+TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES}
 
 EXPORT_DIR = Path(__file__).parent / "storage" / "parquet" / "hf_export"
 
@@ -83,7 +89,7 @@ ds = load_dataset(
 
 ## Engineering & data quality
 
-- **304 tests**, run through a CI pipeline (lint → type check → test → collect → quality
+- {tests_line}, run through a CI pipeline (lint → type check → test → collect → quality
   gate) that also runs the daily collection itself.
 - **Deduplication and lineage tracking**: raw per-partition exports land in DuckDB, then a
   dedup/curation layer resolves the canonical table published here; source-tracking and
@@ -150,6 +156,26 @@ def export_tables(db_path: Path) -> list[tuple[str, int, int]]:
         conn.close()
 
 
+def count_tests() -> int | None:
+    """Count the test suite via pytest --collect-only, for the dataset card.
+
+    Returns None (rather than a stale hardcoded number) if collection fails
+    for any reason -- the card falls back to not stating a count.
+    """
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+            cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        match = re.search(r"(\d+) tests? collected", result.stdout)
+        return int(match.group(1)) if match else None
+    except Exception:
+        return None
+
+
 def main(repo_name: str = "shipping-data-pipeline", private: bool = False) -> None:
     token = os.environ.get("HUGGINGFACE_TOKEN") or os.environ.get("HF_TOKEN")
     if not token:
@@ -193,10 +219,16 @@ def main(repo_name: str = "shipping-data-pipeline", private: bool = False) -> No
         print(f"  repo already existed with private={current}; setting private={private}")
         api.update_repo_settings(repo_id=repo_id, repo_type="dataset", private=private)
 
-    table_rows = "\n".join(f"| {name} | {count:,} | |" for name, count, _ in stats)
+    table_rows = "\n".join(
+        f"| {name} | {count:,} | {TABLE_DESCRIPTIONS.get(name, '')} |"
+        for name, count, _ in stats
+    )
+    n_tests = count_tests()
+    tests_line = f"**{n_tests} tests**" if n_tests is not None else "Full pytest suite"
     readme = README_TEMPLATE.format(
         repo_id=repo_id,
         n_tables=len(stats),
+        tests_line=tests_line,
         n_rows=total_rows,
         total_size_mb=total_size_mb,
         generated_date=datetime.now(UTC).strftime("%Y-%m-%d"),

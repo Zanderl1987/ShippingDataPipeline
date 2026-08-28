@@ -132,7 +132,10 @@ TRADE_FLOW = TableSchema(
         "source",
     ],
     version="0.1.0",
-    description="International trade flow data",
+    description=(
+        "International trade flow data (UN Comtrade, Eurostat Comext, US Census) -- "
+        "check the currency column, values are not all USD"
+    ),
     raw_sql="""
 CREATE TABLE IF NOT EXISTS trade_flow (
     reporter_code   VARCHAR,
@@ -758,6 +761,7 @@ CARRIERS = TableSchema(
     name="carriers",
     partition_cols=["snapshot_date"],
     dedup_keys=["snapshot_date", "carrier_code"],
+    description="Ocean, trucking, and air carrier performance data (FreightPulse)",
     raw_sql="""
 CREATE TABLE IF NOT EXISTS carriers (
     snapshot_date           DATE NOT NULL,
