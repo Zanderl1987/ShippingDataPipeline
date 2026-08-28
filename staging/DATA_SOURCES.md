@@ -458,8 +458,9 @@ Each source is categorized by data type and rated across the axes that matter fo
 |-------|--------|
 | **Data** | EU trade in goods since 1988, HS2/HS4/HS6/CN8 detail (dataset `DS-045409`) |
 | **Access** | **Free, no auth** |
-| **Format** | SDMX 2.1 (XML) |
-| **Verdict** | **PROBE, leaning GO** — live-verified 2026-08-28: `/dataflow` and `/dataflow/ESTAT/DS-045409` both return real metadata with no key. A data query needs the exact dimension order from the DSD (`.../datastructure/ESTAT/DS-045409`) — a guessed key (`M.DE.US.TOTAL.VALUE_IN_EUROS`) 400'd with `INVALID_QUERY_NB_FILTERS`. Same codebase already talks to Eurostat (`eurostat_maritime.py`), so the client pattern exists — this is a per-dataset key-shape research task, not a new integration pattern. |
+| **Format** | SDMX 2.1 XML only — `Accept: application/vnd.sdmx.data+json` returns 406 "Not Acceptable", no JSON option found |
+| **Key shape** | 6 dot-separated dimensions in DSD position order: `freq.reporter.partner.product.flow.indicators` (e.g. `M.DE.US.TOTAL.2.VALUE_IN_EUROS`). The earlier 5-part guess was missing `flow` — that's exactly what caused `INVALID_QUERY_NB_FILTERS`. `flow` codelist `CXT_EU_FLUX`: `1`=IMPORT, `2`=EXPORT, `3`=RE-EXPORT. Any dimension can be left blank for a wildcard (e.g. `M.DE..TOTAL.2.VALUE_IN_EUROS` = Germany's exports to *all* partners) — a Germany→all-partners, one-month pull returned 234 series, 80KB, in one request. `reporter`/`partner` use `CXT_FREE_ISO` (ISO country codes), `product` uses `CXT_NC` (CN8/HS codes, `TOTAL` = all products), `indicators` uses `CXT_INDICATORS` (e.g. `VALUE_IN_EUROS`, presumably also a quantity/weight indicator — not enumerated here). |
+| **Verdict** | **GO** — fully live-verified 2026-08-28: `/dataflow`, `/datastructure/ESTAT/DS-045409` (DSD), `/codelist/ESTAT/CXT_EU_FLUX`, and an actual data query all returned real, correct-looking values (Germany→US exports, Jan-Mar 2023: €12.1B / €13.1B / €14.6B — matches known trade volumes). Same codebase already talks to Eurostat (`eurostat_maritime.py`), so the client pattern exists. Not yet built — needs an XML (not JSON) parser and a decision on which `indicators`/`product` granularity to pull. |
 
 ### 5.5 WTO Timeseries API `api.wto.org/timeseries/v1`
 
