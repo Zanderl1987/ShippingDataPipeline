@@ -3,10 +3,13 @@ from __future__ import annotations
 from datetime import date
 from unittest.mock import MagicMock, patch
 
+import polars as pl
 import pytest
 
 from src.collectors.freightpulse import (
     _parse_ports,
+    _safe_float,
+    _safe_int,
     collect_port_congestion,
     fetch_port_congestion,
 )
@@ -136,10 +139,6 @@ class TestParsePorts:
 
 # ── Unit tests for helper functions ──────────────────────────────────────────
 
-import polars as pl
-
-from src.collectors.freightpulse import _safe_float, _safe_int
-
 
 class TestSafeFloat:
     def test_int(self) -> None:
@@ -173,10 +172,6 @@ class TestSafeInt:
 
 
 # ── Integration tests with mocked HTTP ──────────────────────────────────────
-
-from unittest.mock import patch
-
-from src.collectors.freightpulse import collect_port_congestion
 
 
 class TestCollectPortCongestion:

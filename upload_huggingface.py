@@ -62,19 +62,23 @@ and **{n_rows:,} rows**.
 
 ## Usage
 
-```python
-from datasets import load_dataset
-
-ds = load_dataset("{repo_id}", trust_remote_code=True)
-df = ds["{first_table}"].to_pandas()
-```
-
-Or load individual parquet files directly:
+Each table lives in its own subfolder (`<table>/<table>.parquet`) -- load one
+directly with `pandas` or `polars`, or point `datasets` at a single table's
+parquet file:
 
 ```python
 import pandas as pd
 
-df = pd.read_parquet("path/to/parquet/file.parquet")
+df = pd.read_parquet("hf://datasets/{repo_id}/{first_table}/{first_table}.parquet")
+```
+
+```python
+from datasets import load_dataset
+
+ds = load_dataset(
+    "parquet",
+    data_files=f"hf://datasets/{repo_id}/{first_table}/{first_table}.parquet",
+)
 ```
 
 ## Engineering & data quality
@@ -101,13 +105,23 @@ CC BY 4.0 — data sourced from public APIs and government/intergovernmental dat
 
 
 def export_tables(db_path: Path) -> list[tuple[str, int, int]]:
-    """Export each non-empty, non-internal DuckDB table to a parquet file.
+    """Export each non-empty, non-internal DuckDB table to its own parquet file,
+    one subfolder per table (<table>/<table>.parquet) -- mirrors the
+    financial-data-pipeline convention so each table is a distinct, browsable
+    unit on HF instead of a flat file dump, and so HF's config auto-detection
+    has a chance of picking up per-table splits.
 
     Returns a list of (table_name, row_count, file_size_bytes).
     """
+    if EXPORT_DIR.exists():
+        for stale in EXPORT_DIR.glob("*"):
+            if stale.is_dir():
+                for f in stale.glob("*.parquet"):
+                    f.unlink()
+                stale.rmdir()
+            elif stale.suffix == ".parquet":
+                stale.unlink()
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-    for stale in EXPORT_DIR.glob("*.parquet"):
-        stale.unlink()
 
     conn = duckdb.connect(str(db_path), read_only=True)
     try:
@@ -123,7 +137,9 @@ def export_tables(db_path: Path) -> list[tuple[str, int, int]]:
             count = conn.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0]
             if count == 0:
                 continue
-            out_path = EXPORT_DIR / f"{name}.parquet"
+            table_dir = EXPORT_DIR / name
+            table_dir.mkdir(exist_ok=True)
+            out_path = table_dir / f"{name}.parquet"
             conn.execute(
                 f'COPY (SELECT * FROM "{name}") TO ? (FORMAT PARQUET)',
                 [str(out_path)],
@@ -194,8 +210,14 @@ def main(repo_name: str = "shipping-data-pipeline", private: bool = False) -> No
         folder_path=str(EXPORT_DIR),
         repo_id=repo_id,
         repo_type="dataset",
-        allow_patterns=["*.parquet", "README.md"],
-        commit_message=f"Update snapshot ({len(stats)} tables, {total_rows:,} rows)",
+        allow_patterns=["**/*.parquet", "README.md"],
+        # Old layout was flat <table>.parquet at repo root; this run switches to
+        # <table>/<table>.parquet subfolders, so the stale root-level files must
+        # be explicitly deleted or they'd sit alongside the new ones forever.
+        delete_patterns=["*.parquet"],
+        commit_message=(
+            f"Restructure into per-table folders ({len(stats)} tables, {total_rows:,} rows)"
+        ),
     )
 
     print(f"\nDone! Dataset: https://huggingface.co/datasets/{repo_id}")
