@@ -184,13 +184,25 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 | Source | Target | Verdict | Notes |
 |--------|--------|---------|-------|
 | US Census International Trade API (`api.census.gov/data/timeseries/intltrade`) | `trade_flow` (US-side alternate/supplement to UN Comtrade) | ✅ GO — needs free key | Live-probed: now returns `{"Missing Key"}` on a real query — Census tightened keyless access at some point (used to allow low-volume unauthenticated calls). Keys are free and instant at `api.census.gov/data/key_signup.html`, standard federal API. Not yet built. |
-| Eurostat Comext SDMX (`ec.europa.eu/eurostat/api/comext/dissemination/sdmx/2.1`) | `trade_flow` (EU-side alternate/supplement) | ✅ GO | Live-verified end to end 2026-08-28. DSD fetch (`/datastructure/ESTAT/DS-045409`) gave the real 6-dimension key order: `freq.reporter.partner.product.flow.indicators` (the earlier `INVALID_QUERY_NB_FILTERS` was a missing `flow` segment). Corrected key `M.DE.US.TOTAL.2.VALUE_IN_EUROS` (flow `2`=EXPORT per codelist `CXT_EU_FLUX`) returned real data matching known trade volumes (Germany→US exports Jan-Mar 2023: €12.1B/€13.1B/€14.6B). Wildcards work for bulk pulls (`M.DE..TOTAL.2.VALUE_IN_EUROS` = one reporter, all partners, one month → 234 series in one request). XML-only, no JSON (`Accept: application/vnd.sdmx.data+json` → 406). Full detail in DATA_SOURCES.md 5.4. Not yet built. |
+| Eurostat Comext SDMX (`ec.europa.eu/eurostat/api/comext/dissemination/sdmx/2.1`) | `trade_flow` (EU-side alternate/supplement) | ✅ GO — BUILT (Session 21) | See Session 21 below. |
 | WTO Timeseries API (`api.wto.org/timeseries/v1`) | `trade_flow` | ⚠️ PROBE, low priority | Needs an Azure-APIM-style subscription key (401 without one); couldn't confirm a genuinely free tier from the portal page (JS SPA, no plain-text pricing found). Lower priority than Census/Eurostat/Comtrade, which already give global + US + EU coverage. |
 | Equasis (`equasis.org`) | `vessel_registry`/`vessel_safety` | Unchanged — still NO-GO for bulk | Re-checked; still a per-vessel lookup tool (needs login + a specific IMO list), no bulk export or API found in the public pages. Matches the existing verdict in [[phantom-endpoint-collectors]]. |
 | ITU MARS ship station database (`itu.int/mars`) | `vessel_registry` (MMSI/callsign reference) | ⚠️ PROBE, inconclusive | Base URL and search both redirect (301/302), likely to a login or a JS search UI. Didn't find a bulk/keyless path in a quick probe; not investigated further to avoid a rabbit hole. |
 
 No new GO for `vessel_registry`/`vessel_safety` this round — Paris MoU (manual account) and THETIS-MRV (portal login) remain the best existing leads for those two.
 
+## Session 21 (2026-08-28) — Eurostat Comext collector built
+
+| Task | Details | Status |
+|------|---------|--------|
+| Build `eurostat_comext.py` | `collect_comext_data(reporter=..., partner="", flows=("1","2"))` — annual freq, product=TOTAL, partner wildcarded per call (both import+export = 2 requests). Parses SDMX-generic XML with stdlib `xml.etree.ElementTree` (no new dependency). Remaps Comext's `CXT_EU_FLUX` flow codes (1/2/3) to Comtrade's M/X/RX letters so both sources share `trade_flow.flow_code`. | ✅ Built |
+| Widen `trade_flow` schema | Migration `202608280001`: `reporter_code`/`partner_code` INTEGER→VARCHAR (Comext uses ISO-alpha like `"DE"`, Comtrade uses numeric UN M49 like `156` — can't share an INTEGER column), plus a new `currency` column (`DEFAULT 'USD'`) since Comext reports EUR, not USD like the `trade_value_usd` column name implies. Zero-data-risk — `trade_flow` had 0 rows (UN Comtrade key never registered). `schema.py`'s `TRADE_FLOW` raw SQL updated to match so a fresh DB build gets the same shape. | ✅ Done |
+| Wire into orchestrator | `collect_all.py`: `eurostat_comext`, `collect_comext_data(reporter="DE")`, monthly, no key required — mirrors `un_comtrade`'s one-reporter wiring style (`reporter_code=156` for China). | ✅ Wired |
+| Tests | 6 new tests (`test_eurostat_comext.py`): XML parsing (multi-series, import vs export flow mapping, empty, invalid-XML), and `collect_comext_data` with mocked fetch/write. Also fixed `test_un_comtrade_to_db` in `test_integration.py`, which asserted `reporter_code == 156` (int) — now correctly `"156"` (str) post-widen. | ✅ 430/430 pass, ruff clean |
+| Live verification | `collect_comext_data(reporter="DE")` against the real API wrote **2,439 rows** — 253 partner countries, 2021-2025, both flows. Spot-checked DE↔US: export 2022 €155.9B / 2023 €157.7B, import 2022 €70.2B / 2023 €72.0B — matches known real trade volumes. `currency` correctly `'EUR'` for every row. | ✅ Live-verified |
+
+`trade_flow` now has a working keyless source. Census remains the other GO, pending your key.
+
 ---
 
-*Last updated: 2026-08-28 (Session 20 — trade_flow alternates found: Census GO, Eurostat Comext PROBE; vessel_registry/safety still open)*
+*Last updated: 2026-08-28 (Session 21 — Eurostat Comext collector built, live-verified, 2,439 rows)*

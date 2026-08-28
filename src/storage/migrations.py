@@ -258,6 +258,24 @@ MIGRATIONS: list[Migration] = [
         """,
         down_sql="DROP TABLE IF EXISTS carriers;",
     ),
+    Migration(
+        version="202608280001",
+        description="Widen trade_flow for Eurostat Comext (ISO-alpha codes, EUR values)",
+        # trade_flow.reporter_code/partner_code were INTEGER to match UN
+        # Comtrade's numeric UN M49 codes. Eurostat Comext reports ISO-alpha-2
+        # codes ("DE", "US"), which can't cast into an INTEGER column. The
+        # table has 0 rows so far (UN_COMTRADE_API_KEY was never registered),
+        # so this is a zero-data-risk widen rather than a real migration.
+        # Comext values are EUR, not USD like Comtrade's trade_value_usd, so a
+        # currency column disambiguates instead of silently mislabeling one as
+        # the other.
+        up_sql="""
+            ALTER TABLE trade_flow ALTER COLUMN reporter_code TYPE VARCHAR;
+            ALTER TABLE trade_flow ALTER COLUMN partner_code TYPE VARCHAR;
+            ALTER TABLE trade_flow ADD COLUMN IF NOT EXISTS currency VARCHAR DEFAULT 'USD';
+        """,
+        down_sql="",
+    ),
 ]
 
 

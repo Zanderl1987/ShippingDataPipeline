@@ -135,13 +135,14 @@ TRADE_FLOW = TableSchema(
     description="International trade flow data",
     raw_sql="""
 CREATE TABLE IF NOT EXISTS trade_flow (
-    reporter_code   INTEGER,
-    partner_code    INTEGER,
+    reporter_code   VARCHAR,
+    partner_code    VARCHAR,
     commodity_code  VARCHAR,
     flow_code       VARCHAR,
     year            INTEGER,
     trade_value_usd DOUBLE,
     net_weight_kg   DOUBLE,
+    currency        VARCHAR DEFAULT 'USD',
     source          VARCHAR,
     ingested_at     TIMESTAMP DEFAULT now()
 );

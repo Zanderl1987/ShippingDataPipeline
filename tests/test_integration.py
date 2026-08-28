@@ -420,13 +420,16 @@ def test_un_comtrade_to_db(
     conn = duckdb.connect(str(get_db_path()))
     row = conn.execute(
         "SELECT reporter_code, partner_code, trade_value_usd "
-        "FROM trade_flow WHERE reporter_code = 156"
+        "FROM trade_flow WHERE reporter_code = '156'"
     ).fetchone()
     conn.close()
 
     assert row is not None
-    assert row[0] == 156
-    assert row[1] == 842
+    # reporter_code/partner_code are VARCHAR (migration 202608280001) so
+    # Eurostat Comext's ISO-alpha codes ("DE") and Comtrade's numeric UN M49
+    # codes can share the same column.
+    assert row[0] == "156"
+    assert row[1] == "842"
     assert row[2] == 15000000
 
 

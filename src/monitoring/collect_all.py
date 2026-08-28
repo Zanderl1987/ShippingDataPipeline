@@ -442,6 +442,18 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("eurostat_maritime collector not available: %s", e)
 
+    try:
+        from src.collectors.eurostat_comext import collect_comext_data
+        collectors.append(
+            CollectorDef(
+                name="eurostat_comext",
+                collect_fn=lambda: collect_comext_data(reporter="DE"),  # Germany
+                schedule="monthly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("eurostat_comext collector not available: %s", e)
+
     # ── Sanctions / disruption / port benchmarks (no-auth) ────────────────
 
     try:
