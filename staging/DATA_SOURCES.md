@@ -442,6 +442,33 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Access** | **Free with registration** |
 | **Verdict** | **PROBE** — Partially overlaps with UN Comtrade. Use if Comtrade doesn't cover a specific need. |
 
+### 5.3 US Census International Trade API `api.census.gov/data/timeseries/intltrade`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | US import/export trade by HS code, country, port, month — official US Census Bureau foreign trade statistics |
+| **Access** | **Free**, key required (was keyless for low volume historically; probed 2026-08-28 and it now returns `"Missing Key"` on every query) |
+| **Auth** | Free, instant API key at `api.census.gov/data/key_signup.html` |
+| **Format** | REST JSON |
+| **Verdict** | **GO** — needs the free key registered, not yet built. Good US-side supplement/fallback to UN Comtrade for `trade_flow`. |
+
+### 5.4 Eurostat Comext (international trade in goods) `ec.europa.eu/eurostat/api/comext/dissemination/sdmx/2.1`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | EU trade in goods since 1988, HS2/HS4/HS6/CN8 detail (dataset `DS-045409`) |
+| **Access** | **Free, no auth** |
+| **Format** | SDMX 2.1 (XML) |
+| **Verdict** | **PROBE, leaning GO** — live-verified 2026-08-28: `/dataflow` and `/dataflow/ESTAT/DS-045409` both return real metadata with no key. A data query needs the exact dimension order from the DSD (`.../datastructure/ESTAT/DS-045409`) — a guessed key (`M.DE.US.TOTAL.VALUE_IN_EUROS`) 400'd with `INVALID_QUERY_NB_FILTERS`. Same codebase already talks to Eurostat (`eurostat_maritime.py`), so the client pattern exists — this is a per-dataset key-shape research task, not a new integration pattern. |
+
+### 5.5 WTO Timeseries API `api.wto.org/timeseries/v1`
+
+| Field | Detail |
+|-------|--------|
+| **Data** | WTO merchandise/services trade statistics |
+| **Access** | Subscription key required (401 without one) |
+| **Verdict** | **PROBE, low priority** — couldn't confirm a genuinely free tier from the API portal (JS SPA, no plain-text pricing found in a quick probe 2026-08-28). Lower priority than Comtrade/Census/Comext, which already cover global + US + EU. |
+
 ---
 
 ## 6. Weather & Environmental (Ancillary)
