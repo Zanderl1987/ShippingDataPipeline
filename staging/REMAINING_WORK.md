@@ -161,7 +161,7 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 | Register FreightPulse key | Free plan, 100 calls/mo, no credit card. Current 5 collectors send no auth header at all — code needs updating to wire `FREIGHTPULSE_API_KEY` in once registered. Also still blocked on the HTTPS outage, see [[freightpulse-tls-nogo]]/Session 19 below. User registering directly. | ⏳ In progress (user) |
 | Register NYSHEX key (`NYSHEX_API_KEY`) | Free account for NYFI container-freight index → `freight_rates`. `nyfi` collector already built and wired (Session 17), just needs the key. User applied, awaiting response. | ⏳ Pending (awaiting NYSHEX response) |
 | Request Paris MoU data account | Manual form → bulk XML for `vessel_safety` | ⛔ Not started |
-| Register US Census API key (`CENSUS_API_KEY`) | Free, instant signup at `api.census.gov/data/key_signup.html` — needed for `api.census.gov/data/timeseries/intltrade` as a US-side `trade_flow` supplement/fallback to UN Comtrade (see Session 20 / DATA_SOURCES.md 5.3). No collector built yet — needs one once the key lands. User registering directly. | ⏳ In progress (user) |
+| Register US Census API key (`CENSUS_API_KEY`) | Free, instant signup at `api.census.gov/data/key_signup.html` — needed for `api.census.gov/data/timeseries/intltrade` as a US-side `trade_flow` supplement/fallback to UN Comtrade (see DATA_SOURCES.md 5.3). Collector `census_trade.py` built ahead of the key (Session 22) — SKIPs cleanly until it lands, then needs one live run to verify the parser against a real response. User registering directly. | ⏳ In progress (user) |
 
 > **"Collector built" is not evidence a source works.** All five rows above were
 > written against endpoints that had never been called successfully. Each returns
@@ -203,6 +203,17 @@ No new GO for `vessel_registry`/`vessel_safety` this round — Paris MoU (manual
 
 `trade_flow` now has a working keyless source. Census remains the other GO, pending your key.
 
+## Session 22 (2026-08-28) — Census trade collector built ahead of the key
+
+| Task | Details | Status |
+|------|---------|--------|
+| Confirm real field names before building | `variables.json` for both `exports/hs` and `imports/hs` is itself keyless — fetched both to get real field names rather than guess: exports use `E_COMMODITY`/`ALL_VAL_MO`, imports use `I_COMMODITY`/`GEN_VAL_MO` (Census's "General Imports, Total Value" measure — imports don't have an `ALL_VAL_MO` equivalent). Cross-checked against the API's own published example query (`exports/hs?get=E_COMMODITY_SDESC,CTY_NAME,ALL_VAL_YR,DIST_NAME&time=2013-01&CTY_CODE=1220`), which also confirms the key requirement is real ("All data queries ... now require an API key"). | ✅ Confirmed via keyless metadata |
+| Build `census_trade.py` | `collect_trade_data(period=..., comm_lvl="HS2", flows=("X","M"))` — one request per flow, HS2-level aggregation, defaults to 2 months before today (Census intltrade's typical release lag). Response parser follows Census's standard list-of-lists shape (header row first), used across every Bureau API. | ✅ Built |
+| Add `CENSUS_API_KEY` to config | `src/config.py`: `census_api_key` field + env read, matching the existing per-source key pattern. | ✅ Done |
+| Wire into orchestrator | `collect_all.py`: `census_trade`, monthly, `requires_key="census_api_key"` — SKIPs cleanly (confirmed via `get_collectors()`) until the key is set, same as every other key-gated collector in this repo. | ✅ Wired |
+| Tests | 9 new tests (`test_census_trade.py`): export/import parsing, malformed-value rows dropped not crashed, missing-key `ValueError`, invalid `flow_code`, `collect_trade_data` with mocked fetch/write, default-period computation. | ✅ 439/439 pass, ruff clean |
+| **Not live-verified** | `CENSUS_API_KEY` is not yet registered, so **only the metadata (field names, endpoint paths, response shape) is confirmed live** — the actual authenticated JSON body has never been seen. Same caution as the phantom-endpoint lesson in [[phantom-endpoint-collectors]]: "collector built" is not "collector works." Run `collect_trade_data()` for real the first time the key lands, before trusting its output. | ⚠️ Needs first live run once keyed |
+
 ---
 
-*Last updated: 2026-08-28 (Session 21 — Eurostat Comext collector built, live-verified, 2,439 rows)*
+*Last updated: 2026-08-28 (Session 22 — Census trade collector built ahead of the key registration; unverified against live data)*

@@ -449,8 +449,10 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Data** | US import/export trade by HS code, country, port, month — official US Census Bureau foreign trade statistics |
 | **Access** | **Free**, key required (was keyless for low volume historically; probed 2026-08-28 and it now returns `"Missing Key"` on every query) |
 | **Auth** | Free, instant API key at `api.census.gov/data/key_signup.html` |
-| **Format** | REST JSON |
-| **Verdict** | **GO** — needs the free key registered, not yet built. Good US-side supplement/fallback to UN Comtrade for `trade_flow`. |
+| **Format** | REST JSON — list of lists, header row first (Census's standard shape across every Bureau API) |
+| **Endpoints** | `exports/hs` (fields `E_COMMODITY`/`ALL_VAL_MO`) and `imports/hs` (fields `I_COMMODITY`/`GEN_VAL_MO`, i.e. General Imports total value) — confirmed via each endpoint's own keyless `variables.json` and the API's published example query, not guessed |
+| **Collector** | `src/collectors/census_trade.py` — `collect_trade_data(period=..., comm_lvl="HS2", flows=("X","M"))`. Built 2026-08-28. **Not live-verified** — `CENSUS_API_KEY` was not yet registered, so the metadata/field names are confirmed but the authenticated response body is not. Verify against a real response the first time a key lands. |
+| **Verdict** | **GO — BUILT, pending key.** Wired into `collect_all.py` as `census_trade` (monthly, `requires_key="census_api_key"`, SKIPs cleanly until `CENSUS_API_KEY` is set). Writes to the shared `trade_flow` table (reporter_code="US", currency="USD") alongside UN Comtrade and Eurostat Comext. |
 
 ### 5.4 Eurostat Comext (international trade in goods) `ec.europa.eu/eurostat/api/comext/dissemination/sdmx/2.1`
 

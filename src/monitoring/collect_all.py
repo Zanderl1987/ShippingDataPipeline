@@ -222,6 +222,19 @@ def get_collectors() -> list[CollectorDef]:
         logger.debug("un_comtrade collector not available: %s", e)
 
     try:
+        from src.collectors.census_trade import collect_trade_data as collect_census_trade_data
+        collectors.append(
+            CollectorDef(
+                name="census_trade",
+                collect_fn=collect_census_trade_data,
+                requires_key="census_api_key",
+                schedule="monthly",
+            )
+        )
+    except ImportError as e:
+        logger.debug("census_trade collector not available: %s", e)
+
+    try:
         from src.collectors.hormuz_monitor import collect_oil_prices
         collectors.append(
             CollectorDef(
