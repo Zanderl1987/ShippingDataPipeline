@@ -27,6 +27,32 @@ def _get_auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _fetch_paginated_entries(
+    url: str, params: dict[str, Any], limit: int, timeout: int
+) -> dict[str, Any]:
+    """Page through offset/limit-paginated GFW `entries` results up to `limit`.
+
+    A single request caps at the API's own per-page limit (1000), so any
+    caller asking for more than that would otherwise silently get only the
+    first page with no indication data was dropped.
+    """
+    headers = _get_auth_headers()
+    entries: list[Any] = []
+    offset = 0
+    while len(entries) < limit:
+        page_limit = min(1000, limit - len(entries))
+        page_params = {**params, "limit": page_limit, "offset": offset}
+        resp = requests.get(url, params=page_params, headers=headers, timeout=timeout)
+        resp.raise_for_status()
+        page = resp.json()
+        page_entries = page.get("entries", [])
+        entries.extend(page_entries)
+        if len(page_entries) < page_limit:
+            break
+        offset += len(page_entries)
+    return {"entries": entries[:limit]}
+
+
 def search_vessels(
     query: str,
     limit: int = 10,
@@ -81,8 +107,6 @@ def get_vessel_events(
         "datasets[0]": "public-global-fishing-events:latest",
         "start-date": start_date,
         "end-date": end_date,
-        "limit": min(limit, 1000),
-        "offset": 0,
     }
 
     if event_types:
@@ -92,12 +116,7 @@ def get_vessel_events(
     logger.info(
         "Fetching GFW events: vessel=%s, range=%s to %s", vessel_id, start_date, end_date
     )
-    resp = requests.get(
-        url, params=params, headers=_get_auth_headers(), timeout=60
-    )
-    resp.raise_for_status()
-    result: dict[str, Any] = resp.json()
-    return result
+    return _fetch_paginated_entries(url, params, limit, timeout=60)
 
 
 def get_port_visits(
@@ -121,17 +140,10 @@ def get_port_visits(
         "events[0]": "port_visit",
         "start-date": start_date,
         "end-date": end_date,
-        "limit": min(limit, 1000),
-        "offset": 0,
     }
 
     logger.info("Fetching GFW port visits: %s to %s", start_date, end_date)
-    resp = requests.get(
-        url, params=params, headers=_get_auth_headers(), timeout=60
-    )
-    resp.raise_for_status()
-    result: dict[str, Any] = resp.json()
-    return result
+    return _fetch_paginated_entries(url, params, limit, timeout=60)
 
 
 def _parse_vessel_search(data: dict[str, Any]) -> pl.DataFrame:
@@ -190,12 +202,12 @@ def _parse_events(data: dict[str, Any]) -> pl.DataFrame:
         start = entry.get("start")
         end = entry.get("end")
 
-        vessel_info = entry.get("vessel", {})
+        vessel_info = entry.get("vessel") or {}
         imo = vessel_info.get("imo")
         mmsi = vessel_info.get("mmsi")
         vessel_name = vessel_info.get("name")
 
-        position = entry.get("position", {})
+        position = entry.get("position") or {}
         lat = position.get("lat")
         lon = position.get("lon")
 

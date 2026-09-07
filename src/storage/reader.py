@@ -19,6 +19,14 @@ def _validate_table_name(table_name: str) -> None:
         raise ValueError(msg)
 
 
+def _table_columns(table_name: str) -> set[str]:
+    df = query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = ?",
+        [table_name],
+    )
+    return set(df["column_name"].to_list())
+
+
 def query(
     sql: str,
     params: list[Any] | None = None,
@@ -49,6 +57,13 @@ def read_dataset(
     clauses: list[str] = []
     params: list[Any] = []
 
+    if date_from or date_to:
+        if "partition_date" not in _table_columns(table_name):
+            raise ValueError(
+                f"{table_name!r} has no partition_date column, so date_from/"
+                f"date_to filtering isn't supported for it -- filter on its "
+                f"own partition/date columns via query() instead"
+            )
     if date_from:
         clauses.append("partition_date >= ?::date")
         params.append(date_from.isoformat())
@@ -107,6 +122,12 @@ def get_latest_timestamp(
     table_name: str, source: str
 ) -> datetime | None:
     _validate_table_name(table_name)
+    if "timestamp" not in _table_columns(table_name):
+        raise ValueError(
+            f"{table_name!r} has no timestamp column -- get_latest_timestamp() "
+            f"only supports tables with one; query() directly for tables that "
+            f"track recency under a different column name"
+        )
     sql = f"""
         SELECT max(timestamp) as max_ts
         FROM {table_name}

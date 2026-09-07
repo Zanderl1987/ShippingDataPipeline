@@ -43,24 +43,38 @@ class CurationResult:
         return all(r.passed for r in self.validation_reports)
 
 
-def run_deduplication(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
-    """Run deduplication on all applicable tables."""
+def run_deduplication(
+    conn: duckdb.DuckDBPyConnection, errors: list[str] | None = None
+) -> dict[str, int]:
+    """Run deduplication on all applicable tables.
+
+    Per-table failures are logged AND appended to `errors` (when given) --
+    without that, a caller checking `CurationResult.errors` to decide whether
+    a run is trustworthy would see an empty list even though a table's dedup
+    silently never ran.
+    """
     results = {}
 
     try:
         results["ais_positions"] = deduplicate_ais_positions(conn)
     except Exception as e:
         logger.error("Dedup ais_positions failed: %s", e)
+        if errors is not None:
+            errors.append(f"Dedup ais_positions failed: {e}")
 
     try:
         results["vessels"] = deduplicate_vessels(conn)
     except Exception as e:
         logger.error("Dedup vessels failed: %s", e)
+        if errors is not None:
+            errors.append(f"Dedup vessels failed: {e}")
 
     try:
         results["ports"] = deduplicate_ports(conn)
     except Exception as e:
         logger.error("Dedup ports failed: %s", e)
+        if errors is not None:
+            errors.append(f"Dedup ports failed: {e}")
 
     return results
 
@@ -70,7 +84,9 @@ def run_validation(conn: duckdb.DuckDBPyConnection) -> list[ValidationReport]:
     return run_all_validations(conn)
 
 
-def run_enrichment(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
+def run_enrichment(
+    conn: duckdb.DuckDBPyConnection, errors: list[str] | None = None
+) -> dict[str, int]:
     """Run enrichment to create curated tables."""
     results = {}
 
@@ -78,11 +94,15 @@ def run_enrichment(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
         results["curated_ais_positions"] = create_curated_ais_positions(conn)
     except Exception as e:
         logger.error("Enrichment ais_positions failed: %s", e)
+        if errors is not None:
+            errors.append(f"Enrichment ais_positions failed: {e}")
 
     try:
         results["curated_vessels"] = create_curated_vessels(conn)
     except Exception as e:
         logger.error("Enrichment vessels failed: %s", e)
+        if errors is not None:
+            errors.append(f"Enrichment vessels failed: {e}")
 
     return results
 
@@ -133,14 +153,14 @@ def run_curation(
         logger.info("Starting curation pipeline")
 
         logger.info("Step 1: Deduplication")
-        result.dedup_results = run_deduplication(conn)
+        result.dedup_results = run_deduplication(conn, errors=result.errors)
 
         logger.info("Step 2: Validation")
         result.validation_reports = run_validation(conn)
 
         if not skip_enrichment:
             logger.info("Step 3: Enrichment")
-            result.enrichment_results = run_enrichment(conn)
+            result.enrichment_results = run_enrichment(conn, errors=result.errors)
 
         logger.info("Curation pipeline complete")
         logger.info("Deduped %d total rows", result.total_deduped)

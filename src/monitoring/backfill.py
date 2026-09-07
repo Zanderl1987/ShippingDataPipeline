@@ -73,7 +73,24 @@ def _get_backfill_adapters() -> dict[str, Callable[..., list[Callable[[], int]]]
 
     def _open_meteo_adapter(start: date, end: date) -> list[Callable[[], int]]:
         from src.collectors.open_meteo import collect_marine
+        # Open-Meteo's past_days parameter counts back from TODAY, not from
+        # `start` -- it can only serve a trailing window ending today. A
+        # backfill request for a range that doesn't end today (the common
+        # case) would otherwise silently fetch the wrong days while still
+        # reporting success. Refuse rather than mislabel wrong-period rows
+        # as satisfying the requested range.
+        if end != date.today():
+            raise ValueError(
+                "open_meteo backfill only supports a trailing window ending "
+                f"today ({date.today().isoformat()}); requested range ends "
+                f"{end.isoformat()}. Open-Meteo's past_days parameter has no "
+                "way to target an arbitrary historical window."
+            )
         total_days = (end - start).days + 1
+        if total_days > 92:
+            raise ValueError(
+                f"open_meteo past_days maxes at 92; requested {total_days} days"
+            )
         return [
             partial(
                 collect_marine,

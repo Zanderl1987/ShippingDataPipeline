@@ -75,6 +75,48 @@ def test_deduplicate_ais_positions(db) -> None:
     assert removed == 1
 
 
+# --- 2026-09-07 code review fix ---
+
+def test_deduplicate_ais_positions_keeps_axiomancer_null_mmsi_rows(db) -> None:
+    """Fixed: dedup used to GROUP BY mmsi, timestamp, source only. Axiomancer
+    reports no mmsi/timestamp at all, so SQL's NULL=NULL GROUP BY semantics
+    collapsed its ENTIRE multi-day history into one row -- schema.py's
+    AIS_POSITIONS.dedup_keys documents the 6-column key needed (adding imo,
+    vessel_name, partition_date) to keep distinct axiomancer snapshots apart."""
+    init_db()
+
+    df = pl.DataFrame(
+        {
+            "mmsi": [None, None, None],
+            "imo": [111, 222, 111],
+            "vessel_name": ["Ship A", "Ship B", "Ship A"],
+            "latitude": [51.0, 52.0, 51.1],
+            "longitude": [0.1, 0.2, 0.11],
+            "sog": [None, None, None],
+            "cog": [None, None, None],
+            "heading": [None, None, None],
+            "nav_status": [None, None, None],
+            "draught": [None, None, None],
+            "destination": [None, None, None],
+            "eta": [None, None, None],
+            "timestamp": [None, None, None],
+            "source": ["axiomancer", "axiomancer", "axiomancer"],
+            "partition_date": [date(2026, 1, 1), date(2026, 1, 1), date(2026, 1, 2)],
+        }
+    )
+
+    write_raw("test", df)
+
+    count_before = query("SELECT count(*) as cnt FROM ais_positions")[0, "cnt"]
+    assert count_before == 3, "distinct axiomancer rows must not collide on write"
+
+    removed = deduplicate_ais_positions()
+    assert removed == 0, "no two rows here actually share the full dedup key"
+
+    count_after = query("SELECT count(*) as cnt FROM ais_positions")[0, "cnt"]
+    assert count_after == 3
+
+
 def test_deduplicate_vessels(db) -> None:
     init_db()
 

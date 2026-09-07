@@ -50,7 +50,13 @@ def _get_count(conn: duckdb.DuckDBPyConnection, sql: str) -> int:
 def deduplicate_ais_positions(
     conn: duckdb.DuckDBPyConnection | None = None,
 ) -> int:
-    """Remove duplicate AIS positions based on mmsi + timestamp.
+    """Remove duplicate AIS positions using the AIS_POSITIONS.dedup_keys key.
+
+    A narrower (mmsi, timestamp, source) key collapses axiomancer's rows --
+    that source reports no mmsi or timestamp at all, so SQL's NULL=NULL
+    GROUP BY semantics would bucket its entire multi-day history into one
+    row. schema.py documents the full 6-column key needed to keep those
+    rows apart; use it here instead of a hand-picked subset.
 
     Returns number of rows removed.
     """
@@ -68,7 +74,7 @@ def deduplicate_ais_positions(
             WHERE rowid NOT IN (
                 SELECT MIN(rowid)
                 FROM ais_positions
-                GROUP BY mmsi, timestamp, source
+                GROUP BY mmsi, imo, vessel_name, timestamp, source, partition_date
             )
         """)
 

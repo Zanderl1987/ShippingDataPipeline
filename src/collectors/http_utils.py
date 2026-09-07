@@ -117,6 +117,13 @@ def get_with_retry(
                     except ValueError:
                         pass
                 _rate_tracker.record_429(src, retry_after)
+                if not retry_after:
+                    # record_429() only sleeps when retry_after is given --
+                    # without this, a bare 429 (no Retry-After header, common
+                    # on free tiers) retries immediately with zero backoff.
+                    wait = min(30, 2 ** attempt)
+                    logger.warning("Rate limited with no Retry-After, backing off %ds", wait)
+                    time.sleep(wait)
                 continue
             if resp.status_code >= 500:
                 wait = min(30, 2 ** attempt)

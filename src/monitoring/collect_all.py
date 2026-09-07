@@ -51,6 +51,7 @@ class CollectionReport:
     completed_at: datetime | None = None
     results: list[CollectionResult] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+    curation_errors: list[str] = field(default_factory=list)
 
     @property
     def succeeded(self) -> int:
@@ -699,6 +700,7 @@ def run_all_collectors(
     sources: list[str] | None = None,
     force: bool = False,
     notify: bool = True,
+    run_curation: bool = True,
 ) -> CollectionReport:
     """Run all collectors (or specified sources).
 
@@ -706,6 +708,11 @@ def run_all_collectors(
         sources: List of source names to collect. None = all.
         force: If True, run even if recently collected.
         notify: If True, send notifications.
+        run_curation: If True (default), run dedup/validation/enrichment
+            (src.curation.pipeline.run_curation) after collection. Without
+            this, raw collector output is never deduped or validated in
+            production -- CI's collect.yml only calls this function, so
+            skipping it here meant curation silently never ran at all.
 
     Returns:
         CollectionReport with results for each collector.
@@ -734,6 +741,29 @@ def run_all_collectors(
         report.results.append(result)
 
     report.completed_at = datetime.now()
+
+    if run_curation:
+        try:
+            from src.curation.pipeline import run_curation as _run_curation
+            curation_result = _run_curation(tracker=tracker)
+            report.curation_errors = list(curation_result.errors)
+            logger.info(
+                "Curation complete: %d rows deduped, validation %s",
+                curation_result.total_deduped,
+                "passed" if curation_result.validation_passed else "FAILED",
+            )
+            if not curation_result.validation_passed and notify:
+                failed = [
+                    r.table for r in curation_result.validation_reports if not r.passed
+                ]
+                notifier.send(
+                    notify_quality_warning(
+                        [f"Curation validation failed for: {', '.join(failed)}"]
+                    )
+                )
+        except Exception as e:
+            logger.error("Curation failed: %s", e)
+            report.curation_errors.append(str(e))
 
     # Check quality and notify if issues
     try:
@@ -785,6 +815,11 @@ def print_collection_report(report: CollectionReport) -> None:
 
     if report.skipped:
         print(f"\nSkipped: {', '.join(report.skipped)}")
+
+    if report.curation_errors:
+        print("\n--- Curation errors ---")
+        for err in report.curation_errors:
+            print(f"  - {err}")
 
     print("\n" + "=" * 60)
 
@@ -844,4 +879,4 @@ if __name__ == "__main__":
             notify=not args.no_notify,
         )
         print_collection_report(report)
-        sys.exit(0 if report.failed == 0 else 1)
+        sys.exit(0 if report.failed == 0 and not report.curation_errors else 1)

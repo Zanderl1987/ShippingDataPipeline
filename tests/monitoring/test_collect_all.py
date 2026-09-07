@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,6 +12,7 @@ from src.monitoring.collect_all import (
     CollectorDef,
     get_collectors,
     print_collection_report,
+    run_all_collectors,
     run_collector,
 )
 
@@ -155,6 +157,57 @@ class TestRunCollector:
         result = run_collector(collector, mock_tracker, mock_notifier, force=True)
         assert result.success is False
         assert "Test error" in result.error
+
+
+class TestRunAllCollectorsCuration:
+    """2026-09-07 code review fix: run_all_collectors() -- the function CI's
+    collect.yml actually invokes -- never called src.curation.pipeline's
+    run_curation() at all, so dedup/validation/enrichment silently never ran
+    in production. run_curation=True (the new default) must wire it in."""
+
+    @pytest.fixture
+    def isolated_storage(self, tmp_path: Path):
+        from src.config import settings
+
+        old_data = settings.data_dir
+        old_storage = settings.storage_dir
+        settings.data_dir = tmp_path / "data"
+        settings.storage_dir = tmp_path / "storage"
+        settings.ensure_dirs()
+        yield
+        settings.data_dir = old_data
+        settings.storage_dir = old_storage
+
+    def test_curation_runs_by_default_and_populates_report(self, isolated_storage) -> None:
+        report = run_all_collectors(sources=["__no_such_collector__"], notify=False)
+        # No real collectors matched, but curation must still have run (on an
+        # empty freshly-init'd DB) and reported a clean (error-free) result.
+        assert report.curation_errors == []
+
+    def test_curation_can_be_disabled(self, isolated_storage, monkeypatch) -> None:
+        called = {"ran": False}
+
+        def fake_run_curation(*args, **kwargs):
+            called["ran"] = True
+            raise AssertionError("run_curation must not be called when run_curation=False")
+
+        monkeypatch.setattr(
+            "src.curation.pipeline.run_curation", fake_run_curation
+        )
+        run_all_collectors(
+            sources=["__no_such_collector__"], notify=False, run_curation=False
+        )
+        assert called["ran"] is False
+
+    def test_curation_failure_is_recorded_not_swallowed(
+        self, isolated_storage, monkeypatch
+    ) -> None:
+        def boom(*args, **kwargs):
+            raise RuntimeError("curation blew up")
+
+        monkeypatch.setattr("src.curation.pipeline.run_curation", boom)
+        report = run_all_collectors(sources=["__no_such_collector__"], notify=False)
+        assert any("curation blew up" in e for e in report.curation_errors)
 
 
 class TestPrintReport:
