@@ -237,4 +237,19 @@ No new GO this round either. Confirms the pattern from Session 20: `vessel_regis
 
 ---
 
+## Session 25 (2026-09-17) — VLCC rate gap confirmed, Baltic Exchange trial probed
+
+| Item | Finding | Verdict |
+|------|---------|---------|
+| VLCC prices currently tracked? | No. `hormuz_monitor.py` parses `vlcc_td3c_ws` / `vlcc_td3c_tce_usd_day` into `oil_prices`, and is registered in `collect_all.py` (`requires_key="hormuz_api_key"`), but the collector is dormant — no free tier exists for Hormuz Monitor (confirmed NO-GO, already logged at line 58 above), so it's skipped on every run, not failing. `tankermap.py` only gives live vessel positions/cargo tonnage, not rates. `oilpriceapi.py`'s `collect_freight_indices` covers BDI/BCI/SCFI/WCI, not VLCC/tanker indices. | Confirmed gap |
+| Baltic Exchange free trial (`balticexchange.com/en/free-trial.html`) | Site sits behind a JS proof-of-work bot wall — `curl`/scripted fetch gets a "Challenge Validation" stub even with a browser UA; only renders via a real browser. Trial is **1 week**, self-serve signup form, covers all published wet/dry/gas indices including **BDTI** (Baltic Dirty Tanker Index — carries VLCC/dirty-tanker routes like TD3C). Delivered **via website + mobile app**; signup page does not mention API/programmatic access as part of the trial — the API (`api.balticexchange.com`) is a separate product, so the trial may be dashboard-only, not a key a collector can hit. Gate: requires a **work email on a company domain** ("emails from non-company domains will be queried") — a personal Gmail address likely doesn't pass self-serve. | **PROBE** — real trial, tanker data included, but API access and the personal-email gate are unconfirmed without a human completing signup |
+
+**Next step if pursuing Baltic Exchange**: sign up manually (company email needed) and check whether the trial account grants `api.balticexchange.com` credentials or only web/app viewing — that determines whether it's usable by a collector at all before spending build time on `src/collectors/baltic_exchange.py`.
+
+## Follow-ups / TODO
+
+- [ ] User to provide a YouTube video link; extract information from it (via transcript, since video/audio can't be watched directly) and fold findings into the relevant pipeline docs.
+
+---
+
 *Last updated: 2026-08-28 (Session 24 — vessel_registry/safety source hunt round 2, no new GO, Tokyo MoU APCIS found but session-gated)*
