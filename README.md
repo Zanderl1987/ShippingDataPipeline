@@ -114,6 +114,7 @@ sdp status --warnings-only
 | EIA Petroleum | US crude stocks, refinery, imports | API key |
 | JODI-Oil | Global oil production/trade | None (CSV) |
 | IMF PortWatch | Chokepoint transits + capacity | None (ArcGIS) |
+| IMF PortWatch ports | Daily port calls + import/export tonnes (~2,000 ports), port profiles, monthly trade nowcasts, disruption events | None (ArcGIS) |
 | TankerMap | Live tanker positions, port calls | None |
 | Hormuz Monitor | Risk scores, oil prices, VLCC rates | API key |
 | OilPriceAPI | Oil price benchmarks + freight indices | API key |
@@ -133,6 +134,7 @@ src/
 │   ├── eia_petroleum.py   # US petroleum data
 │   ├── jodi_oil.py        # Global oil trade
 │   ├── imf_portwatch.py   # Chokepoint transits
+│   ├── portwatch_ports.py # Port activity, profiles, TradeNow, disruptions
 │   ├── tankermap.py       # Tanker positions
 │   ├── hormuz_monitor.py  # Risk + oil prices
 │   ├── digitraffic.py     # Baltic AIS + vessels + port calls
@@ -185,7 +187,11 @@ The pipeline runs automatically via GitHub Actions:
 
 - **Schedule:** Daily at 06:00 UTC
 - **Manual trigger:** Actions → "Collect Data" → Run workflow
-- **Steps:** Lint → Type check → Test → Collect → Quality gate → Artifacts
+- **Steps:** Lint → Type check → Test → Seed from HuggingFace → Collect → Quality gate → Publish to HuggingFace → Artifacts
+- **HuggingFace is the store of record.** Each run starts from an empty database, loads the
+  published tables (`seed_from_huggingface.py`), upserts new data on top, and republishes.
+  Large histories (e.g. `port_activity`, ~6M rows) are backfilled only in CI
+  (`SDP_ALLOW_BULK_BACKFILL=true`); local runs stay incremental to keep disk use small.
 
 ### Setup GitHub Secrets
 

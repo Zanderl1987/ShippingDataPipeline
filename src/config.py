@@ -25,6 +25,9 @@ class Settings:
     data_dir: Path = Path("./data")
     storage_dir: Path = Path("./storage")
     log_level: str = "INFO"
+    #: Allow collectors to pull a source's full history in one go (hundreds of
+    #: MB). Set in CI only; local runs stay incremental to keep disk use small.
+    allow_bulk_backfill: bool = False
 
     aisstream_api_key: str | None = None
     gfw_api_token: str | None = None
@@ -55,6 +58,7 @@ class Settings:
             data_dir=Path(os.getenv("SDP_DATA_DIR", "./data")),
             storage_dir=Path(os.getenv("SDP_STORAGE_DIR", "./storage")),
             log_level=os.getenv("SDP_LOG_LEVEL", "INFO"),
+            allow_bulk_backfill=os.getenv("SDP_ALLOW_BULK_BACKFILL", "").lower() in ("1", "true"),
             aisstream_api_key=os.getenv("AISSTREAM_API_KEY"),
             gfw_api_token=os.getenv("GFW_API_TOKEN"),
             vesselapi_api_key=os.getenv("VESSELAPI_API_KEY"),

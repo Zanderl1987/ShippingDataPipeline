@@ -246,6 +246,15 @@ No new GO this round either. Confirms the pattern from Session 20: `vessel_regis
 
 **Next step if pursuing Baltic Exchange**: sign up manually (company email needed) and check whether the trial account grants `api.balticexchange.com` credentials or only web/app viewing — that determines whether it's usable by a collector at all before spending build time on `src/collectors/baltic_exchange.py`.
 
+## Session 26 (2026-09-23) — CI unblocked, HF as store of record, PortWatch port data
+
+| Task | Details | Status |
+|------|---------|--------|
+| Fix CI mypy blocker | 13 `union-attr`/`arg-type` errors in `nyfi`, `freightpulse`, `freightpulse_carriers`, `eurostat_comext` failed the type-check step on every daily run from 2026-08-26 → 09-23, so nothing was collected for four weeks. | ✅ Fixed |
+| HF as store of record | CI started each run from an empty DB and published only that run's rows: snapshot tables never accumulated and a failed source vanished from HF. New `seed_from_huggingface.py` step loads the published tables first; `upload_huggingface.py` no longer deletes remote parquet. Added a `concurrency` group so two runs can't race on the publish. | ✅ Done |
+| PortWatch port data | 4 new tables: `port_activity`, `port_profiles`, `trade_nowcast`, `disruption_events` — see DATA_SOURCES.md 8.3. | ✅ Built, live-verified locally |
+| Watch HF growth | Snapshot tables now accumulate. `ais_positions` (Axiomancer ~59K rows/day) is the fastest grower — decide whether to keep full daily history or thin it. | ⏳ Decision |
+
 ## Follow-ups / TODO
 
 - [ ] User to provide a YouTube video link; extract information from it (via transcript, since video/audio can't be watched directly) and fold findings into the relevant pipeline docs.

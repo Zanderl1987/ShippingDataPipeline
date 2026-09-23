@@ -783,6 +783,164 @@ CREATE TABLE IF NOT EXISTS carriers (
 """,
 )
 
+PORT_ACTIVITY = TableSchema(
+    name="port_activity",
+    # Partitioned by year, not day: ~2,000 ports x ~2,800 days would otherwise
+    # be thousands of tiny parquet directories.
+    partition_cols=["year", "source"],
+    dedup_keys=["activity_date", "port_id", "source"],
+    description=(
+        "Daily port calls and estimated import/export volume (metric tonnes) by "
+        "vessel type for ~2,000 ports worldwide, from AIS (IMF PortWatch)"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS port_activity (
+    activity_date           DATE,
+    year                    INTEGER,
+    port_id                 VARCHAR,
+    port_name               VARCHAR,
+    country                 VARCHAR,
+    iso3                    VARCHAR,
+    portcalls_container     INTEGER,
+    portcalls_dry_bulk      INTEGER,
+    portcalls_general_cargo INTEGER,
+    portcalls_roro          INTEGER,
+    portcalls_tanker        INTEGER,
+    portcalls_cargo         INTEGER,
+    portcalls               INTEGER,
+    import_container        DOUBLE,
+    import_dry_bulk         DOUBLE,
+    import_general_cargo    DOUBLE,
+    import_roro             DOUBLE,
+    import_tanker           DOUBLE,
+    import_cargo            DOUBLE,
+    import_total            DOUBLE,
+    export_container        DOUBLE,
+    export_dry_bulk         DOUBLE,
+    export_general_cargo    DOUBLE,
+    export_roro             DOUBLE,
+    export_tanker           DOUBLE,
+    export_cargo            DOUBLE,
+    export_total            DOUBLE,
+    source                  VARCHAR,
+    partition_date          DATE,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+PORT_PROFILES = TableSchema(
+    name="port_profiles",
+    partition_cols=[],
+    description=(
+        "Reference data for the IMF PortWatch ports: location, UN/LOCODE, vessel "
+        "mix, top industries, and share of national maritime trade"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS port_profiles (
+    port_id                        VARCHAR PRIMARY KEY,
+    port_name                      VARCHAR,
+    full_name                      VARCHAR,
+    country                        VARCHAR,
+    iso3                           VARCHAR,
+    continent                      VARCHAR,
+    locode                         VARCHAR,
+    latitude                       DOUBLE,
+    longitude                      DOUBLE,
+    vessel_count_total             INTEGER,
+    vessel_count_container         INTEGER,
+    vessel_count_dry_bulk          INTEGER,
+    vessel_count_general_cargo     INTEGER,
+    vessel_count_roro              INTEGER,
+    vessel_count_tanker            INTEGER,
+    industry_top1                  VARCHAR,
+    industry_top2                  VARCHAR,
+    industry_top3                  VARCHAR,
+    share_country_maritime_import  DOUBLE,
+    share_country_maritime_export  DOUBLE,
+    source                         VARCHAR,
+    ingested_at                    TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+TRADE_NOWCAST = TableSchema(
+    name="trade_nowcast",
+    partition_cols=["source"],
+    dedup_keys=["month_date", "region", "source"],
+    description=(
+        "Monthly AIS-based port calls and trade value/volume nowcasts by country "
+        "and region group (IMF PortWatch TradeNow)"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS trade_nowcast (
+    month_date                    DATE,
+    region                        VARCHAR,
+    iso3                          VARCHAR,
+    ais_portcalls_container       DOUBLE,
+    ais_portcalls_general_cargo   DOUBLE,
+    ais_portcalls_dry_bulk        DOUBLE,
+    ais_portcalls_roro            DOUBLE,
+    ais_portcalls_tanker          DOUBLE,
+    ais_import_tanker             DOUBLE,
+    ais_export_tanker             DOUBLE,
+    ais_import_dry_bulk           DOUBLE,
+    ais_export_dry_bulk           DOUBLE,
+    ais_import_container          DOUBLE,
+    ais_export_container          DOUBLE,
+    ais_import_general_cargo      DOUBLE,
+    ais_export_general_cargo      DOUBLE,
+    ais_import_roro               DOUBLE,
+    ais_export_roro               DOUBLE,
+    value_import_total            DOUBLE,
+    value_export_total            DOUBLE,
+    volume_import_total           DOUBLE,
+    volume_export_total           DOUBLE,
+    trade_value                   DOUBLE,
+    trade_volume                  DOUBLE,
+    source                        VARCHAR,
+    partition_date                DATE,
+    ingested_at                   TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+DISRUPTION_EVENTS = TableSchema(
+    name="disruption_events",
+    partition_cols=["source"],
+    dedup_keys=["event_id", "episode_id", "source"],
+    description=(
+        "Natural-hazard disruption events (GDACS alerts) with affected ports and "
+        "countries, as curated by IMF PortWatch"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS disruption_events (
+    event_id            VARCHAR,
+    episode_id          VARCHAR,
+    event_type          VARCHAR,
+    event_name          VARCHAR,
+    description         VARCHAR,
+    alert_level         VARCHAR,
+    alert_score         DOUBLE,
+    severity_text       VARCHAR,
+    country             VARCHAR,
+    iso3                VARCHAR,
+    affected_countries  VARCHAR,
+    affected_ports      VARCHAR,
+    n_affected_ports    INTEGER,
+    affected_population VARCHAR,
+    is_current          BOOLEAN,
+    from_date           TIMESTAMP,
+    to_date             TIMESTAMP,
+    latitude            DOUBLE,
+    longitude           DOUBLE,
+    source              VARCHAR,
+    partition_date      DATE,
+    ingested_at         TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 ALL_TABLES: list[TableSchema] = [
     AIS_POSITIONS,
     VESSELS,
@@ -810,6 +968,10 @@ ALL_TABLES: list[TableSchema] = [
     AIR_CARGO,
     PORT_CONGESTION,
     CARRIERS,
+    PORT_ACTIVITY,
+    PORT_PROFILES,
+    TRADE_NOWCAST,
+    DISRUPTION_EVENTS,
     SOURCE_TRACKING,
     SCHEMA_MIGRATIONS,
     LINEAGE_EVENTS,

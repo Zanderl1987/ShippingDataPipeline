@@ -143,6 +143,42 @@ def get_collectors() -> list[CollectorDef]:
         logger.warning("imf_portwatch collector not available")
 
     try:
+        from src.collectors.portwatch_ports import (
+            SOURCE_ACTIVITY,
+            SOURCE_DISRUPTIONS,
+            SOURCE_PROFILES,
+            SOURCE_TRADENOW,
+            collect_disruption_events,
+            collect_port_activity,
+            collect_port_profiles,
+            collect_trade_nowcast,
+        )
+        collectors.extend([
+            CollectorDef(
+                name=SOURCE_ACTIVITY,
+                collect_fn=collect_port_activity,
+                schedule="daily",
+            ),
+            CollectorDef(
+                name=SOURCE_PROFILES,
+                collect_fn=collect_port_profiles,
+                schedule="weekly",
+            ),
+            CollectorDef(
+                name=SOURCE_TRADENOW,
+                collect_fn=collect_trade_nowcast,
+                schedule="weekly",
+            ),
+            CollectorDef(
+                name=SOURCE_DISRUPTIONS,
+                collect_fn=collect_disruption_events,
+                schedule="daily",
+            ),
+        ])
+    except ImportError as e:
+        logger.warning("portwatch_ports collectors not available: %s", e)
+
+    try:
         from src.collectors.tankermap import collect_vessels
         collectors.append(
             CollectorDef(

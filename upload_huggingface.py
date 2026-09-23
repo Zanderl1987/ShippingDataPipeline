@@ -52,7 +52,7 @@ tags:
 task_categories:
   - other
 size_categories:
-  - 1MB<n<100MB
+  - {size_category}
 ---
 
 # Shipping Data Pipeline — Full Curated Snapshot
@@ -104,9 +104,18 @@ ds = load_dataset(
 - **Total Rows**: {n_rows:,}
 - **Total Size**: {total_size_mb:.1f} MB
 
-## License
+## License and attribution
 
 CC BY 4.0 — data sourced from public APIs and government/intergovernmental databases.
+Upstream terms still apply to each source's data. In particular:
+
+- `port_activity`, `port_profiles`, `trade_nowcast`, `chokepoint_transits`,
+  `disruption_events`: **Source: International Monetary Fund, PortWatch**
+  (https://portwatch.imf.org), used under the IMF copyright and usage terms
+  (https://www.imf.org/en/about/copyright-and-terms). IMF data is available free
+  of charge from the IMF. Columns are renamed and retyped; values are unaltered.
+- `disruption_events` also derives from GDACS, the Global Disaster Alert and
+  Coordination System (https://www.gdacs.org).
 """
 
 
@@ -154,6 +163,21 @@ def export_tables(db_path: Path) -> list[tuple[str, int, int]]:
         return stats
     finally:
         conn.close()
+
+
+def size_category(n_rows: int) -> str:
+    """HF's size_categories tag, which buckets by row count."""
+    for limit, label in [
+        (1_000, "n<1K"),
+        (10_000, "1K<n<10K"),
+        (100_000, "10K<n<100K"),
+        (1_000_000, "100K<n<1M"),
+        (10_000_000, "1M<n<10M"),
+        (100_000_000, "10M<n<100M"),
+    ]:
+        if n_rows < limit:
+            return label
+    return "100M<n<1B"
 
 
 def count_tests() -> int | None:
@@ -234,6 +258,7 @@ def main(repo_name: str = "shipping-data-pipeline", private: bool = False) -> No
         generated_date=datetime.now(UTC).strftime("%Y-%m-%d"),
         first_table=stats[0][0],
         table_rows=table_rows,
+        size_category=size_category(total_rows),
     )
     (EXPORT_DIR / "README.md").write_text(readme, encoding="utf-8")
 
@@ -243,13 +268,10 @@ def main(repo_name: str = "shipping-data-pipeline", private: bool = False) -> No
         repo_id=repo_id,
         repo_type="dataset",
         allow_patterns=["**/*.parquet", "README.md"],
-        # Old layout was flat <table>.parquet at repo root; this run switches to
-        # <table>/<table>.parquet subfolders, so the stale root-level files must
-        # be explicitly deleted or they'd sit alongside the new ones forever.
-        delete_patterns=["*.parquet"],
-        commit_message=(
-            f"Restructure into per-table folders ({len(stats)} tables, {total_rows:,} rows)"
-        ),
+        # No delete_patterns: CI seeds from this dataset before collecting
+        # (seed_from_huggingface.py), so a table missing from one run's export
+        # means something went wrong, not that it should be removed.
+        commit_message=f"Update snapshot ({len(stats)} tables, {total_rows:,} rows)",
     )
 
     print(f"\nDone! Dataset: https://huggingface.co/datasets/{repo_id}")

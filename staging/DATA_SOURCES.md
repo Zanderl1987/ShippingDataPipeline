@@ -593,6 +593,17 @@ See 2.5 — includes real-time weather, 5-day forecast, alerts, currents/tides f
 | **Table** | `chokepoint_transits` |
 | **Verdict** | **GO** — Unique daily chokepoint transit data. No auth, 5+ year history. Essential for supply chain risk analysis. |
 
+**Additional PortWatch layers (added 2026-09-23)** — same ArcGIS org (`services9.arcgis.com/weJ1QsnbMYJlCHdG`), no auth. IMF terms: free to redistribute with attribution ("Source: International Monetary Fund, PortWatch").
+
+| Layer | Rows | Table | Collector (`src/collectors/portwatch_ports.py`) |
+|-------|------|-------|------|
+| `Daily_Ports_Data` | ~5.8M, daily from 2019, ~2,065 ports | `port_activity` | `collect_port_activity` — full history from the ArcGIS Hub CSV export in CI only, then re-fetches the trailing 30 days (PortWatch revises recent days) |
+| `PortWatch_ports_database` | 2,065 | `port_profiles` | `collect_port_profiles` (includes LOCODE for joining to `ports`) |
+| `Monthly_TradeNow` | ~18K, monthly from 2019 | `trade_nowcast` | `collect_trade_nowcast` — countries + region aggregates, re-fetched whole |
+| `portwatch_disruptions_database` + `geopulse_events` | 132 + 600 | `disruption_events` | `collect_disruption_events` — GDACS-derived; `affectedpopulation` is free text |
+
+Skipped: `Daily_Trade_Data_REG` (aggregate of `port_activity`), `Daily_Trade_Data_WLD` (stopped 2025-04), `Daily_Regional_Data` (stopped 2024-06), `spillovers_*` / `Spillover_Simulator_*` (static model outputs, 1.6M rows), `Container_Metrics` (wide pivot of port data), `Global_Shipping_Routes` (empty response). The rest of the org's services are unrelated IMF climate dashboards.
+
 ### 8.4 TankerMap `tankermap.com`
 
 | Field | Detail |

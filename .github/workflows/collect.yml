@@ -16,6 +16,12 @@ on:
         default: 'false'
         type: boolean
 
+# Every run seeds from, then republishes, the HF dataset -- two overlapping
+# runs would each publish without the other's rows.
+concurrency:
+  group: collect-data
+  cancel-in-progress: false
+
 env:
   SDP_DATA_DIR: ./data
   SDP_STORAGE_DIR: ./storage
@@ -25,7 +31,9 @@ env:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The first run after a new bulk source lands (port_activity, ~6M rows)
+    # backfills from a ~1 GB CSV; routine runs take a few minutes.
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -51,8 +59,13 @@ jobs:
       - name: Run tests
         run: uv run python -m pytest tests/ -x -q
 
+      - name: Seed database from HuggingFace
+        if: env.HF_TOKEN != ''
+        run: uv run python seed_from_huggingface.py
+
       - name: Collect data
         env:
+          SDP_ALLOW_BULK_BACKFILL: "true"
           AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
           GFW_API_TOKEN: ${{ secrets.GFW_API_TOKEN }}
           VESSELAPI_API_KEY: ${{ secrets.VESSELAPI_API_KEY }}
@@ -80,9 +93,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pipeline-status-${{ github.run_number }}
+          # pipeline.db is no longer attached: it now holds the full seeded
+          # dataset (hundreds of MB), which lives on HuggingFace anyway.
           path: |
             status_report.txt
-            storage/pipeline.db
           retention-days: 30
 
       - name: Notify on failure
