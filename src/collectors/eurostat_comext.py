@@ -91,7 +91,7 @@ def _parse_comext_xml(xml_text: str) -> list[dict[str, Any]]:
             v.get("id"): v.get("value")
             for v in key_el.findall(f"{{{g}}}Value")
         }
-        flow_raw = dims.get("flow", "")
+        flow_raw = dims.get("flow") or ""
         for obs in series.findall(f"{{{g}}}Obs"):
             dim_el = obs.find(f"{{{g}}}ObsDimension")
             val_el = obs.find(f"{{{g}}}ObsValue")

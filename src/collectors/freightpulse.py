@@ -69,8 +69,10 @@ def fetch_port_congestion() -> dict[str, Any]:
 
 def _parse_ports(data: dict[str, Any]) -> pl.DataFrame:
     """Parse the FreightPulse response into per-port congestion rows."""
-    payload = data.get("data") if isinstance(data.get("data"), dict) else {}
-    inner = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    raw = data.get("data")
+    payload: dict[str, Any] = raw if isinstance(raw, dict) else {}
+    raw_inner = payload.get("data")
+    inner: dict[str, Any] = raw_inner if isinstance(raw_inner, dict) else {}
     ports = inner.get("ports")
     if not isinstance(ports, list):
         logger.warning("FreightPulse: no ports array in response")

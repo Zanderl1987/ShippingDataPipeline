@@ -77,7 +77,8 @@ def _extract_indices(data: dict[str, Any]) -> tuple[str | None, str | None, list
     if not isinstance(data, dict):
         return None, None, []
 
-    payload = data.get("data") if isinstance(data.get("data"), dict) else data
+    raw = data.get("data")
+    payload: dict[str, Any] = raw if isinstance(raw, dict) else data
     timeframe = payload.get("timeframe")
     publish_date = payload.get("publishDate") or payload.get("publish_date")
     indices = payload.get("indices")

@@ -80,8 +80,10 @@ def _safe_int(v: Any) -> int | None:
 
 def _parse_carriers(data: dict[str, Any]) -> pl.DataFrame:
     """Parse ocean, trucking, and air carriers into a unified DataFrame."""
-    payload = data.get("data") if isinstance(data.get("data"), dict) else {}
-    inner = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    raw = data.get("data")
+    payload: dict[str, Any] = raw if isinstance(raw, dict) else {}
+    raw_inner = payload.get("data")
+    inner: dict[str, Any] = raw_inner if isinstance(raw_inner, dict) else {}
 
     snapshot_date = date.today()
     snapshot_ts = payload.get("timestamp")
