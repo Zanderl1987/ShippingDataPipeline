@@ -567,29 +567,11 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("bts_air_cargo collector not available: %s", e)
 
-    try:
-        from src.collectors.freightpulse import collect_port_congestion
-        collectors.append(
-            CollectorDef(
-                name="freightpulse",
-                collect_fn=collect_port_congestion,
-                schedule="daily",
-            )
-        )
-    except ImportError as e:
-        logger.warning("freightpulse collector not available: %s", e)
-
-    try:
-        from src.collectors.freightpulse_rates import collect_freight_rates
-        collectors.append(
-            CollectorDef(
-                name="freightpulse_rates",
-                collect_fn=collect_freight_rates,
-                schedule="daily",
-            )
-        )
-    except ImportError as e:
-        logger.warning("freightpulse_rates collector not available: %s", e)
+    # freightpulse (port congestion), freightpulse_rates, and freightpulse_carriers
+    # are unregistered: when FreightPulse's HTTPS came back (2026-09-23) those
+    # endpoints had changed to require per-query parameters (a port/country/
+    # region; US origin/destination zips; a carrier search term) and return 422
+    # for the bulk call these collectors make. They need a redesign, not a retry.
 
     try:
         from src.collectors.freightpulse_fuel import collect_fuel_prices
@@ -614,18 +596,6 @@ def get_collectors() -> list[CollectorDef]:
         )
     except ImportError as e:
         logger.warning("freightpulse_disruptions collector not available: %s", e)
-
-    try:
-        from src.collectors.freightpulse_carriers import collect_carriers
-        collectors.append(
-            CollectorDef(
-                name="freightpulse_carriers",
-                collect_fn=collect_carriers,
-                schedule="daily",
-            )
-        )
-    except ImportError as e:
-        logger.warning("freightpulse_carriers collector not available: %s", e)
 
     return collectors
 

@@ -253,6 +253,7 @@ No new GO this round either. Confirms the pattern from Session 20: `vessel_regis
 | Fix CI mypy blocker | 13 `union-attr`/`arg-type` errors in `nyfi`, `freightpulse`, `freightpulse_carriers`, `eurostat_comext` failed the type-check step on every daily run from 2026-08-26 → 09-23, so nothing was collected for four weeks. | ✅ Fixed |
 | HF as store of record | CI started each run from an empty DB and published only that run's rows: snapshot tables never accumulated and a failed source vanished from HF. New `seed_from_huggingface.py` step loads the published tables first; `upload_huggingface.py` no longer deletes remote parquet. Added a `concurrency` group so two runs can't race on the publish. | ✅ Done |
 | PortWatch port data | 4 new tables: `port_activity`, `port_profiles`, `trade_nowcast`, `disruption_events` — see DATA_SOURCES.md 8.3. | ✅ Built, live-verified locally |
+| FreightPulse API changed | HTTPS is back, but `port-congestion` now requires a port/country/region, `freight-rates` requires US origin/destination zips (trucking, not ocean), and `carriers` requires a search term — all 422 on the bulk call. Those 3 collectors are unregistered in `collect_all.py` (modules kept) so they stop failing the daily run. `fuel-prices` and `disruptions` still work. | ⏳ Redesign needed |
 | Watch HF growth | Snapshot tables now accumulate. `ais_positions` (Axiomancer ~59K rows/day) is the fastest grower — decide whether to keep full daily history or thin it. | ⏳ Decision |
 
 ## Follow-ups / TODO
