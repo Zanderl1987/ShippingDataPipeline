@@ -87,3 +87,62 @@ def test_run_deduplication_without_errors_list_does_not_crash(db) -> None:
     finally:
         conn.close()
     assert isinstance(results, dict)
+
+
+# --- 2026-09-24: curation validation failed on every run ---
+#
+# AIS "not available" codes (sog 102.3, cog 360, heading 511) were stored as
+# real values, and the not-null checks demanded mmsi/timestamp from
+# axiomancer, which never sends them. Cleaning now runs before validation.
+
+def test_run_curation_cleans_before_validating(db) -> None:
+    from datetime import date, datetime
+
+    import polars as pl
+
+    from src.storage.writer import write_raw
+
+    write_raw(
+        "digitraffic",
+        pl.DataFrame(
+            {
+                "mmsi": [1, 2, None],
+                "vessel_name": ["A", "B", "C"],
+                "latitude": [51.0, 51.0, 51.0],
+                "longitude": [4.0, 4.0, 4.0],
+                "sog": [102.3, 10.0, 10.0],
+                "cog": [360.0, 90.0, 90.0],
+                "heading": [511.0, 90.0, 90.0],
+                "timestamp": [datetime(2026, 9, 24, h) for h in (1, 2, 3)],
+                "source": ["digitraffic"] * 3,
+                "partition_date": [date(2026, 9, 24)] * 3,
+            }
+        ),
+    )
+    write_raw(
+        "axiomancer",
+        pl.DataFrame(
+            {
+                "mmsi": [None],
+                "imo": [9000001],
+                "vessel_name": ["D"],
+                "latitude": [10.0],
+                "longitude": [10.0],
+                "source": ["axiomancer"],
+                "partition_date": [date(2026, 9, 24)],
+            },
+            schema_overrides={"mmsi": pl.Int64},
+        ),
+    )
+
+    result = p.run_curation(skip_enrichment=True)
+
+    assert result.errors == []
+    assert result.cleaning_results["ais_positions"] == 4  # 3 codes + 1 row
+    failed = [
+        (r.table, x.check)
+        for r in result.validation_reports
+        for x in r.results
+        if not x.passed
+    ]
+    assert failed == []

@@ -87,6 +87,12 @@ class TestParseCoordinatesPair:
         assert _parse_coordinates(None) == (None, None)
         assert _parse_coordinates("") == (None, None)
 
+    def test_out_of_range_pair_dropped(self) -> None:
+        # UN/LOCODE has typos that parse to impossible values (Mironovka UA at
+        # longitude 381.8); drop the pair rather than publish them.
+        assert _parse_coordinates("4829N 38150E") == (None, None)
+        assert _parse_coordinates("9130N 00131E") == (None, None)
+
 
 class TestParseCodeListRows:
     def test_parses_positional_columns(self) -> None:

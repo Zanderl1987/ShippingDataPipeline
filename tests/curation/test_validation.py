@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import polars as pl
@@ -209,7 +209,64 @@ def test_validate_ais_positions(db) -> None:
 
     report = validate_ais_positions()
     assert report.passed
-    assert report.total_checks == 6
+    assert report.total_checks == 7
+
+
+def _ais_row(**kw: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "mmsi": 123,
+        "imo": 111,
+        "vessel_name": "A",
+        "latitude": 51.0,
+        "longitude": 0.1,
+        "sog": 10.0,
+        "cog": 90.0,
+        "heading": 90.0,
+        "timestamp": datetime(2026, 1, 1, 10),
+        "source": "test",
+        "partition_date": date(2026, 1, 1),
+    }
+    row.update(kw)
+    return row
+
+
+def test_validate_ais_positions_allows_axiomancer_without_mmsi_or_timestamp(db) -> None:
+    # Axiomancer never reports mmsi or a timestamp; requiring them made this
+    # check fail on every run.
+    init_db()
+    write_raw(
+        "test",
+        pl.DataFrame(
+            [
+                _ais_row(),
+                _ais_row(mmsi=None, imo=222, vessel_name="B", timestamp=None,
+                         source="axiomancer"),
+            ]
+        ),
+    )
+    report = validate_ais_positions()
+    assert report.passed, [r.message for r in report.results if not r.passed]
+
+
+def test_validate_ais_positions_still_requires_mmsi_for_other_sources(db) -> None:
+    init_db()
+    write_raw("test", pl.DataFrame([_ais_row(mmsi=None)]))
+    failed = [r.check for r in validate_ais_positions().results if not r.passed]
+    assert failed == ["not_null(mmsi) excluding axiomancer"]
+
+
+def test_validate_ais_positions_top_encodable_speed_passes(db) -> None:
+    # AIS speed tops out at 102.2 ("102.2 kn or more").
+    init_db()
+    write_raw("test", pl.DataFrame([_ais_row(sog=102.2)]))
+    assert validate_ais_positions().passed
+
+
+def test_validate_ais_positions_rejects_heading_not_available(db) -> None:
+    init_db()
+    write_raw("test", pl.DataFrame([_ais_row(heading=511.0)]))
+    failed = [r.check for r in validate_ais_positions().results if not r.passed]
+    assert failed == ["range(heading, [0, 359])"]
 
 
 def test_validate_vessels(db) -> None:

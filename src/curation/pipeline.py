@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import duckdb
 
+from src.curation.cleaning import clean_ais_positions, clean_ports
 from src.curation.dedup import (
     deduplicate_ais_positions,
     deduplicate_ports,
@@ -31,6 +32,7 @@ class CurationResult:
     """Result of a curation run."""
 
     dedup_results: dict[str, int] = field(default_factory=dict)
+    cleaning_results: dict[str, int] = field(default_factory=dict)
     validation_reports: list[ValidationReport] = field(default_factory=list)
     enrichment_results: dict[str, int] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
@@ -80,6 +82,21 @@ def run_deduplication(
     return results
 
 
+def run_cleaning(
+    conn: duckdb.DuckDBPyConnection, errors: list[str] | None = None
+) -> dict[str, int]:
+    """NULL impossible values and drop unusable rows (src.curation.cleaning)."""
+    results = {}
+    for table, fn in (("ais_positions", clean_ais_positions), ("ports", clean_ports)):
+        try:
+            results[table] = fn(conn)
+        except Exception as e:
+            logger.error("Cleaning %s failed: %s", table, e)
+            if errors is not None:
+                errors.append(f"Cleaning {table} failed: {e}")
+    return results
+
+
 def run_validation(conn: duckdb.DuckDBPyConnection) -> list[ValidationReport]:
     """Run validation on all tables."""
     return run_all_validations(conn)
@@ -123,8 +140,9 @@ def run_curation(
 
     Steps:
     1. Deduplication - Remove duplicate records
-    2. Validation - Check data quality
-    3. Enrichment - Create curated tables with joins
+    2. Cleaning - NULL impossible values, drop unusable rows
+    3. Validation - Check data quality
+    4. Enrichment - Create curated tables with joins
 
     Args:
         skip_enrichment: If True, skip the enrichment step.
@@ -163,11 +181,14 @@ def run_curation(
         logger.info("Step 1: Deduplication")
         result.dedup_results = run_deduplication(conn, errors=result.errors)
 
-        logger.info("Step 2: Validation")
+        logger.info("Step 2: Cleaning")
+        result.cleaning_results = run_cleaning(conn, errors=result.errors)
+
+        logger.info("Step 3: Validation")
         result.validation_reports = run_validation(conn)
 
         if not skip_enrichment:
-            logger.info("Step 3: Enrichment")
+            logger.info("Step 4: Enrichment")
             result.enrichment_results = run_enrichment(conn, errors=result.errors)
 
         logger.info("Curation pipeline complete")
@@ -189,6 +210,7 @@ def run_curation(
                     duration_ms=duration_ms,
                     metadata={
                         "dedup_results": result.dedup_results,
+                        "cleaning_results": result.cleaning_results,
                         "validation_passed": result.validation_passed,
                         "enrichment_results": result.enrichment_results,
                     },

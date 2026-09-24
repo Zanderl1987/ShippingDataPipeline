@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import duckdb
 
+from src.curation.cleaning import NO_MMSI_OR_TIMESTAMP_SOURCES
 from src.storage.schema import ALL_TABLES
 from src.storage.writer import get_db_path
 
@@ -87,8 +88,13 @@ def validate_not_null(
     table: str,
     column: str,
     conn: duckdb.DuckDBPyConnection | None = None,
+    exclude_sources: tuple[str, ...] = (),
 ) -> ValidationResult:
-    """Check that a column has no NULL values."""
+    """Check that a column has no NULL values.
+
+    Rows whose `source` is in exclude_sources are not checked -- for sources
+    that never report the column at all.
+    """
     should_close = False
     if conn is None:
         db_path = get_db_path()
@@ -99,13 +105,26 @@ def validate_not_null(
         _validate_table_name(table)
         _validate_column_name(table, column, conn)
 
-        total = _get_count(conn, f"SELECT count(*) FROM {table}")
-        null_count = _get_count(conn, f"SELECT count(*) FROM {table} WHERE {column} IS NULL")
+        scope = ""
+        check = f"not_null({column})"
+        if exclude_sources:
+            _validate_column_name(table, "source", conn)
+            scope = "source NOT IN ({})".format(
+                ", ".join("'" + s.replace("'", "''") + "'" for s in exclude_sources)
+            )
+            check += " excluding " + ", ".join(exclude_sources)
+        where = f"WHERE {scope}" if scope else ""
+        and_scope = f"AND {scope}" if scope else ""
+
+        total = _get_count(conn, f"SELECT count(*) FROM {table} {where}")
+        null_count = _get_count(
+            conn, f"SELECT count(*) FROM {table} WHERE {column} IS NULL {and_scope}"
+        )
 
         passed = null_count == 0
         return ValidationResult(
             table=table,
-            check=f"not_null({column})",
+            check=check,
             passed=passed,
             failed_count=null_count,
             total_count=total,
@@ -189,12 +208,16 @@ def validate_ais_positions(
     """Run all validation checks on ais_positions table."""
     report = ValidationReport(table="ais_positions")
 
-    report.results.append(validate_not_null("ais_positions", "mmsi", conn))
-    report.results.append(validate_not_null("ais_positions", "timestamp", conn))
+    # Ranges match src.curation.cleaning.AIS_VALID, which runs first; a
+    # failure here means a value got past cleaning.
+    exempt = NO_MMSI_OR_TIMESTAMP_SOURCES
+    report.results.append(validate_not_null("ais_positions", "mmsi", conn, exempt))
+    report.results.append(validate_not_null("ais_positions", "timestamp", conn, exempt))
     report.results.append(validate_range("ais_positions", "latitude", -90, 90, conn))
     report.results.append(validate_range("ais_positions", "longitude", -180, 180, conn))
-    report.results.append(validate_range("ais_positions", "sog", 0, 100, conn))
+    report.results.append(validate_range("ais_positions", "sog", 0, 102.2, conn))
     report.results.append(validate_range("ais_positions", "cog", 0, 360, conn))
+    report.results.append(validate_range("ais_positions", "heading", 0, 359, conn))
 
     return report
 

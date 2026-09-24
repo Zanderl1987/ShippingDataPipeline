@@ -100,6 +100,11 @@ def _parse_coordinates(pair: Any) -> tuple[float | None, float | None]:
     parts = pair.strip().split()
     lat = _parse_coordinate(parts[0]) if parts else None
     lon = _parse_coordinate(parts[1]) if len(parts) > 1 else None
+    # The source file has typos that parse to impossible values (e.g.
+    # Mironovka UA at longitude 381.8). If either half is impossible, neither
+    # can be trusted.
+    if (lat is not None and abs(lat) > 90) or (lon is not None and abs(lon) > 180):
+        return None, None
     return lat, lon
 
 
