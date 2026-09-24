@@ -83,6 +83,9 @@ jobs:
           CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
           OILPRICEAPI_API_KEY: ${{ secrets.OILPRICEAPI_API_KEY }}
           NYSHEX_API_KEY: ${{ secrets.NYSHEX_API_KEY }}
+          # Optional: set either secret to get data alerts pushed to a channel.
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           # HORMUZ_API_KEY: not available (NO-GO, no free tier)
         run: |
           code=0
@@ -127,27 +130,7 @@ jobs:
         run: |
           echo "::error::Collection pipeline failed. Check logs for details."
 
-  quality-gate:
-    needs: collect
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
-        with:
-          version: "0.7"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync --all-extras
-
-      - name: Check data quality
-        run: |
-          uv run python -m src.monitoring.quality --check-staleness --check-nulls
-          echo "Quality gate passed"
+  # There is no separate quality-gate job: it ran on a fresh checkout with an
+  # empty database, so it always passed. Data alerts (row drops, null spikes,
+  # stale sources) run inside the Collect step, on the seeded data, and show as
+  # warnings on the run page.

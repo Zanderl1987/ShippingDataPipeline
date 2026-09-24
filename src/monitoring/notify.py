@@ -33,6 +33,7 @@ class Notifier:
         webhook_url: str | None = None,
         email_config: dict[str, str] | None = None,
         log_file: str | None = None,
+        push_levels: tuple[str, ...] | None = None,
     ) -> None:
         """Initialize notifier.
 
@@ -41,10 +42,13 @@ class Notifier:
             email_config: Email settings (smtp_host, smtp_port, user,
                           password, from_addr, to_addrs).
             log_file: Path to log file for notifications.
+            push_levels: Levels sent to the webhook and email; None sends all.
+                Every level is always logged.
         """
         self.webhook_url = webhook_url
         self.email_config = email_config
         self.log_file = log_file
+        self.push_levels = push_levels
 
     @classmethod
     def from_env(cls) -> Notifier:
@@ -69,6 +73,9 @@ class Notifier:
             or settings.discord_webhook_url,
             email_config=email_cfg,
             log_file=settings.notification_log_file,
+            # A run sends one success notice per collector (~30 a day); only
+            # problems are worth a push.
+            push_levels=("warning", "error"),
         )
 
     def send(self, notification: Notification) -> dict[str, bool]:
@@ -82,6 +89,9 @@ class Notifier:
         # Always log
         self._log_notification(notification)
         results["log"] = True
+
+        if self.push_levels is not None and notification.level not in self.push_levels:
+            return results
 
         # Send webhook if configured
         if self.webhook_url:

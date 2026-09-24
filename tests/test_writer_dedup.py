@@ -210,3 +210,22 @@ class TestUnkeyedTablesStillAppend:
         write_raw("test", df, table_name="lineage_events")
 
         assert query("SELECT * FROM lineage_events").height == 2
+
+
+def test_rewriting_a_primary_key_row_refreshes_ingested_at(db) -> None:
+    # INSERT OR REPLACE only updates the columns it lists; ports kept its
+    # first ingested_at for a month although it was rewritten every run.
+    import duckdb
+
+    from src.storage.writer import get_db_path
+
+    port = pl.DataFrame(
+        {"unlocode": ["NLRTM"], "port_name": ["Rotterdam"], "source": ["unlocode"]}
+    )
+    write_raw("unlocode", port, table_name="ports")
+    with duckdb.connect(str(get_db_path())) as conn:
+        conn.execute("UPDATE ports SET ingested_at = TIMESTAMP '2026-01-01'")
+    write_raw("unlocode", port, table_name="ports")
+    with duckdb.connect(str(get_db_path())) as conn:
+        rows = conn.execute("SELECT ingested_at > TIMESTAMP '2026-01-02' FROM ports").fetchall()
+    assert rows == [(True,)]

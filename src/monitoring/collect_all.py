@@ -14,7 +14,6 @@ from src.monitoring.notify import (
     notify_collection_success,
     notify_quality_warning,
 )
-from src.monitoring.quality import check_quality_thresholds, get_quality_report
 from src.storage.tracker import SourceTracker
 
 logger = logging.getLogger(__name__)
@@ -729,8 +728,13 @@ def run_all_collectors(
 
     # Ensure the full schema exists before collecting. Without this, a collector
     # writing to a table that was never created silently persists 0 rows.
+    from src.monitoring.quality_alerts import take_baseline
     from src.storage.writer import init_db
-    init_db().close()
+    conn = init_db()
+    try:
+        baseline = take_baseline(conn)
+    finally:
+        conn.close()
 
     tracker = SourceTracker()
     notifier = Notifier.from_env() if notify else Notifier()
@@ -771,14 +775,24 @@ def run_all_collectors(
             logger.error("Curation failed: %s", e)
             report.curation_errors.append(str(e))
 
-    # Check quality and notify if issues
+    # Alert on what this run changed (see quality_alerts for why not on
+    # overall null rates).
     try:
-        quality_report = get_quality_report()
-        warnings = check_quality_thresholds(quality_report)
-        if warnings and notify:
-            notifier.send(notify_quality_warning(warnings))
+        from src.monitoring.quality_alerts import check_run, write_github_annotations
+        conn = init_db()
+        try:
+            alerts = check_run(conn, baseline)
+        finally:
+            conn.close()
+        if alerts:
+            logger.warning("%d data alerts", len(alerts))
+            write_github_annotations(alerts)
+            if notify:
+                notifier.send(notify_quality_warning([a.message for a in alerts]))
+        else:
+            logger.info("Data alerts: none")
     except Exception as e:
-        logger.error("Quality check failed: %s", e)
+        logger.error("Data alert checks failed: %s", e)
 
     # Log summary
     duration = (report.completed_at - report.started_at).total_seconds()

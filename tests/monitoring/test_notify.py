@@ -141,3 +141,14 @@ class TestNotificationHelpers:
         assert notif.level == "warning"
         assert "source1" in notif.message
         assert "source2" in notif.message
+
+
+def test_push_levels_limit_webhook_but_not_log() -> None:
+    notifier = Notifier(webhook_url="https://example.com/webhook", push_levels=("warning",))
+    with patch.object(notifier, "_send_webhook") as mock_webhook:
+        assert notifier.send(Notification(title="ok", message="m", level="success")) == {
+            "log": True
+        }
+        mock_webhook.assert_not_called()
+        notifier.send(Notification(title="bad", message="m", level="warning"))
+        mock_webhook.assert_called_once()

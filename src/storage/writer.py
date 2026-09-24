@@ -210,8 +210,15 @@ def write_raw(
         if dedup_keys:
             _upsert_on_keys(conn, table_name, col_list, dedup_keys, df)
         elif _table_has_pk(conn, table_name):
+            # INSERT OR REPLACE updates only the listed columns, so without
+            # this a rewritten row kept its first ingested_at forever.
+            stamp_cols, stamp_vals = col_list, col_list
+            if "ingested_at" in table_columns:
+                stamp_cols += ", ingested_at"
+                stamp_vals += ", now()"
             conn.execute(
-                f"INSERT OR REPLACE INTO {table_name}({col_list}) SELECT {col_list} FROM df;"
+                f"INSERT OR REPLACE INTO {table_name}({stamp_cols}) "
+                f"SELECT {stamp_vals} FROM df;"
             )
         else:
             conn.execute(
