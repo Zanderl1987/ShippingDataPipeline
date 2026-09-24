@@ -672,7 +672,7 @@ SUPPLY_CHAIN_DISRUPTIONS = TableSchema(
     partition_cols=["partition_date", "source"],
     dedup_keys=["snapshot_date", "disruption_id", "source"],
     version="0.1.0",
-    description="Active supply chain disruption alerts (FreightPulse)",
+    description="FreightPulse disruption alerts (retired 2026-09-24, never populated)",
     raw_sql="""
 CREATE TABLE IF NOT EXISTS supply_chain_disruptions (
     snapshot_date           DATE,

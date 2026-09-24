@@ -569,6 +569,10 @@ def get_collectors() -> list[CollectorDef]:
     # (rebuilt from port_activity as port_congestion_proxy in curation), rates
     # are US trucking only, and carriers is a US trucking name search. Their
     # tables keep the history collected before the change.
+    # freightpulse_disruptions was retired the same day: the endpoint now
+    # repackages NWS (US weather), GDACS and USGS natural-hazard alerts, with
+    # no route or rate impact; GDACS events are covered by PortWatch
+    # disruption_events. Its supply_chain_disruptions table never held rows.
 
     try:
         from src.collectors.freightpulse_fuel import collect_fuel_prices
@@ -581,18 +585,6 @@ def get_collectors() -> list[CollectorDef]:
         )
     except ImportError as e:
         logger.warning("freightpulse_fuel collector not available: %s", e)
-
-    try:
-        from src.collectors.freightpulse_disruptions import collect_disruptions
-        collectors.append(
-            CollectorDef(
-                name="freightpulse_disruptions",
-                collect_fn=collect_disruptions,
-                schedule="daily",
-            )
-        )
-    except ImportError as e:
-        logger.warning("freightpulse_disruptions collector not available: %s", e)
 
     return collectors
 
