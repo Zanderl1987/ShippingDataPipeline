@@ -63,7 +63,13 @@ jobs:
         if: env.HF_TOKEN != ''
         run: uv run python seed_from_huggingface.py
 
+      # A run where some collectors failed still publishes: every successful
+      # collector's rows are in the database, and skipping the upload would
+      # drop them all because of one flaky source. collect_all exits
+      # EXIT_PARTIAL (2) for that case and the job is failed at the end. Any
+      # other non-zero exit (a crash) stops the run before publishing.
       - name: Collect data
+        id: collect
         env:
           SDP_ALLOW_BULK_BACKFILL: "true"
           AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
@@ -75,9 +81,16 @@ jobs:
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
           # HORMUZ_API_KEY: not available (NO-GO, no free tier)
         run: |
+          code=0
           uv run python -m src.monitoring.collect_all \
             ${{ github.event.inputs.sources && format('--sources {0}', github.event.inputs.sources) || '' }} \
-            ${{ github.event.inputs.force == 'true' && '--force' || '' }}
+            ${{ github.event.inputs.force == 'true' && '--force' || '' }} || code=$?
+          if [ "$code" -eq 2 ]; then
+            echo "partial=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Some collectors or curation failed; publishing the rest. The job will fail at the end."
+            exit 0
+          fi
+          exit "$code"
 
       - name: Run data quality checks
         run: uv run python -m src.monitoring.quality
@@ -98,6 +111,12 @@ jobs:
           path: |
             status_report.txt
           retention-days: 30
+
+      - name: Fail if any collector failed
+        if: steps.collect.outputs.partial == 'true'
+        run: |
+          echo "::error::Published, but some collectors or curation failed. See the Collect data step."
+          exit 1
 
       - name: Notify on failure
         if: failure()

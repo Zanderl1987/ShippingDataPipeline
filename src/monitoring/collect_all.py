@@ -795,6 +795,20 @@ def run_all_collectors(
     return report
 
 
+#: Exit status when the run finished but some collectors or curation failed.
+#: CI still publishes on it (every successful collector's rows are in the
+#: database), then fails the job. An uncaught exception exits 1, which CI does
+#: not publish on, so this must not be 0 or 1.
+EXIT_PARTIAL = 2
+
+
+def exit_code(report: CollectionReport) -> int:
+    """0 if everything succeeded, EXIT_PARTIAL if anything failed."""
+    if report.failed or report.curation_errors:
+        return EXIT_PARTIAL
+    return 0
+
+
 def print_collection_report(report: CollectionReport) -> None:
     """Print a formatted collection report."""
     print("\n" + "=" * 60)
@@ -885,4 +899,4 @@ if __name__ == "__main__":
             notify=not args.no_notify,
         )
         print_collection_report(report)
-        sys.exit(0 if report.failed == 0 and not report.curation_errors else 1)
+        sys.exit(exit_code(report))

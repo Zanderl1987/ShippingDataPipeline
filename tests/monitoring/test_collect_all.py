@@ -7,9 +7,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.monitoring.collect_all import (
+    EXIT_PARTIAL,
     CollectionReport,
     CollectionResult,
     CollectorDef,
+    exit_code,
     get_collectors,
     print_collection_report,
     run_all_collectors,
@@ -54,6 +56,32 @@ class TestCollectionReport:
             CollectionResult(source="b", success=True, rows_written=200),
         ]
         assert report.total_rows == 300
+
+
+class TestExitCode:
+    """CI publishes on EXIT_PARTIAL but not on a crash, so the two must differ."""
+
+    def test_all_ok(self) -> None:
+        report = CollectionReport(started_at=datetime.now())
+        report.results = [CollectionResult(source="a", success=True)]
+        assert exit_code(report) == 0
+
+    def test_failed_collector_is_partial(self) -> None:
+        report = CollectionReport(started_at=datetime.now())
+        report.results = [
+            CollectionResult(source="a", success=True),
+            CollectionResult(source="b", success=False),
+        ]
+        assert exit_code(report) == EXIT_PARTIAL
+
+    def test_curation_error_is_partial(self) -> None:
+        report = CollectionReport(started_at=datetime.now())
+        report.curation_errors = ["boom"]
+        assert exit_code(report) == EXIT_PARTIAL
+
+    def test_partial_is_not_python_crash_code(self) -> None:
+        # An uncaught exception exits 1; that must never be read as "publish".
+        assert EXIT_PARTIAL not in (0, 1)
 
 
 class TestCollectors:
