@@ -109,6 +109,9 @@ jobs:
       - name: Generate status report
         run: uv run python -m src.analytics.reports overview > status_report.txt
 
+      - name: Generate data dashboard
+        run: uv run python -m src.analytics.dashboard --out data_dashboard.html
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -117,6 +120,7 @@ jobs:
           # dataset (hundreds of MB), which lives on HuggingFace anyway.
           path: |
             status_report.txt
+            data_dashboard.html
           retention-days: 30
 
       - name: Fail if any collector failed
