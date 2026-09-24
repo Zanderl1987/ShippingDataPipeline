@@ -19,9 +19,9 @@ SOURCE = "aisstream"
 WSS_URL = "wss://stream.aisstream.io/v0/stream"
 
 # Mirrors the pipeline's existing chokepoint focus (imf_portwatch's
-# CHOKEPOINT_NAMES / chokepoint_transits table already tracks these same 4
-# straits) rather than an arbitrary region -- chosen 2026-08-03 to keep AIS
-# coverage coherent with the rest of the pipeline's geographic scope.
+# chokepoint_transits table already tracks these same 4 straits) rather
+# than an arbitrary region -- chosen 2026-08-03 to keep AIS coverage
+# coherent with the rest of the pipeline's geographic scope.
 CHOKEPOINT_BBOXES: list[list[list[float]]] = [
     [[25.5, 55.0], [27.0, 57.0]],      # Strait of Hormuz
     [[1.0, 100.0], [3.0, 104.5]],      # Strait of Malacca / Singapore Strait

@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 import polars as pl
 import requests
 
+from src.collectors.portwatch_ports import query_all
 from src.storage.tracker import SourceTracker, TimedCollector
 from src.storage.writer import write_raw
 
@@ -21,21 +22,11 @@ DAILY_CHOKEPOINTS_URL = f"{BASE_URL}/Daily_Chokepoints_Data/FeatureServer/0/quer
 
 SOURCE = "imf_portwatch"
 
-CHOKEPOINT_NAMES = {
-    "CHOKEPOINT1": "Suez Canal",
-    "CHOKEPOINT2": "Panama Canal",
-    "CHOKEPOINT3": "Strait of Malacca",
-    "CHOKEPOINT4": "Bab el-Mandeb Strait",
-    "CHOKEPOINT5": "Strait of Hormuz",
-    "CHOKEPOINT6": "Cape of Good Hope",
-    "CHOKEPOINT7": "Turkish Straits (Bosphorus)",
-    "CHOKEPOINT8": "Danish Straits",
-    "CHOKEPOINT9": "Kiel Canal",
-    "CHOKEPOINT10": "Suez Canal (North)",
-    "CHOKEPOINT11": "Suez Canal (South)",
-    "CHOKEPOINT12": "Bab el-Mandeb (West)",
-    "CHOKEPOINT13": "Bab el-Mandeb (East)",
-}
+# Chokepoint ids are "chokepoint1".."chokepoint28"; names come from each
+# row's own portname. (A hardcoded id -> name table used to live here; its
+# uppercase keys never matched, and its names were wrong -- it called
+# chokepoint3 Malacca, which PortWatch lists as the Bosporus.)
+_CHOKEPOINT_ID = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def get_chokepoint_info() -> dict[str, Any]:
@@ -61,7 +52,7 @@ def get_daily_chokepoint_data(
     """Get daily transit counts and capacity for chokepoints.
 
     Args:
-        chokepoint_ids: List of chokepoint IDs (e.g. ["CHOKEPOINT1", "CHOKEPOINT5"]).
+        chokepoint_ids: List of chokepoint IDs (e.g. ["chokepoint1", "chokepoint6"]).
             If None, returns all chokepoints.
         start_date: Start date filter (YYYY-MM-DD).
         end_date: End date filter (YYYY-MM-DD).
@@ -72,46 +63,28 @@ def get_daily_chokepoint_data(
     conditions: list[str] = []
     if chokepoint_ids:
         for cp in chokepoint_ids:
-            conditions.append(f"portid = '{cp}'")
-        where_clause = " OR ".join(conditions)
-    else:
-        where_clause = "1=1"
+            if not _CHOKEPOINT_ID.match(cp):
+                raise ValueError(f"Invalid chokepoint id: {cp!r}")
+        # Bracketed: SQL's AND binds tighter than OR, so without them the
+        # date filter below applied only to the last id.
+        conditions.append(
+            "(" + " OR ".join(f"portid = '{cp}'" for cp in chokepoint_ids) + ")"
+        )
 
-    if start_date:
-        if not re.match(r"^\d{4}-\d{2}-\d{2}$", start_date):
-            raise ValueError(f"Invalid start_date format: {start_date!r}. Must be YYYY-MM-DD.")
-        where_clause += f" AND date >= TIMESTAMP '{start_date} 00:00:00'"
+    for label, value, clock, op in (
+        ("start_date", start_date, "00:00:00", ">="),
+        ("end_date", end_date, "23:59:59", "<="),
+    ):
+        if value:
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", value):
+                raise ValueError(f"Invalid {label} format: {value!r}. Must be YYYY-MM-DD.")
+            conditions.append(f"date {op} TIMESTAMP '{value} {clock}'")
 
-    params: dict[str, Any] = {
-        "where": where_clause,
-        "outFields": "*",
-        "outSR": "4326",
-        "f": "json",
-        "resultOffset": 0,
-    }
-
-    if end_date:
-        if not re.match(r"^\d{4}-\d{2}-\d{2}$", end_date):
-            raise ValueError(f"Invalid end_date format: {end_date!r}. Must be YYYY-MM-DD.")
-        params["where"] += f" AND date <= TIMESTAMP '{end_date} 23:59:59'"
-
+    where = " AND ".join(conditions) or "1=1"
     logger.info("Fetching PortWatch daily chokepoint data")
-    all_features: list[dict[str, Any]] = []
-    offset = 0
-
-    while True:
-        params["resultOffset"] = offset
-        resp = requests.get(DAILY_CHOKEPOINTS_URL, params=params, timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-        features = data.get("features", [])
-        all_features.extend(features)
-
-        if len(features) < 1000:
-            break
-        offset += 1000
-
-    return {"features": all_features}
+    # query_all orders by ObjectId and follows exceededTransferLimit; unordered
+    # offset paging can return overlapping or skipped rows between pages.
+    return {"features": query_all(DAILY_CHOKEPOINTS_URL, where=where)}
 
 
 def _parse_chokepoint_transits(data: dict[str, Any]) -> pl.DataFrame:
@@ -129,12 +102,12 @@ def _parse_chokepoint_transits(data: dict[str, Any]) -> pl.DataFrame:
             transit_date = date_val[:10]
         elif isinstance(date_val, (int, float)):
             # Fallback: some ArcGIS layers return epoch milliseconds
-            transit_date = datetime.fromtimestamp(date_val / 1000).strftime("%Y-%m-%d")
+            transit_date = datetime.fromtimestamp(date_val / 1000, tz=UTC).strftime("%Y-%m-%d")
         else:
             transit_date = ""
 
         port_id = attr.get("portid", "")
-        port_name = CHOKEPOINT_NAMES.get(port_id, attr.get("portname", port_id))
+        port_name = attr.get("portname") or port_id
 
         records.append({
             "transit_date": transit_date,
