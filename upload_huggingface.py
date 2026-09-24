@@ -32,7 +32,16 @@ load_dotenv(Path(__file__).parent / ".env")
 from src.config import settings  # noqa: E402  (needs env vars from load_dotenv)
 from src.storage.schema import ALL_TABLES  # noqa: E402
 
-TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES}
+TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES} | {
+    # Rebuilt by curation every run, so not in the schema.
+    "chokepoint_daily": (
+        "Derived: daily traffic per PortWatch chokepoint, 7-day averages vs a "
+        "year earlier and the prior 28 days, plus GDACS hazards within 500 km"
+    ),
+    "port_congestion_proxy": "Derived: each port's latest 7-day vs 90-day average port calls",
+    "curated_ais_positions": "Derived: ais_positions joined with vessel and port details",
+    "curated_vessels": "Derived: vessels with vessel age added",
+}
 
 EXPORT_DIR = Path(__file__).parent / "storage" / "parquet" / "hf_export"
 

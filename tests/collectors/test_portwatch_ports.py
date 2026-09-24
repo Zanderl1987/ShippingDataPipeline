@@ -191,6 +191,25 @@ class TestPortProfiles:
         assert rows["locode"][0] == "VE BJV"
 
 
+class TestChokepointProfiles:
+    def test_parse_and_upsert(self, db):
+        # Live layer fields, 2026-09-24.
+        feature = {"attributes": {
+            "portid": "chokepoint1", "portname": "Suez Canal", "fullname": "Suez Canal",
+            "country": None, "LOCODE": None, "lat": 30.59334599, "lon": 32.43688221,
+            "vessel_count_total": 19787, "vessel_count_RoRo": 766,
+            "industry_top1": "Mineral Products",
+        }}
+        with patch.object(pw, "query_all", return_value=[feature]):
+            assert pw.collect_chokepoint_profiles() == 1
+            pw.collect_chokepoint_profiles()
+        rows = query("SELECT * FROM chokepoint_profiles")
+        assert rows.height == 1
+        row = rows.row(0, named=True)
+        assert (row["chokepoint_id"], row["chokepoint_name"]) == ("chokepoint1", "Suez Canal")
+        assert (row["latitude"], row["vessel_count_roro"]) == (30.59334599, 766)
+
+
 class TestTradeNowcast:
     def test_parse(self):
         df = pw._parse_tradenow([{"attributes": {

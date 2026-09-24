@@ -909,6 +909,35 @@ CREATE TABLE IF NOT EXISTS port_profiles (
 """,
 )
 
+CHOKEPOINT_PROFILES = TableSchema(
+    name="chokepoint_profiles",
+    partition_cols=[],
+    description=(
+        "Reference data for the 28 IMF PortWatch chokepoints: location, vessel "
+        "mix and top industries"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS chokepoint_profiles (
+    chokepoint_id               VARCHAR PRIMARY KEY,
+    chokepoint_name             VARCHAR,
+    full_name                   VARCHAR,
+    latitude                    DOUBLE,
+    longitude                   DOUBLE,
+    vessel_count_total          INTEGER,
+    vessel_count_container      INTEGER,
+    vessel_count_dry_bulk       INTEGER,
+    vessel_count_general_cargo  INTEGER,
+    vessel_count_roro           INTEGER,
+    vessel_count_tanker         INTEGER,
+    industry_top1               VARCHAR,
+    industry_top2               VARCHAR,
+    industry_top3               VARCHAR,
+    source                      VARCHAR,
+    ingested_at                 TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 TRADE_NOWCAST = TableSchema(
     name="trade_nowcast",
     partition_cols=["source"],
@@ -1015,6 +1044,7 @@ ALL_TABLES: list[TableSchema] = [
     CARRIERS,
     PORT_ACTIVITY,
     PORT_PROFILES,
+    CHOKEPOINT_PROFILES,
     VESSEL_TRACKS_US,
     TRADE_NOWCAST,
     DISRUPTION_EVENTS,

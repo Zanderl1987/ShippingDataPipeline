@@ -33,6 +33,7 @@ BASE_URL = "https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services"
 
 DAILY_PORTS_URL = f"{BASE_URL}/Daily_Ports_Data/FeatureServer/0/query"
 PORTS_URL = f"{BASE_URL}/PortWatch_ports_database/FeatureServer/0/query"
+CHOKEPOINTS_URL = f"{BASE_URL}/PortWatch_chokepoints_database/FeatureServer/0/query"
 TRADENOW_URL = f"{BASE_URL}/Monthly_TradeNow/FeatureServer/0/query"
 DISRUPTIONS_URL = f"{BASE_URL}/portwatch_disruptions_database/FeatureServer/0/query"
 GEOPULSE_URL = f"{BASE_URL}/geopulse_events/FeatureServer/0/query"
@@ -47,6 +48,7 @@ DAILY_PORTS_CSV_URL = (
 
 SOURCE_ACTIVITY = "imf_portwatch_port_activity"
 SOURCE_PROFILES = "imf_portwatch_port_profiles"
+SOURCE_CHOKEPOINT_PROFILES = "imf_portwatch_chokepoint_profiles"
 SOURCE_TRADENOW = "imf_portwatch_tradenow"
 SOURCE_DISRUPTIONS = "imf_portwatch_disruptions"
 SOURCE_GEOPULSE = "imf_portwatch_geopulse"
@@ -100,6 +102,25 @@ _PROFILE_FIELDS: list[tuple[str, str, pl.DataType]] = [
     ("industry_top3", "industry_top3", pl.Utf8()),
     ("share_country_maritime_import", "share_country_maritime_import", pl.Float64()),
     ("share_country_maritime_export", "share_country_maritime_export", pl.Float64()),
+]
+
+#: The chokepoint layer uses the port layer's field names; the port-only ones
+#: (country, LOCODE, trade shares) are always empty there.
+_CHOKEPOINT_PROFILE_FIELDS: list[tuple[str, str, pl.DataType]] = [
+    ("chokepoint_id", "portid", pl.Utf8()),
+    ("chokepoint_name", "portname", pl.Utf8()),
+    ("full_name", "fullname", pl.Utf8()),
+    ("latitude", "lat", pl.Float64()),
+    ("longitude", "lon", pl.Float64()),
+    ("vessel_count_total", "vessel_count_total", pl.Int32()),
+    ("vessel_count_container", "vessel_count_container", pl.Int32()),
+    ("vessel_count_dry_bulk", "vessel_count_dry_bulk", pl.Int32()),
+    ("vessel_count_general_cargo", "vessel_count_general_cargo", pl.Int32()),
+    ("vessel_count_roro", "vessel_count_RoRo", pl.Int32()),
+    ("vessel_count_tanker", "vessel_count_tanker", pl.Int32()),
+    ("industry_top1", "industry_top1", pl.Utf8()),
+    ("industry_top2", "industry_top2", pl.Utf8()),
+    ("industry_top3", "industry_top3", pl.Utf8()),
 ]
 
 _TRADENOW_NUMERIC = [
@@ -381,6 +402,32 @@ def collect_port_profiles(tracker: SourceTracker | None = None) -> int:
             logger.warning("No PortWatch port profiles returned")
             return 0
         tc.rows_written = write_raw(SOURCE_PROFILES, df, table_name="port_profiles")
+        return tc.rows_written
+
+
+def _parse_chokepoint_profiles(features: list[dict[str, Any]]) -> pl.DataFrame:
+    if not features:
+        return pl.DataFrame()
+    fields = _CHOKEPOINT_PROFILE_FIELDS
+    df = _frame(_map_fields(features, fields), {t: d for t, _, d in fields})
+    return df.filter(pl.col("chokepoint_id").is_not_null()).with_columns(
+        pl.lit(SOURCE_CHOKEPOINT_PROFILES).alias("source")
+    )
+
+
+def collect_chokepoint_profiles(tracker: SourceTracker | None = None) -> int:
+    """Collect the 28 PortWatch chokepoints' locations into `chokepoint_profiles`."""
+    if tracker is None:
+        tracker = SourceTracker()
+    with TimedCollector(tracker, SOURCE_CHOKEPOINT_PROFILES) as tc:
+        df = _parse_chokepoint_profiles(query_all(CHOKEPOINTS_URL))
+        tc.rows_fetched = df.height
+        if df.height == 0:
+            logger.warning("No PortWatch chokepoint profiles returned")
+            return 0
+        tc.rows_written = write_raw(
+            SOURCE_CHOKEPOINT_PROFILES, df, table_name="chokepoint_profiles"
+        )
         return tc.rows_written
 
 

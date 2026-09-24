@@ -129,6 +129,14 @@ def run_enrichment(
         if errors is not None:
             errors.append(f"Enrichment port_congestion_proxy failed: {e}")
 
+    try:
+        from src.analytics.chokepoint_daily import create_chokepoint_daily
+        results["chokepoint_daily"] = create_chokepoint_daily(conn)
+    except Exception as e:
+        logger.error("Enrichment chokepoint_daily failed: %s", e)
+        if errors is not None:
+            errors.append(f"Enrichment chokepoint_daily failed: {e}")
+
     return results
 
 

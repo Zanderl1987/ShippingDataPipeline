@@ -144,9 +144,11 @@ def get_collectors() -> list[CollectorDef]:
     try:
         from src.collectors.portwatch_ports import (
             SOURCE_ACTIVITY,
+            SOURCE_CHOKEPOINT_PROFILES,
             SOURCE_DISRUPTIONS,
             SOURCE_PROFILES,
             SOURCE_TRADENOW,
+            collect_chokepoint_profiles,
             collect_disruption_events,
             collect_port_activity,
             collect_port_profiles,
@@ -161,6 +163,11 @@ def get_collectors() -> list[CollectorDef]:
             CollectorDef(
                 name=SOURCE_PROFILES,
                 collect_fn=collect_port_profiles,
+                schedule="weekly",
+            ),
+            CollectorDef(
+                name=SOURCE_CHOKEPOINT_PROFILES,
+                collect_fn=collect_chokepoint_profiles,
                 schedule="weekly",
             ),
             CollectorDef(
