@@ -17,6 +17,8 @@ MARINE_BASE_URL = "https://marine-api.open-meteo.com/v1/marine"
 WEATHER_BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
 SOURCE = "open_meteo"
+#: Tracker name for collect_weather; must match its collect_all registration.
+WEATHER_TRACKER_NAME = "open_meteo_weather"
 
 MARINE_VARIABLES = [
     "wave_height",
@@ -248,7 +250,7 @@ def collect_weather(
     if tracker is None:
         tracker = SourceTracker()
 
-    with TimedCollector(tracker, SOURCE) as tc:
+    with TimedCollector(tracker, WEATHER_TRACKER_NAME) as tc:
         raw = fetch_weather(
             latitude,
             longitude,

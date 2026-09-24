@@ -657,6 +657,7 @@ def run_collector(
                 )
 
     logger.info("Running collector: %s", collector.name)
+    before = tracker.get_last_collection(collector.name)
     start = time.perf_counter()
 
     try:
@@ -665,6 +666,16 @@ def run_collector(
 
         # Read row counts from tracker (recorded by collector's TimedCollector)
         last = tracker.get_last_collection(collector.name)
+        if last is None or last == before:
+            # The collector recorded under some other name, so the counts
+            # below would be 0 or a previous run's (erddap_marine, fred_oil
+            # and open_meteo_weather reported "0 rows" for weeks this way).
+            logger.warning(
+                "Collector %s recorded no tracker row under its registered name; "
+                "reported row counts are not from this run",
+                collector.name,
+            )
+            last = None
         rows_fetched = last["rows_fetched"] if last else 0
         rows_written = last["rows_written"] if last else 0
 

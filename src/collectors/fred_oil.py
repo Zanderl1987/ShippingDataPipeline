@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 SOURCE = "fred"
+#: Registered name in collect_all; the tracker row must use it.
+TRACKER_NAME = "fred_oil"
 
 # FRED series ID -> oil_prices column.
 SERIES_TO_COLUMN = {
@@ -137,7 +139,7 @@ def collect_oil_prices(
     if start_date is None:
         start_date = (date.today() - timedelta(days=30)).isoformat()
 
-    with TimedCollector(tracker, SOURCE) as tc:
+    with TimedCollector(tracker, TRACKER_NAME) as tc:
         series_observations = {
             series_id: fetch_series_observations(
                 series_id=series_id, start_date=start_date, end_date=end_date,

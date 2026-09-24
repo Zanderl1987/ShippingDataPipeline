@@ -230,3 +230,43 @@ class TestPrintReport:
         captured = capsys.readouterr()
         assert "COLLECTION REPORT" in captured.out
         assert "test" in captured.out
+
+
+class TestTrackerNameMismatch:
+    """A collector that records under a name other than its registration
+    reported 0 rows while writing data (erddap_marine -> "erddap")."""
+
+    def _run(self, record_as: str, caplog: pytest.LogCaptureFixture) -> CollectionResult:
+        from src.storage.tracker import SourceTracker
+
+        tracker = SourceTracker()
+
+        def collect() -> None:
+            tracker.record_collection(record_as, rows_fetched=9, rows_written=9)
+
+        return run_collector(
+            CollectorDef(name="registered", collect_fn=collect),
+            tracker,
+            MagicMock(),
+            force=True,
+        )
+
+    def test_matching_name_reports_counts(self, caplog: pytest.LogCaptureFixture) -> None:
+        result = self._run("registered", caplog)
+        assert (result.rows_fetched, result.rows_written) == (9, 9)
+        assert "recorded no tracker row" not in caplog.text
+
+    def test_mismatched_name_warns(self, caplog: pytest.LogCaptureFixture) -> None:
+        result = self._run("something_else", caplog)
+        assert (result.rows_fetched, result.rows_written) == (0, 0)
+        assert "registered recorded no tracker row" in caplog.text
+
+    def test_stale_row_is_not_reused(self, caplog: pytest.LogCaptureFixture) -> None:
+        from src.storage.tracker import SourceTracker
+
+        # A previous run's row under the right name must not be reported as
+        # this run's counts.
+        SourceTracker().record_collection("registered", rows_fetched=5, rows_written=5)
+        result = self._run("something_else", caplog)
+        assert (result.rows_fetched, result.rows_written) == (0, 0)
+        assert "recorded no tracker row" in caplog.text
