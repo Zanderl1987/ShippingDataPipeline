@@ -38,6 +38,10 @@ TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES} | {
         "Derived: daily traffic per PortWatch chokepoint, 7-day averages vs a "
         "year earlier and the prior 28 days, plus GDACS hazards within 500 km"
     ),
+    "port_weekly": (
+        "Derived: port calls and cargo per port per week (Mon-Sun) from port_activity; "
+        "weeks with is_complete_week = false are partial"
+    ),
     "port_congestion_proxy": "Derived: each port's latest 7-day vs 90-day average port calls",
     "curated_ais_positions": "Derived: ais_positions joined with vessel and port details",
     "curated_vessels": "Derived: vessels with vessel age added",

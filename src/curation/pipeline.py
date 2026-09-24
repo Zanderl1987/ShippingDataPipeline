@@ -137,6 +137,14 @@ def run_enrichment(
         if errors is not None:
             errors.append(f"Enrichment chokepoint_daily failed: {e}")
 
+    try:
+        from src.analytics.port_weekly import create_port_weekly
+        results["port_weekly"] = create_port_weekly(conn)
+    except Exception as e:
+        logger.error("Enrichment port_weekly failed: %s", e)
+        if errors is not None:
+            errors.append(f"Enrichment port_weekly failed: {e}")
+
     return results
 
 
