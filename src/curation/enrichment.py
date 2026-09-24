@@ -10,6 +10,28 @@ from src.storage.writer import get_db_path
 
 logger = logging.getLogger(__name__)
 
+#: One row per port code from ``ports``, which holds a row per source. Each
+#: field comes from the most trusted source that has it (UN/LOCODE, then
+#: Digitraffic, then anything else); latitude and longitude are taken as a
+#: pair so they always come from the same row.
+PORTS_BY_CODE = """(
+    SELECT
+        unlocode,
+        arg_min(port_name, rank) FILTER (WHERE port_name IS NOT NULL) AS port_name,
+        arg_min(country, rank) FILTER (WHERE country IS NOT NULL) AS country,
+        arg_min(country_code, rank) FILTER (WHERE country_code IS NOT NULL) AS country_code,
+        arg_min(latitude, rank)
+            FILTER (WHERE latitude IS NOT NULL AND longitude IS NOT NULL) AS latitude,
+        arg_min(longitude, rank)
+            FILTER (WHERE latitude IS NOT NULL AND longitude IS NOT NULL) AS longitude
+    FROM (
+        SELECT *,
+            CASE source WHEN 'unlocode' THEN 0 WHEN 'digitraffic' THEN 1 ELSE 2 END AS rank
+        FROM ports
+    )
+    GROUP BY unlocode
+)"""
+
 
 def _get_count(conn: duckdb.DuckDBPyConnection, sql: str) -> int:
     """Execute a count query and return the result."""
@@ -85,7 +107,7 @@ def enrich_ais_with_port_info(
         should_close = True
 
     try:
-        result = conn.execute("""
+        result = conn.execute(f"""
             SELECT
                 a.*,
                 p.port_name as destination_port_name,
@@ -93,7 +115,7 @@ def enrich_ais_with_port_info(
                 p.latitude as destination_latitude,
                 p.longitude as destination_longitude
             FROM ais_positions a
-            LEFT JOIN ports p ON a.destination = p.unlocode
+            LEFT JOIN {PORTS_BY_CODE} p ON a.destination = p.unlocode
         """).pl()
 
         logger.info(
@@ -119,7 +141,7 @@ def create_curated_ais_positions(
         should_close = True
 
     try:
-        conn.execute("""
+        conn.execute(f"""
             CREATE OR REPLACE TABLE curated_ais_positions AS
             SELECT
                 a.mmsi,
@@ -149,7 +171,7 @@ def create_curated_ais_positions(
                 p.country as destination_country
             FROM ais_positions a
             LEFT JOIN vessels v ON a.imo = v.imo
-            LEFT JOIN ports p ON a.destination = p.unlocode
+            LEFT JOIN {PORTS_BY_CODE} p ON a.destination = p.unlocode
         """)
 
         count = _get_count(conn, "SELECT count(*) FROM curated_ais_positions")

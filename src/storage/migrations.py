@@ -276,6 +276,22 @@ MIGRATIONS: list[Migration] = [
         """,
         down_sql="",
     ),
+    Migration(
+        version="202609240001",
+        description="ports: drop the unlocode primary key, one row per code per source",
+        # DuckDB can't drop a constraint, so the table is rebuilt. CTAS drops
+        # column defaults, hence the SET DEFAULT. A transaction so a failure
+        # can't leave ports dropped but not yet replaced.
+        up_sql="""
+            BEGIN TRANSACTION;
+            CREATE TABLE ports_rebuilt AS SELECT * FROM ports;
+            DROP TABLE ports;
+            ALTER TABLE ports_rebuilt RENAME TO ports;
+            ALTER TABLE ports ALTER COLUMN ingested_at SET DEFAULT now();
+            COMMIT;
+        """,
+        down_sql="",
+    ),
 ]
 
 
@@ -353,6 +369,10 @@ def apply_pending_migrations(conn: duckdb.DuckDBPyConnection | None = None) -> l
                 logger.info("Migration %s applied successfully", migration.version)
 
             except Exception as e:
+                try:
+                    conn.execute("ROLLBACK")
+                except duckdb.Error:
+                    pass  # the migration didn't open a transaction
                 logger.error(
                     "Migration %s (%s) failed: %s. Not recording it as applied; "
                     "it will be retried on the next run. Stopping here so later "

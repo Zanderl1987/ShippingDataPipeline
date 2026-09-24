@@ -176,11 +176,16 @@ CREATE TABLE IF NOT EXISTS freight_rates (
 PORTS = TableSchema(
     name="ports",
     partition_cols=[],
-    version="0.1.0",
-    description="Global port reference data",
+    # One row per code per source (UN/LOCODE, Digitraffic): keyed on the code
+    # alone, whichever source ran last replaced the other's row, losing
+    # Digitraffic's country names and coordinates. Curation joins use
+    # enrichment.PORTS_BY_CODE, one merged row per code.
+    dedup_keys=["unlocode", "source"],
+    version="0.2.0",
+    description="Global port reference data, one row per port per source",
     raw_sql="""
 CREATE TABLE IF NOT EXISTS ports (
-    unlocode        VARCHAR PRIMARY KEY,
+    unlocode        VARCHAR,
     port_name       VARCHAR,
     country         VARCHAR,
     country_code    VARCHAR,

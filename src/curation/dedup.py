@@ -128,7 +128,7 @@ def deduplicate_vessels(
 def deduplicate_ports(
     conn: duckdb.DuckDBPyConnection | None = None,
 ) -> int:
-    """Remove duplicate ports based on unlocode (primary key).
+    """Remove duplicate ports: more than one row for the same code and source.
 
     Returns number of rows removed.
     """
@@ -146,7 +146,7 @@ def deduplicate_ports(
             WHERE rowid NOT IN (
                 SELECT MAX(rowid)
                 FROM ports
-                GROUP BY unlocode
+                GROUP BY unlocode, source
             )
         """)
 
