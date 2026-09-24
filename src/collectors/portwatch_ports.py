@@ -176,11 +176,14 @@ def query_all(
     url: str,
     where: str = "1=1",
     return_geometry: bool = False,
+    return_centroid: bool = False,
+    source: str = "imf_portwatch",
 ) -> list[dict[str, Any]]:
     """Page through an ArcGIS layer query and return every feature.
 
     Ordered by ObjectId so pages are stable -- without an explicit order the
-    server may return overlapping or skipped rows across offsets.
+    server may return overlapping or skipped rows across offsets. Works for
+    any hosted ArcGIS layer; *source* labels the requests in logs.
     """
     features: list[dict[str, Any]] = []
     offset = 0
@@ -195,7 +198,9 @@ def query_all(
             "resultRecordCount": PAGE_SIZE,
             "f": "json",
         }
-        data = get_with_retry(url, params=params, timeout=90, source="imf_portwatch").json()
+        if return_centroid:
+            params["returnCentroid"] = "true"
+        data = get_with_retry(url, params=params, timeout=90, source=source).json()
         # ArcGIS reports query errors as HTTP 200 with an "error" body.
         if "error" in data:
             raise RuntimeError(f"ArcGIS query failed for {url}: {data['error']}")

@@ -470,6 +470,19 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("unlocode collector not available: %s", e)
 
+    try:
+        from src.collectors.usace_ports import SOURCE as USACE_SOURCE
+        from src.collectors.usace_ports import collect_principal_ports
+        collectors.append(
+            CollectorDef(
+                name=USACE_SOURCE,
+                collect_fn=collect_principal_ports,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.warning("usace_principal_ports collector not available: %s", e)
+
     # ── Port volumes / macro indices (no-auth, Tier-1 pattern-reuse) ──────
 
     try:

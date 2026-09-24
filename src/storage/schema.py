@@ -938,6 +938,34 @@ CREATE TABLE IF NOT EXISTS chokepoint_profiles (
 """,
 )
 
+PORT_TONNAGE_US = TableSchema(
+    name="port_tonnage_us",
+    partition_cols=[],
+    dedup_keys=["data_year", "port_code", "source"],
+    description=(
+        "USACE principal US ports: annual cargo short tons (total, domestic, "
+        "foreign, imports, exports) by calendar year"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS port_tonnage_us (
+    data_year       INTEGER,
+    port_code       VARCHAR,
+    port_name       VARCHAR,
+    port_type       VARCHAR,
+    tonnage_rank    INTEGER,
+    total_tons      DOUBLE,
+    domestic_tons   DOUBLE,
+    foreign_tons    DOUBLE,
+    import_tons     DOUBLE,
+    export_tons     DOUBLE,
+    latitude        DOUBLE,
+    longitude       DOUBLE,
+    source          VARCHAR,
+    ingested_at     TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 TRADE_NOWCAST = TableSchema(
     name="trade_nowcast",
     partition_cols=["source"],
@@ -1045,6 +1073,7 @@ ALL_TABLES: list[TableSchema] = [
     PORT_ACTIVITY,
     PORT_PROFILES,
     CHOKEPOINT_PROFILES,
+    PORT_TONNAGE_US,
     VESSEL_TRACKS_US,
     TRADE_NOWCAST,
     DISRUPTION_EVENTS,
