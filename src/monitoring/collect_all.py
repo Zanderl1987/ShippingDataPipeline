@@ -320,14 +320,11 @@ def get_collectors() -> list[CollectorDef]:
     # (built and tested, but never registered here — see Session 15 audit)
 
     try:
-        from src.collectors.noaa_marinecadastre import collect_bulk_download
-        _prev_month = date.today().replace(day=1) - timedelta(days=1)
+        from src.collectors.noaa_marinecadastre import collect_vessel_tracks
         collectors.append(
             CollectorDef(
                 name="noaa_marinecadastre",
-                collect_fn=lambda: collect_bulk_download(
-                    year=_prev_month.year, month=_prev_month.month
-                ),
+                collect_fn=collect_vessel_tracks,
                 schedule="weekly",
             )
         )

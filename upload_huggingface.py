@@ -156,7 +156,7 @@ def export_tables(db_path: Path) -> list[tuple[str, int, int]]:
             table_dir.mkdir(exist_ok=True)
             out_path = table_dir / f"{name}.parquet"
             conn.execute(
-                f'COPY (SELECT * FROM "{name}") TO ? (FORMAT PARQUET)',
+                f'COPY (SELECT * FROM "{name}") TO ? (FORMAT PARQUET, COMPRESSION ZSTD)',
                 [str(out_path)],
             )
             stats.append((name, count, out_path.stat().st_size))

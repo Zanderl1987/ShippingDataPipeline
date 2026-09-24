@@ -1,195 +1,158 @@
-"""Collect historical AIS data from NOAA MarineCadastre."""
+"""Collect US vessel tracks from NOAA MarineCadastre AIS.
+
+NOAA publishes monthly GeoParquet track files (one row per track, a vessel's
+continuous movement) on Azure, listed at INDEX_URL. Data arrive about every
+90 days, roughly 145-165 days after collection (MarineCadastre AIS FAQ, May
+2026), so this is a historical source, not a live feed. As of 2026-09 the
+index runs 2024-01..2025-12. Licence: CC0 1.0.
+
+Each file is ~1.2-1.4 GB, almost all of it the line geometry. DuckDB's httpfs
+reads only the other columns (~27 MB per month) straight from the remote
+parquet, so the file is never downloaded whole.
+
+An earlier version of this module fetched
+``coast.noaa.gov/data/marinecadastre/ais/<year>/container/ais_vessel_<year>_<mm>.parquet``;
+that layout never existed (every month 404s, back to 2024-01), and the
+collector reported success with 0 rows every week.
+"""
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date
-from pathlib import Path
 
+import duckdb
 import polars as pl
-import requests
 
+from src.collectors.http_utils import get_with_retry
 from src.config import settings
 from src.storage.tracker import SourceTracker, TimedCollector
-from src.storage.writer import write_raw
+from src.storage.writer import get_connection, write_raw
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://coast.noaa.gov/data/marinecadastre/ais"
-
 SOURCE = "noaa_marinecadastre"
+TABLE = "vessel_tracks_us"
 
-# Known bulk download URLs for recent years
-BULK_URLS: dict[int, str] = {
-    2025: f"{BASE_URL}/2025/container/ais_vessel_2025_01.parquet",
-    2024: f"{BASE_URL}/2024/container/ais_vessel_2024_01.parquet",
-    2023: f"{BASE_URL}/2023/container/ais_vessel_2023_01.parquet",
-}
+BASE_URL = "https://ocmgeodatastor1.blob.core.windows.net/marinecadastre/aistrack"
+INDEX_URL = f"{BASE_URL}/index-aistrack.html"
 
+_TRACK_FILE = re.compile(r"ais-track-(\d{4})-(\d{2})\.parquet")
 
-def get_bulk_download_urls(year: int) -> list[str]:
-    """Get available bulk download URLs for a year.
-
-    Args:
-        year: Year to get URLs for.
-
-    Returns:
-        List of download URLs.
-    """
-    urls: list[str] = []
-
-    if year in BULK_URLS:
-        urls.append(BULK_URLS[year])
-    else:
-        for month in range(1, 13):
-            url = f"{BASE_URL}/{year}/container/ais_vessel_{year}_{month:02d}.parquet"
-            urls.append(url)
-
-    return urls
+#: Source columns kept (everything but `geometry`), in file order.
+COLUMNS = [
+    "mmsi",
+    "vessel_name",
+    "imo",
+    "call_sign",
+    "vessel_type",
+    "vessel_type_name",
+    "status",
+    "length",
+    "width",
+    "draft",
+    "cargo",
+    "transceiver",
+    "duration_minutes",
+    "start_time",
+    "end_time",
+]
 
 
-def download_file(url: str, dest: Path) -> bool:
-    """Download a file from URL.
+def _parse_index(html: str) -> list[date]:
+    """Months (first day) that have a track file, oldest first."""
+    months = {date(int(y), int(m), 1) for y, m in _TRACK_FILE.findall(html)}
+    return sorted(months)
 
-    Args:
-        url: Source URL.
-        dest: Destination path.
 
-    Returns:
-        True if successful.
-    """
-    logger.info("Downloading %s", url)
+def _fetch_index() -> list[date]:
+    resp = get_with_retry(INDEX_URL, timeout=60, source=SOURCE)
+    return _parse_index(resp.text)
 
+
+def _stored_months() -> set[date]:
+    conn = get_connection()
     try:
-        resp = requests.get(url, timeout=300, stream=True)
-        resp.raise_for_status()
-
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        with open(dest, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=8192):
-                f.write(chunk)
-
-        # Integrity check: file must be > 1KB (a truncated download is useless)
-        if dest.stat().st_size < 1024:
-            logger.warning(
-                "Downloaded file %s is suspiciously small (%d bytes), removing",
-                dest, dest.stat().st_size,
-            )
-            dest.unlink(missing_ok=True)
-            return False
-
-        logger.info("Downloaded to %s", dest)
-        return True
-
-    except requests.RequestException as e:
-        logger.warning("Failed to download %s: %s", url, e)
-        return False
+        rows = conn.execute(
+            f"SELECT DISTINCT track_month FROM {TABLE} WHERE source = ?", [SOURCE]
+        ).fetchall()
+    except duckdb.CatalogException:
+        return set()
+    finally:
+        conn.close()
+    return {r[0] for r in rows}
 
 
-def _parse_ais_parquet(file_path: Path) -> pl.DataFrame:
-    """Parse an AIS parquet file into a DataFrame.
+def _months_to_fetch(available: list[date], stored: set[date], bulk: bool) -> list[date]:
+    """Months to load this run.
 
-    Expected columns from NOAA MarineCadastre:
-    - MMSI, IMO, VesselName, CallSign, VesselType, Status,
-      Length, Width, Draft, Cargo, SOG, COG, Heading,
-      DateTime, BaseDateTime, LAT, LON, TransceiverClass
+    With bulk backfill (CI) every missing month is loaded. Without it (a dev
+    machine) only months newer than anything stored, or just the newest month
+    when the table is empty, so a local run never pulls two years of tracks.
     """
+    missing = [m for m in available if m not in stored]
+    if bulk:
+        return missing
+    if not stored:
+        return missing[-1:]
+    newest = max(stored)
+    return [m for m in missing if m > newest]
+
+
+def _read_month(month: date) -> pl.DataFrame:
+    """Read one month's tracks, all columns but the geometry, from Azure."""
+    url = f"{BASE_URL}/ais-track-{month:%Y-%m}.parquet"
+    conn = duckdb.connect()
     try:
-        df = pl.read_parquet(file_path)
-    except Exception as e:
-        logger.warning("Failed to read parquet %s: %s", file_path, e)
-        return pl.DataFrame()
-
-    if df.height == 0:
-        return pl.DataFrame()
-
-    col_map = {
-        "MMSI": "mmsi",
-        "IMO": "imo",
-        "VesselName": "vessel_name",
-        "CallSign": "callsign",
-        "VesselType": "vessel_type",
-        "Status": "nav_status",
-        "Length": "length_m",
-        "Width": "beam_m",
-        "Draft": "draught",
-        "SOG": "sog",
-        "COG": "cog",
-        "Heading": "heading",
-        "BaseDateTime": "timestamp",
-        "LAT": "latitude",
-        "LON": "longitude",
-    }
-
-    rename_map = {k: v for k, v in col_map.items() if k in df.columns}
-    df = df.rename(rename_map)
-
-    if "timestamp" in df.columns:
-        df = df.with_columns(
-            pl.col("timestamp").str.to_datetime(strict=False).alias("timestamp")
+        conn.execute("INSTALL httpfs; LOAD httpfs;")
+        cols = ", ".join(
+            # TIMESTAMP_NS -> TIMESTAMP to match the table.
+            f"CAST({c} AS TIMESTAMP) AS {c}" if c.endswith("_time") else c
+            for c in COLUMNS
         )
-
-    today = date.today()
-    df = df.with_columns(
-        pl.lit(today).alias("partition_date"),
-        pl.lit(SOURCE).alias("source"),
-    )
-
-    return df
+        return conn.execute(f"SELECT {cols} FROM read_parquet('{url}')").pl()
+    finally:
+        conn.close()
 
 
-def collect_bulk_download(
-    year: int,
-    month: int | None = None,
+def collect_vessel_tracks(
     tracker: SourceTracker | None = None,
+    bulk_backfill: bool | None = None,
 ) -> int:
-    """Download and ingest AIS data from NOAA bulk files.
-
-    Args:
-        year: Year to download.
-        month: Optional specific month (1-12). If None, downloads all available.
-        tracker: Optional SourceTracker.
+    """Load every published month not yet in `vessel_tracks_us`.
 
     Returns:
-        Total rows written.
+        Number of rows written.
     """
     if tracker is None:
         tracker = SourceTracker()
+    if bulk_backfill is None:
+        bulk_backfill = settings.allow_bulk_backfill
 
-    total_written = 0
-    data_dir = settings.data_dir / "noaa_marinecadastre"
+    with TimedCollector(tracker, SOURCE) as tc:
+        available = _fetch_index()
+        if not available:
+            raise RuntimeError(
+                f"No ais-track-YYYY-MM.parquet files listed at {INDEX_URL}; "
+                "the NOAA layout may have changed"
+            )
 
-    if month:
-        urls = [f"{BASE_URL}/{year}/container/ais_vessel_{year}_{month:02d}.parquet"]
-    else:
-        urls = get_bulk_download_urls(year)
+        months = _months_to_fetch(available, _stored_months(), bulk_backfill)
+        if not months:
+            logger.info("MarineCadastre: no new track months (latest %s)", available[-1])
+            return 0
 
-    for url in urls:
-        filename = url.split("/")[-1]
-        dest = data_dir / filename
+        fetched = written = 0
+        for month in months:
+            df = _read_month(month).with_columns(
+                pl.lit(month).alias("track_month"),
+                pl.lit(SOURCE).alias("source"),
+                pl.lit(date.today()).alias("partition_date"),
+            )
+            fetched += df.height
+            written += write_raw(SOURCE, df, table_name=TABLE)
+            logger.info("MarineCadastre: wrote %d tracks for %s", df.height, f"{month:%Y-%m}")
 
-        with TimedCollector(tracker, SOURCE) as tc:
-            try:
-                success = download_file(url, dest)
-                if not success:
-                    tc.rows_fetched = 0
-                    tc.rows_written = 0
-                    continue
-
-                df = _parse_ais_parquet(dest)
-                tc.rows_fetched = df.height
-
-                if df.height == 0:
-                    logger.warning("No data in %s", filename)
-                    continue
-
-                count = write_raw(SOURCE, df)
-                tc.rows_written = count
-                total_written += count
-                logger.info("Wrote %d rows from %s", count, filename)
-
-            except Exception as e:
-                logger.error("Error processing %s: %s", filename, e)
-                tc.rows_fetched = 0
-                tc.rows_written = 0
-
-    return total_written
+        tc.rows_fetched = fetched
+        tc.rows_written = written
+        return written

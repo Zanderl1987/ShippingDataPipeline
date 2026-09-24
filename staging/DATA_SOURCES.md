@@ -103,10 +103,10 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Data** | US coastal waters AIS — historical, bulk-distributed |
 | **Access** | **Free, public domain** |
 | **Auth** | None |
-| **Depth** | Multi-year historical, delayed by ~3-6 months |
-| **Format** | GeoParquet (2023+), Shapefile, GeoPackage, CSV |
-| **Collector** | `src/collectors/noaa_marinecadastre.py` — get_available_years, download_year, parse_parquet_chunk |
-| **Verdict** | **GO** — Best source for US waters historical AIS. Bulk download, not API. Good for backfill + training. |
+| **Depth** | Monthly vessel-track files 2024-01 → 2025-12 (as of 2026-09); daily point files 2024 only. New data about every 90 days, **~145-165 days after collection** (AIS FAQ, May 2026) |
+| **Format** | GeoParquet on Azure: `ocmgeodatastor1.blob.core.windows.net/marinecadastre/aistrack/ais-track-YYYY-MM.parquet` (index: `index-aistrack.html`), ~1.2-1.4 GB/month, almost all line geometry. Legacy daily zips (≤2024) at `coast.noaa.gov/htdata/CMSP/AISDataHandler/` |
+| **Collector** | `src/collectors/noaa_marinecadastre.py` — `collect_vessel_tracks` (weekly) → `vessel_tracks_us`: every column but the geometry, read remotely via DuckDB httpfs (~34 MB/month on HF with ZSTD). CI backfills all missing months; local runs load only months newer than stored. **Rebuilt 2026-09-24:** the old collector fetched `…/ais/<yr>/container/ais_vessel_<yr>_<mm>.parquet`, a layout that never existed, and reported success with 0 rows every week |
+| **Verdict** | **GO — BUILT (historical only)** — US waters, all vessel types, 1.27M tracks / 37K vessels in 2025-12. Too delayed for anything current. CC0 |
 
 ### 1.8 Danish Maritime Authority `dma.dk`
 

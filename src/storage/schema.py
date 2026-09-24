@@ -832,6 +832,43 @@ CREATE TABLE IF NOT EXISTS port_activity (
 """,
 )
 
+VESSEL_TRACKS_US = TableSchema(
+    name="vessel_tracks_us",
+    # One partition per monthly NOAA file.
+    partition_cols=["track_month", "source"],
+    # Unique across all 1,273,672 tracks of the 2025-12 file, no null mmsi.
+    dedup_keys=["mmsi", "start_time", "source"],
+    description=(
+        "Vessel tracks in US waters from NOAA MarineCadastre AIS, one row per "
+        "track (a vessel's continuous movement, split at day boundaries), all "
+        "vessel types, without the line geometry. Published ~145-165 days after "
+        "collection, added about quarterly"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS vessel_tracks_us (
+    track_month       DATE,
+    mmsi              INTEGER,
+    imo               VARCHAR,
+    vessel_name       VARCHAR,
+    call_sign         VARCHAR,
+    vessel_type       INTEGER,
+    vessel_type_name  VARCHAR,
+    status            INTEGER,
+    length            DOUBLE,
+    width             INTEGER,
+    draft             DOUBLE,
+    cargo             INTEGER,
+    transceiver       VARCHAR,
+    duration_minutes  INTEGER,
+    start_time        TIMESTAMP,
+    end_time          TIMESTAMP,
+    source            VARCHAR,
+    partition_date    DATE,
+    ingested_at       TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 PORT_PROFILES = TableSchema(
     name="port_profiles",
     partition_cols=[],
@@ -973,6 +1010,7 @@ ALL_TABLES: list[TableSchema] = [
     CARRIERS,
     PORT_ACTIVITY,
     PORT_PROFILES,
+    VESSEL_TRACKS_US,
     TRADE_NOWCAST,
     DISRUPTION_EVENTS,
     SOURCE_TRACKING,
