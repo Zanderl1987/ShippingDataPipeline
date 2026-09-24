@@ -137,7 +137,7 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 
 | Source | Verdict | Notes |
 |--------|---------|-------|
-| USACE Waterborne Commerce Statistics | ❌ NO-GO | navigationdatacenter.us behind login wall; USACE digital library PDFs only; navdata-test API transport error |
+| USACE Waterborne Commerce Statistics | ✅ Partial (2026-09-24) | Detailed data still behind the navigationdatacenter.us login. The principal-ports summary (150 ports, annual short tons: total/domestic/foreign/imports/exports) is a public USACE IWR ArcGIS layer; collected weekly by `usace_principal_ports` → `port_tonnage_us`. One year at a time (CY 2023 now); history accrues from here. |
 | AISstream.io | ✅ GO | Free API key, WebSocket, global real-time AIS. Collector already built. |
 | FreightPulse Port Congestion | ✅ GO — BUILT | Free REST API, no auth, 114 ports. Collector built 2026-08-26. |
 | FreightPulse Freight Rates | ⏳ TO PROBE | `/api/v1/freight-rates` — could fill the container per-route rate gap in `freight_rates` |
