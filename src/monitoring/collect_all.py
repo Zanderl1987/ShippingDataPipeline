@@ -567,11 +567,11 @@ def get_collectors() -> list[CollectorDef]:
     except ImportError as e:
         logger.warning("bts_air_cargo collector not available: %s", e)
 
-    # freightpulse (port congestion), freightpulse_rates, and freightpulse_carriers
-    # are unregistered: when FreightPulse's HTTPS came back (2026-09-23) those
-    # endpoints had changed to require per-query parameters (a port/country/
-    # region; US origin/destination zips; a carrier search term) and return 422
-    # for the bulk call these collectors make. They need a redesign, not a retry.
+    # FreightPulse port congestion, freight rates, and carriers were retired
+    # 2026-09-24. Its API changed: congestion is now IMF PortWatch port calls
+    # (rebuilt from port_activity as port_congestion_proxy in curation), rates
+    # are US trucking only, and carriers is a US trucking name search. Their
+    # tables keep the history collected before the change.
 
     try:
         from src.collectors.freightpulse_fuel import collect_fuel_prices

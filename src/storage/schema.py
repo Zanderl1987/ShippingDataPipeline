@@ -606,7 +606,7 @@ PORT_CONGESTION = TableSchema(
     partition_cols=["partition_date", "source"],
     dedup_keys=["snapshot_date", "port_code", "source"],
     version="0.1.0",
-    description="Real-time port congestion metrics (FreightPulse)",
+    description="Port congestion metrics (FreightPulse; retired 2026-09-24, history only)",
     raw_sql="""
 CREATE TABLE IF NOT EXISTS port_congestion (
     snapshot_date           DATE,
@@ -761,7 +761,10 @@ CARRIERS = TableSchema(
     name="carriers",
     partition_cols=["snapshot_date"],
     dedup_keys=["snapshot_date", "carrier_code"],
-    description="Ocean, trucking, and air carrier performance data (FreightPulse)",
+    description=(
+        "Ocean, trucking, and air carrier performance data"
+        " (FreightPulse; retired 2026-09-24, history only)"
+    ),
     raw_sql="""
 CREATE TABLE IF NOT EXISTS carriers (
     snapshot_date           DATE NOT NULL,

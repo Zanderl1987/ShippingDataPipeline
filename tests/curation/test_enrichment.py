@@ -222,3 +222,72 @@ def test_create_curated_vessels(db) -> None:
 
     count = create_curated_vessels()
     assert count == 1
+
+
+def _port_days(port_id: str, end: date, calls: list[int]) -> pl.DataFrame:
+    """One port_activity row per day, the last one dated `end`."""
+    from datetime import timedelta
+
+    n = len(calls)
+    days = [end - timedelta(days=n - 1 - i) for i in range(n)]
+    return pl.DataFrame(
+        {
+            "activity_date": days,
+            "year": [d.year for d in days],
+            "port_id": [port_id] * n,
+            "port_name": [port_id.upper()] * n,
+            "country": ["Testland"] * n,
+            "portcalls": calls,
+            "source": ["portwatch"] * n,
+            "partition_date": [end] * n,
+        }
+    )
+
+
+def test_create_port_congestion_proxy(db) -> None:
+    import duckdb
+
+    from src.curation.enrichment import create_port_congestion_proxy
+    from src.storage.writer import get_db_path
+
+    init_db()
+    end = date(2026, 9, 18)
+    # 120 days: 30 days outside the baseline window (value 1000, must be
+    # ignored), 83 baseline-only days of 10, then 7 recent days of 20.
+    calls_a = [1000] * 30 + [10] * 83 + [20] * 7
+    # A port whose data stops earlier keeps its own as-of date.
+    calls_b = [5] * 90
+    write_raw(
+        "portwatch_ports",
+        pl.concat(
+            [_port_days("port1", end, calls_a), _port_days("port2", date(2026, 9, 1), calls_b)]
+        ),
+        table_name="port_activity",
+    )
+    write_raw(
+        "portwatch_ports",
+        pl.DataFrame({"port_id": ["port1"], "port_name": ["PORT1"], "locode": ["XX AAA"]}),
+        table_name="port_profiles",
+    )
+
+    assert create_port_congestion_proxy() == 2
+
+    conn = duckdb.connect(str(get_db_path()), read_only=True)
+    rows = {
+        r[0]: r[1:]
+        for r in conn.execute(
+            "SELECT port_id, locode, as_of, recent_avg_portcalls_per_day, "
+            "baseline_avg_portcalls_per_day, ratio_vs_baseline, baseline_days "
+            "FROM port_congestion_proxy"
+        ).fetchall()
+    }
+    conn.close()
+
+    locode, as_of, recent, baseline, ratio, n = rows["port1"]
+    assert (locode, as_of, n) == ("XX AAA", end, 90)
+    assert recent == pytest.approx(20.0)
+    assert baseline == pytest.approx((83 * 10 + 7 * 20) / 90)
+    assert ratio == pytest.approx(20.0 / ((83 * 10 + 7 * 20) / 90))
+
+    locode, as_of, recent, baseline, ratio, n = rows["port2"]
+    assert (locode, as_of, recent, baseline, ratio) == (None, date(2026, 9, 1), 5.0, 5.0, 1.0)

@@ -290,8 +290,8 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Rate Limit** | Free: 100 calls/month |
 | **Depth** | Free: current values only (paid unlocks history) |
 | **Endpoints** | `GET /api/v1/port-congestion` (114 ports, congestion index + vessel counts + dwell days + trend), `/api/v1/freight-rates`, `/api/v1/fuel-prices`, `/api/v1/disruptions`, `/api/v1/carriers` |
-| **Collector** | `src/collectors/freightpulse.py` — collect_port_congestion (daily) → `port_congestion` |
-| **Verdict** | **GO — BUILT** — port congestion collector built 2026-08-26 (20 tests, 366/366 suite pass). No auth required for the basic call. Freight rates + fuel prices + disruptions still to probe. |
+| **Collector** | `freightpulse_fuel.py` → `fuel_prices`, `freightpulse_disruptions.py` → `supply_chain_disruptions`. Port congestion, freight rates and carriers collectors **retired 2026-09-24** (see Verdict); their tables keep pre-change history. |
+| **Verdict** | **PARTIAL** — fuel prices + disruptions still collected. **2026-09-24: API changed, three endpoints retired.** `port-congestion` now needs a port/country/region and its payload names **IMF PortWatch** as source: 7-day avg port calls vs 90-day avg (window includes the 7 days), no wait/anchorage data. Reproduced exactly from our `port_activity` (Rotterdam, Singapore, Istanbul, Oita), so it is rebuilt in curation as `port_congestion_proxy` for all ports at no API cost. `freight-rates` is now US trucking between two zips and returned `available: false` ("Error querying Warp freight API"); `carriers` is a US trucking name/DOT search. Neither has ocean data any more. |
 
 ### 3.8 NYSHEX NYFI `nyshex.com`
 

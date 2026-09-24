@@ -14,6 +14,7 @@ from src.curation.dedup import (
 from src.curation.enrichment import (
     create_curated_ais_positions,
     create_curated_vessels,
+    create_port_congestion_proxy,
 )
 from src.curation.validation import (
     ValidationReport,
@@ -103,6 +104,13 @@ def run_enrichment(
         logger.error("Enrichment vessels failed: %s", e)
         if errors is not None:
             errors.append(f"Enrichment vessels failed: {e}")
+
+    try:
+        results["port_congestion_proxy"] = create_port_congestion_proxy(conn)
+    except Exception as e:
+        logger.error("Enrichment port_congestion_proxy failed: %s", e)
+        if errors is not None:
+            errors.append(f"Enrichment port_congestion_proxy failed: {e}")
 
     return results
 

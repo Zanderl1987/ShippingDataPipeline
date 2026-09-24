@@ -9,6 +9,7 @@ from src.curation.dedup import (
 from src.curation.enrichment import (
     create_curated_ais_positions,
     create_curated_vessels,
+    create_port_congestion_proxy,
     enrich_ais_with_port_info,
     enrich_ais_with_vessel_info,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "ValidationResult",
     "create_curated_ais_positions",
     "create_curated_vessels",
+    "create_port_congestion_proxy",
     "deduplicate_ais_positions",
     "deduplicate_ports",
     "deduplicate_table",
