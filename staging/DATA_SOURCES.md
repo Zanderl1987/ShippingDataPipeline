@@ -28,7 +28,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Docs** | https://aisstream.io/documentation |
 | **SDK** | OpenAPI 3.0 models + Python lib: https://github.com/aisstream/ais-message-models |
 | **Collector** | `src/collectors/aisstream.py` — collect_stream (daily, 120s window) → `ais_positions` + `vessels` |
-| **Verdict** | **GO — BUILT** — collector built and wired, API key in `.env`. First live run pending (Session 18). |
+| **Verdict** | **GO — BUILT, live in CI** — `AISSTREAM_API_KEY` is a repo secret; ~350 positions per daily 120 s window as of 2026-09-24. |
 
 ### 1.2 AISHub `aishub.net`
 
@@ -116,7 +116,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Access** | **Open data, free** |
 | **Auth** | None |
 | **Depth** | Historical (rolling window), daily files |
-| **Verdict** | **GO** — European waters coverage. Daily file delivery, free. |
+| **Verdict** | **GO** — European waters coverage. Daily file delivery, free. **Collector unregistered 2026-08-03** (Session 15 audit: endpoint's SSL broken; it reported success with 0 rows every run). Module kept in `src/collectors/`; re-probe before reviving. |
 
 ### 1.9 Digitraffic (Baltic Sea AIS) `meri.digitraffic.fi`
 
@@ -191,7 +191,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Access** | **Free, open API** |
 | **Auth** | None |
 | **Format** | REST JSON |
-| **Verdict** | **GO** — Open, no auth, covers Barcelona operations. Also serves as a reference pattern — other ports may adopt similar specs. |
+| **Verdict** | **GO** — Open, no auth, covers Barcelona operations. Also serves as a reference pattern — other ports may adopt similar specs. **Collector unregistered 2026-08-03** (Session 15 audit: API returned 404; it reported success with 0 rows every run). Module kept in `src/collectors/`; re-probe before reviving. |
 
 ### 2.6 MPA Singapore OCEANS-X `oceans-x.mpa.gov.sg`
 
@@ -200,7 +200,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Data** | Singapore port — vessel arrivals/departures, vessel information, vessel tracking |
 | **Access** | **API marketplace platform** — free registration |
 | **Auth** | Platform account |
-| **Verdict** | **PROBE** — Singapore is the world's largest transshipment hub. Platform-based access; need to register and evaluate. |
+| **Verdict** | **PROBE** — Singapore is the world's largest transshipment hub. Platform-based access; need to register and evaluate. **Collector unregistered 2026-08-03** (Session 15 audit: endpoint returned 404; it reported success with 0 rows every run). Module kept in `src/collectors/`; re-probe before reviving. |
 
 ### 2.7 VT Explorer `vtexplorer.com`
 
@@ -225,7 +225,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Depth** | Historical from 2016 |
 | **Format** | Web page, CSV export, public REST-like API endpoints on the FBX site |
 | **Notes** | The FBX public page at fbx.freightos.com displays current rate for each route. Web scraping the public page is possible (no login wall), but scraping ToS should be reviewed. |
-| **Verdict** | **PROBE** — Publicly visible data. Scrape feasibility depends on ToS. The Baltic Exchange offers a free 1-week trial of their full data API — that may be the cleaner path. |
+| **Verdict** | **PROBE** — Publicly visible data. Scrape feasibility depends on ToS. The Baltic Exchange offers a free 1-week trial of their full data API — that may be the cleaner path. **Collector unregistered 2026-08-03** (Session 15 audit: 429 rate limits and HTML instead of JSON; it reported success with 0 rows every run). Module kept in `src/collectors/`; re-probe before reviving. |
 
 ### 3.2 Baltic Exchange API `balticexchange.com`
 
@@ -362,7 +362,7 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Access** | **Free with registration** |
 | **Auth** | Username/password |
 | **Format** | Web + CSV export |
-| **Verdict** | **PROBE** — Free but requires registration. Good for safety/quality data enrichment; evaluate if CSV export is automated. |
+| **Verdict** | **PROBE** — Free but requires registration. Good for safety/quality data enrichment; evaluate if CSV export is automated. **Collector unregistered 2026-08-03** (Session 15 audit: needs a login; it reported success with 0 rows every run). Module kept in `src/collectors/`; re-probe before reviving. |
 
 ### 4.6 UN/LOCODE official (UNECE) `unece.org`
 
@@ -687,7 +687,7 @@ Skipped: `Daily_Trade_Data_REG` (aggregate of `port_activity`), `Daily_Trade_Dat
 | 9 | **AISStream** | ✓ Integrated |
 | 10 | **BarentsWatch** | ✓ Integrated |
 | 11 | **NOAA MarineCadastre** | ✓ Integrated |
-| 12 | **Danish Maritime Authority** | Deferred |
+| 12 | **Danish Maritime Authority** | Unregistered 2026-08-03 (SSL broken) |
 
 ### Phase 4 ✓ Complete (Analysis data — oil & risk)
 
@@ -704,10 +704,10 @@ Skipped: `Daily_Trade_Data_REG` (aggregate of `port_activity`), `Daily_Trade_Dat
 
 | Priority | Source | Status |
 |----------|--------|--------|
-| 19 | **FBX / Baltic Exchange** | Pending (trial/scrape) |
+| 19 | **FBX / Baltic Exchange** | FBX unregistered 2026-08-03 (429/HTML); Baltic trial pending |
 | 20 | **SCFI** | Pending |
-| 21 | **Port of Barcelona** | Pending |
-| 22 | **Singapore OCEANS-X** | Pending |
+| 21 | **Port of Barcelona** | Unregistered 2026-08-03 (404) |
+| 22 | **Singapore OCEANS-X** | Unregistered 2026-08-03 (404) |
 
 ---
 

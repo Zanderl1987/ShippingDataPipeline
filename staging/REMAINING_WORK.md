@@ -131,6 +131,7 @@ Still 0 rows — all key-gated (need a key registered in `.env`), not bugs: `oil
 |-----------|------|--------|
 | `freightpulse` (`freightpulse`, daily) | FreightPulse port congestion — no auth required, GET `/api/v1/port-congestion` returns 114 global ports with congestion index, vessel counts, wait times, berth utilization, container dwell days, trend analysis. Snapshot date from `data.timestamp` (ISO8601). New `port_congestion` table partitioned by `(partition_date, source)`, dedup keys `(snapshot_date, port_code, source)`. Migration `202608260001`. | ✅ BUILT — 20 tests, 366/366 suite pass. |
 | `aisstream` (`aisstream`, daily) — verified | Already built in prior session. WebSocket at `wss://stream.aisstream.io/v0/stream`, 4 chokepoint bounding boxes, 120s collection window, writes to `ais_positions` + `vessels`. API key in `.env`. | ✅ BUILT + WIRED — first live run pending. |
+| `freightpulse_rates` / `_fuel` / `_disruptions` / `_carriers` (Session 18, `244c993`, `4a60abd`) | Four more FreightPulse endpoints → `freight_rates`, `fuel_prices`, `supply_chain_disruptions`, `carriers`. | Only `freightpulse_fuel` still runs. Rates, carriers (and congestion) retired 2026-09-24 after the API changed; disruptions retired the same day (it never wrote a row). See DATA_SOURCES.md 3.7. |
 
 ## Data source vetting (Session 18, 2026-08-26)
 
