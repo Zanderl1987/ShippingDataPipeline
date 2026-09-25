@@ -87,7 +87,7 @@ th { color: var(--muted); font-weight: 600; }
 
     <div class="panel s7"><h2 id="curve-title">Current fold: training curve</h2>
       <div class="chart"><canvas id="c-curve"></canvas></div>
-      <p class="note">Average precision by boosting round. The round count is picked where validation (the last 26 weeks before the cutoff) peaks, then the model is refit on everything known.</p></div>
+      <p class="note">Average precision (AP) by boosting round: <b>higher is better</b>, so training sitting above validation is normal (it is scored on rows the model learned from). A wide gap means memorising. The round count is picked where validation (the last 26 weeks before the cutoff) peaks, then the model is refit on everything known.</p></div>
     <div class="panel s5"><h2>AP per fold</h2>
       <div class="chart"><canvas id="c-folds"></canvas></div>
       <p class="note">Each fold trains on labels published by its cutoff and warns for the next 12 weeks.</p></div>
@@ -136,7 +136,7 @@ function setup() {
   const legend = { labels: { boxWidth: 12 } };
   charts.curve = new Chart($("c-curve"), { type: "line", data: { labels: [], datasets: [] },
     options: { interaction: { mode: "index", intersect: false }, elements: { point: { radius: 0 } },
-      plugins: { legend }, scales: { x: { title: { display: true, text: "round" } } } } });
+      plugins: { legend }, scales: { x: { title: { display: true, text: "round" } }, y: { title: { display: true, text: "AP (higher is better)" } } } } });
   charts.folds = new Chart($("c-folds"), { type: "bar", data: { labels: [], datasets: [] },
     options: { plugins: { legend }, scales: { y: { beginAtZero: true } } } });
   charts.pr = new Chart($("c-pr"), { type: "scatter", data: { datasets: [] },
