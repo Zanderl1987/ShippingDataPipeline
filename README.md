@@ -102,6 +102,8 @@ pipeline's data: [GitHub Pages](https://zanderl1987.github.io/ShippingDataPipeli
   backtest, `predict.py` live run, `dashboard.py`). The weekly job is
   `.github/workflows/warning.yml`; every warning is kept in the
   [warnings history](https://huggingface.co/datasets/ZanderL1337/port-disruption-warnings).
+- **Write-up:** [`src/ml/disruption_warning/README.md`](src/ml/disruption_warning/README.md)
+  (method, results, limits, and why it doesn't push alerts).
 
 ## Data Sources (19 collectors)
 
