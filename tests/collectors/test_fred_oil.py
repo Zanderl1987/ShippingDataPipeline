@@ -1,22 +1,20 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.collectors.fred_oil import parse_fred_oil_prices
+from src.collectors.fred_oil import parse_fred_csv
 
-WTI_OBSERVATIONS = [
-    {"date": "2026-01-02", "value": "72.50"},
-    {"date": "2026-01-03", "value": "73.10"},
-    {"date": "2026-01-04", "value": "."},  # FRED's missing-observation marker
-]
-
-BRENT_OBSERVATIONS = [
-    {"date": "2026-01-02", "value": "76.20"},
-    {"date": "2026-01-03", "value": "76.80"},
-]
+# The shape fredgraph.csv returns: "" for a day without a price.
+CSV = """observation_date,DCOILBRENTEU,DCOILWTICO
+2026-01-02,76.20,72.50
+2026-01-05,76.80,73.10
+2026-01-06,,
+2026-01-07,,71.90
+"""
 
 
 @pytest.fixture
@@ -33,83 +31,64 @@ def mock_settings(tmp_path: Path) -> None:
     settings.storage_dir = old_storage
 
 
-def test_parse_fred_oil_prices_merges_series() -> None:
-    df = parse_fred_oil_prices({
-        "DCOILWTICO": WTI_OBSERVATIONS,
-        "DCOILBRENTEU": BRENT_OBSERVATIONS,
-    })
-    # 2026-01-04 has only a WTI observation, and it's the "." missing marker,
-    # so it should be dropped entirely rather than produce an all-null row.
-    assert df.height == 2
-    by_date = {str(r["price_date"]): r for r in df.to_dicts()}
-    assert by_date["2026-01-02"]["wti_usd"] == pytest.approx(72.50)
-    assert by_date["2026-01-02"]["brent_usd"] == pytest.approx(76.20)
-    assert by_date["2026-01-03"]["wti_usd"] == pytest.approx(73.10)
+def test_parse_fred_csv_merges_series() -> None:
+    df = parse_fred_csv(CSV)
+    # 2026-01-06 has no price at all, so it's dropped rather than kept as nulls.
+    assert df.height == 3
+    by_date = {r["price_date"]: r for r in df.to_dicts()}
+    assert by_date[date(2026, 1, 2)]["wti_usd"] == pytest.approx(72.50)
+    assert by_date[date(2026, 1, 2)]["brent_usd"] == pytest.approx(76.20)
+    assert by_date[date(2026, 1, 7)]["brent_usd"] is None
     assert set(df["source"].unique().to_list()) == {"fred"}
 
 
-def test_parse_fred_oil_prices_unknown_series_ignored() -> None:
-    df = parse_fred_oil_prices({"SOME_OTHER_SERIES": WTI_OBSERVATIONS})
-    assert df.height == 0
+def test_parse_fred_csv_old_header_and_missing_marker() -> None:
+    df = parse_fred_csv("DATE,DCOILWTICO\n2026-01-02,72.5\n2026-01-05,.\n")
+    assert df.height == 1 and df.columns[:2] == ["price_date", "wti_usd"]
 
 
-def test_parse_fred_oil_prices_empty() -> None:
-    assert parse_fred_oil_prices({}).height == 0
-    assert parse_fred_oil_prices({"DCOILWTICO": []}).height == 0
+def test_parse_fred_csv_unknown_series_or_empty() -> None:
+    assert parse_fred_csv("observation_date,OTHER\n2026-01-02,1\n").height == 0
+    assert parse_fred_csv("").height == 0
 
 
-def test_fetch_series_observations_requires_key() -> None:
-    from src.collectors.fred_oil import fetch_series_observations
-    from src.config import settings
-
-    old_key = settings.fred_api_key
-    settings.fred_api_key = None
-    try:
-        with pytest.raises(ValueError, match="FRED_API_KEY"):
-            fetch_series_observations(
-                series_id="DCOILWTICO", start_date="2026-01-01", end_date="2026-01-31",
-            )
-    finally:
-        settings.fred_api_key = old_key
-
-
-@patch("src.collectors.fred_oil.write_raw")
-@patch("src.collectors.fred_oil.fetch_series_observations")
-def test_collect_oil_prices(
-    mock_fetch: MagicMock,
-    mock_write: MagicMock,
-    mock_settings: None,
-) -> None:
+def _collect(mock_fetch: MagicMock, *, bulk: bool) -> None:
+    from src.collectors.fred_oil import collect_oil_prices
     from src.storage.writer import init_db
 
     init_db()
-    mock_fetch.side_effect = [WTI_OBSERVATIONS, BRENT_OBSERVATIONS]
-    mock_write.return_value = 2
+    mock_fetch.return_value = CSV
+    collect_oil_prices(bulk_backfill=bulk)
 
-    from src.collectors.fred_oil import collect_oil_prices
 
-    count = collect_oil_prices(start_date="2026-01-01", end_date="2026-01-31")
-    assert count == 2
-    assert mock_fetch.call_count == 2
-    mock_write.assert_called_once()
-    written_df = mock_write.call_args[0][1]
-    assert written_df.height == 2
+@patch("src.collectors.fred_oil.write_raw", return_value=3)
+@patch("src.collectors.fred_oil.fetch_prices_csv")
+def test_empty_table_backfills_full_history_in_ci(
+    mock_fetch: MagicMock, mock_write: MagicMock, mock_settings: None,
+) -> None:
+    _collect(mock_fetch, bulk=True)
+    assert mock_fetch.call_args.args[0] is None  # no start date: everything
+    assert mock_write.call_args.args[1].height == 3
+
+
+@patch("src.collectors.fred_oil.write_raw", return_value=3)
+@patch("src.collectors.fred_oil.fetch_prices_csv")
+def test_local_run_fetches_recent_days_only(
+    mock_fetch: MagicMock, mock_write: MagicMock, mock_settings: None,
+) -> None:
+    _collect(mock_fetch, bulk=False)
+    start = date.fromisoformat(mock_fetch.call_args.args[0])
+    assert (date.today() - start).days == 30
 
 
 @patch("src.collectors.fred_oil.write_raw")
-@patch("src.collectors.fred_oil.fetch_series_observations")
+@patch("src.collectors.fred_oil.fetch_prices_csv", return_value="")
 def test_collect_oil_prices_empty(
-    mock_fetch: MagicMock,
-    mock_write: MagicMock,
-    mock_settings: None,
+    mock_fetch: MagicMock, mock_write: MagicMock, mock_settings: None,
 ) -> None:
+    from src.collectors.fred_oil import collect_oil_prices
     from src.storage.writer import init_db
 
     init_db()
-    mock_fetch.return_value = []
-
-    from src.collectors.fred_oil import collect_oil_prices
-
-    count = collect_oil_prices(start_date="2026-01-01", end_date="2026-01-31")
-    assert count == 0
+    assert collect_oil_prices(bulk_backfill=False) == 0
     mock_write.assert_not_called()

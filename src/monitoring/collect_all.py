@@ -283,7 +283,6 @@ def get_collectors() -> list[CollectorDef]:
             CollectorDef(
                 name="fred_oil",
                 collect_fn=collect_fred_oil_prices,
-                requires_key="fred_api_key",
                 schedule="daily",
             )
         )
