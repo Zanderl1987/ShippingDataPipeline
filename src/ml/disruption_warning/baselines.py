@@ -144,8 +144,10 @@ def warning_rows(
     exposure: pl.DataFrame,
     origins: list[date] | None = None,
     horizons: tuple[int, ...] = HORIZONS,
+    labelled_only: bool = True,
 ) -> pl.DataFrame:
-    """One row per origin x port x horizon whose target week has a label:
+    """One row per origin x port x horizon whose target week has a label
+    (with ``labelled_only=False``, also those still in the future, ``y`` null):
     the target (``y`` = is_disruption, ``big`` = a disruption of 50%+), what
     was known at the origin, and the nearest known event."""
     base = labels.join(_pooled_rate(labels), on="week_start", how="left").with_columns(
@@ -171,7 +173,9 @@ def warning_rows(
                 pl.col("is_drop").fill_null(False).alias("origin_drop"),
             )
         )
-    rows = pl.concat(frames).filter(pl.col("y").is_not_null())
+    rows = pl.concat(frames)
+    if labelled_only:
+        rows = rows.filter(pl.col("y").is_not_null())
     if origins is not None:
         rows = rows.filter(pl.col("origin_week").is_in(origins))
     return _attach_events(rows, exposure).sort("origin_week", "horizon", "port_id")

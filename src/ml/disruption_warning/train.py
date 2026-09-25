@@ -50,6 +50,7 @@ BEST_RULES = ["last_z", "persistence_or_gdacs"]
 GOAL_AP = 0.045
 GOAL_PRECISION = 0.15
 LIVE_PAGE = Path(__file__).with_name("live.html")
+MIN_CALIBRATION_POSITIVES = 100
 CALIBRATION_BINS = [0.0, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.4, 1.0]
 
 
@@ -57,12 +58,23 @@ CALIBRATION_BINS = [0.0, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.4, 1.0]
 class TrainConfig:
     train_start: date = date(2020, 1, 6)
     eval_start: date = date(2023, 1, 2)
+    #: Last origin scored (exclusive); lets settings be tuned on early years only.
+    eval_end: date = date.max
     retrain_weeks: int = 12
     #: Rare positives: ~26 weeks of targets hold ~500 disruptions, enough to
     #: pick the number of rounds without chasing noise.
     valid_weeks: int = 26
     num_boost_round: int = 2000
     early_stopping_rounds: int = 150
+    #: Weight training rows by recency: a row this many weeks older than the
+    #: cutoff counts half. None weighs all rows the same.
+    half_life_weeks: float | None = None
+    #: Rescale scores into chances with a logistic fit: "valid" on the
+    #: validation weeks, "history" on the model's own earlier out-of-sample
+    #: predictions whose outcomes are known (last ``calibration_weeks``; falls
+    #: back to "valid" until they hold ``MIN_CALIBRATION_POSITIVES``), None off.
+    calibrate: str | None = "history"
+    calibration_weeks: int = 52
     params: dict[str, Any] = field(
         default_factory=lambda: {
             "objective": "binary",
@@ -100,6 +112,115 @@ def _live_callback(progress: Progress, every: int = 10) -> Any:
             progress.save()
 
     return callback
+
+
+def _weights(frame: pl.DataFrame, cutoff: date, half_life: float | None) -> Any:
+    if half_life is None:
+        return None
+    age = frame.select((pl.lit(cutoff) - pl.col("target_week")).dt.total_days())
+    weeks = age.to_series().to_numpy() / 7
+    return 0.5 ** (weeks / half_life)
+
+
+def _logit(p: Any) -> Any:
+    import numpy as np
+
+    p = np.clip(p, 1e-6, 1 - 1e-6)
+    return np.log(p / (1 - p))
+
+
+def fit_platt(pred: Any, y: Any, steps: int = 200) -> tuple[float, float]:
+    """Fit ``chance = sigmoid(a * logit(pred) + b)`` by Newton's method.
+    Monotone, so it changes the chances quoted but not the ranking."""
+    import numpy as np
+
+    x, y = _logit(pred), np.asarray(y, dtype=float)
+    a, b = 1.0, 0.0
+    for _ in range(steps):
+        p = 1 / (1 + np.exp(-(a * x + b)))
+        w = p * (1 - p) + 1e-9
+        g = np.array([np.sum((p - y) * x), np.sum(p - y)])
+        h = np.array([[np.sum(w * x * x), np.sum(w * x)], [np.sum(w * x), np.sum(w)]])
+        step = np.linalg.solve(h + 1e-6 * np.eye(2), g)
+        a, b = a - step[0], b - step[1]
+        if np.abs(step).max() < 1e-8:
+            break
+    return float(a), float(b)
+
+
+def apply_platt(pred: Any, a: float, b: float) -> Any:
+    import numpy as np
+
+    return 1 / (1 + np.exp(-(a * _logit(pred) + b)))
+
+
+@dataclass
+class Fitted:
+    booster: Any
+    rounds: int
+    #: Platt scaling (``apply_platt``); (1, 0) leaves scores as they are.
+    platt: tuple[float, float]
+    n_valid: int
+
+    def raw(self, frame: pl.DataFrame) -> Any:
+        return self.booster.predict(_to_numpy(frame))
+
+    def predict(self, frame: pl.DataFrame) -> Any:
+        return apply_platt(self.raw(frame), *self.platt)
+
+    def contributions(self, frame: pl.DataFrame) -> Any:
+        """Each feature's push on the log-odds, per row (last column: bias)."""
+        return self.booster.predict(_to_numpy(frame), pred_contrib=True)
+
+
+def fit_model(
+    known: pl.DataFrame,
+    cutoff: date,
+    config: TrainConfig,
+    seed: int = 0,
+    callbacks: list[Any] | None = None,
+    on_split: Any = None,
+) -> Fitted:
+    """Pick the number of rounds on the last ``valid_weeks`` of targets before
+    ``cutoff``, fit the calibration there, then refit on every known row."""
+    import lightgbm as lgb
+
+    valid_from = cutoff - timedelta(weeks=config.valid_weeks)
+    tr = known.filter(pl.col("target_week") <= valid_from)
+    va = known.filter(pl.col("target_week") > valid_from)
+    if on_split is not None:
+        on_split(tr, va)
+
+    def dataset(frame: pl.DataFrame, ref: Any = None) -> Any:
+        return lgb.Dataset(
+            _to_numpy(frame),
+            label=frame["y"].cast(pl.Int8).to_numpy(),
+            weight=_weights(frame, cutoff, config.half_life_weeks),
+            feature_name=FEATURES,
+            categorical_feature=CATEGORICAL,
+            reference=ref,
+            free_raw_data=False,
+        )
+
+    d_tr = dataset(tr)
+    sample = tr.sample(n=min(60_000, tr.height), seed=seed)
+    picked = lgb.train(
+        config.params,
+        d_tr,
+        num_boost_round=config.num_boost_round,
+        valid_sets=[dataset(sample, d_tr), dataset(va, d_tr)],
+        valid_names=["train", "valid"],
+        callbacks=[
+            lgb.early_stopping(config.early_stopping_rounds, verbose=False),
+            *(callbacks or []),
+        ],
+    )
+    rounds = max(1, picked.best_iteration)
+    platt = (1.0, 0.0)
+    if config.calibrate is not None:
+        platt = fit_platt(picked.predict(_to_numpy(va), num_iteration=rounds), va["y"].to_numpy())
+    booster = lgb.train(config.params, dataset(known), num_boost_round=rounds)
+    return Fitted(booster, rounds, platt, va.height)
 
 
 def goal_check(rows: pl.DataFrame, by: list[str] | None = None) -> pl.DataFrame:
@@ -178,11 +299,11 @@ def _update_scores(progress: Progress, rows: pl.DataFrame) -> None:
 def train_and_backtest(
     fx: pl.DataFrame, radius_km: float, config: TrainConfig, progress: Progress
 ) -> pl.DataFrame:
-    import lightgbm as lgb
     import numpy as np
 
     eval_origins = sorted(
-        o for o in fx["origin_week"].unique().to_list() if o >= config.eval_start
+        o for o in fx["origin_week"].unique().to_list()
+        if config.eval_start <= o < config.eval_end
     )
     cutoffs = eval_origins[:: config.retrain_weeks]
     progress.state["n_folds"] = len(cutoffs)
@@ -198,61 +319,44 @@ def train_and_backtest(
         "goal_ap": GOAL_AP,
         "goal_precision": GOAL_PRECISION,
     }
-    predictions = []
+    predictions: list[pl.DataFrame] = []
     importance = np.zeros(len(FEATURES))
+
     for i, cutoff in enumerate(cutoffs):
         t0 = time.perf_counter()
-        next_cutoff = cutoffs[i + 1] if i + 1 < len(cutoffs) else date.max
-        valid_from = cutoff - timedelta(weeks=config.valid_weeks)
+        next_cutoff = cutoffs[i + 1] if i + 1 < len(cutoffs) else config.eval_end
         known = fx.filter(pl.col("target_week") <= cutoff)
-        tr = known.filter(pl.col("target_week") <= valid_from)
-        va = known.filter(pl.col("target_week") > valid_from)
-        tr_sample = tr.sample(n=min(60_000, tr.height), seed=i)
         test = fx.filter((pl.col("origin_week") >= cutoff) & (pl.col("origin_week") < next_cutoff))
-
-        def dataset(frame: pl.DataFrame, ref: Any = None) -> Any:
-            return lgb.Dataset(
-                _to_numpy(frame),
-                label=frame["y"].cast(pl.Int8).to_numpy(),
-                feature_name=FEATURES,
-                categorical_feature=CATEGORICAL,
-                reference=ref,
-                free_raw_data=False,
-            )
-
-        d_tr = dataset(tr)
-        d_va, d_sample = dataset(va, d_tr), dataset(tr_sample, d_tr)
         progress.state["current"] = {
             "fold": i + 1,
             "cutoff": cutoff,
             "n_train": known.height,
-            "n_valid": va.height,
+            "n_valid": 0,
             "n_test": test.height,
             "positives_train": int(known["y"].sum()),
             "iteration": 0,
             "curve": {},
         }
         progress.state["status"] = f"training fold {i + 1} of {len(cutoffs)}"
-        progress.log(
-            f"fold {i + 1}/{len(cutoffs)}: cutoff {cutoff}, train {tr.height:,}, "
-            f"valid {va.height:,} ({int(va['y'].sum())} disruptions), test {test.height:,}"
+        fitted = fit_model(
+            known, cutoff, config, seed=i, callbacks=[_live_callback(progress)],
+            on_split=lambda tr, va, i=i: progress.log(
+                f"fold {i + 1}/{len(cutoffs)}: cutoff {cutoff}, train {tr.height:,}, "
+                f"valid {va.height:,} ({int(va['y'].sum())} disruptions), test {test.height:,}"
+            ),
         )
-        picked = lgb.train(
-            config.params,
-            d_tr,
-            num_boost_round=config.num_boost_round,
-            valid_sets=[d_sample, d_va],
-            valid_names=["train", "valid"],
-            callbacks=[
-                lgb.early_stopping(config.early_stopping_rounds, verbose=False),
-                _live_callback(progress),
-            ],
-        )
-        rounds = max(1, picked.best_iteration)
-        progress.state["status"] = f"refitting fold {i + 1} on all known rows ({rounds} rounds)"
-        progress.save()
-        booster = lgb.train(config.params, dataset(known), num_boost_round=rounds)
-        pred = test.with_columns(pl.Series(MODEL, booster.predict(_to_numpy(test))))
+        rounds, booster = fitted.rounds, fitted.booster
+        progress.state["current"]["n_valid"] = fitted.n_valid
+        raw = fitted.raw(test)
+        platt = fitted.platt
+        if config.calibrate == "history" and predictions:
+            past = pl.concat(predictions).filter(
+                (pl.col("target_week") <= cutoff)
+                & (pl.col("target_week") > cutoff - timedelta(weeks=config.calibration_weeks))
+            )
+            if past["y"].sum() >= MIN_CALIBRATION_POSITIVES:
+                platt = fit_platt(past["raw"].to_numpy(), past["y"].to_numpy())
+        pred = test.with_columns(pl.Series("raw", raw), pl.Series(MODEL, apply_platt(raw, *platt)))
         predictions.append(pred)
         gain = booster.feature_importance("gain")
         importance += gain / max(gain.sum(), 1e-9)
@@ -282,7 +386,7 @@ def train_and_backtest(
             ),
             key=lambda r: -r["share"],
         )
-        _update_scores(progress, rule_scores(pl.concat(predictions), radius_km))
+        _update_scores(progress, rule_scores(pl.concat(predictions).drop("raw"), radius_km))
         progress.log(
             f"fold {i + 1} done: {rounds} rounds, AP {_fmt(fold_all['ap_model'])} vs "
             f"{fold_all['best_rule']} {_fmt(fold_all['ap_rule'])}, "
@@ -292,7 +396,7 @@ def train_and_backtest(
     progress.state["status"] = "done"
     progress.state["current"] = None
     progress.log("done")
-    return rule_scores(pl.concat(predictions), radius_km)
+    return rule_scores(pl.concat(predictions).drop("raw"), radius_km)
 
 
 def new_run_dir(root: Path | None = None) -> Path:
@@ -324,9 +428,11 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Train and backtest the disruption classifier")
     parser.add_argument("--hf", action="store_true", help="read data from HF")
     parser.add_argument("--out", help="also write the scored backtest rows to this parquet")
+    parser.add_argument("--calibrate", choices=["valid", "history", "none"],
+                        default=TrainConfig.calibrate)
     args = parser.parse_args(argv)
 
-    config = TrainConfig()
+    config = TrainConfig(calibrate=None if args.calibrate == "none" else args.calibrate)
     run_dir = new_run_dir()
     progress = Progress(run_dir, config)
     progress.state["reference"] = None

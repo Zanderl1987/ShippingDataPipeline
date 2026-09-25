@@ -83,6 +83,26 @@ sdp collect --force
 sdp status --warnings-only
 ```
 
+## Port Disruption Watch
+
+A weekly early warning for sudden drops in ship calls at ~690 ports, built from this
+pipeline's data: [GitHub Pages](https://zanderl1987.github.io/ShippingDataPipeline/) ·
+[Hugging Face Space](https://huggingface.co/spaces/ZanderL1337/port-disruption-watch).
+
+- **What it predicts:** the chance that a port's calls fall 30%+ below its usual level
+  (and outside its normal swings, and not a repeat of last year's holiday dip), for last
+  week, this week and next week, right after IMF PortWatch's Tuesday release.
+- **How well:** in a 2023–2026 backtest (retrained every 12 weeks on past data only),
+  the weekly top 1% of ports are disrupted 11.8% of the time, against 0.8% for a random
+  port and 7.9% for the best simple rule (a port whose calls are already falling). The
+  chances are calibrated: of the port-weeks it gave a 20–40% chance, 27% dropped.
+- **Where it fails:** typhoons (GDACS often lists them late or not at all) and slow
+  shifts like the Red Sea diversions, which the "usual level" absorbs.
+- **Code:** `src/ml/disruption_warning/` (labels, baselines, features, `train.py`
+  backtest, `predict.py` live run, `dashboard.py`). The weekly job is
+  `.github/workflows/warning.yml`; every warning is kept in the
+  [warnings history](https://huggingface.co/datasets/ZanderL1337/port-disruption-warnings).
+
 ## Data Sources (19 collectors)
 
 ### AIS Tracking (No Auth)

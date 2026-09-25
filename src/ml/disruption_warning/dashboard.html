@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__TITLE__</title>
+<meta name="description" content="Weekly early warning of sudden drops in port calls at ~660 ports worldwide, from IMF PortWatch data.">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2430;--muted:#5d6b7c;--line:#e3e7ec;--head:#0f2a47;
+--accent:#1f6feb;--hi:#c81e1e;--watch:#d97706;--hi-bg:#fff1e8;--ok:#15803d;--ok-bg:#e8f6ed;--grid:#e9edf1;--dot:#9aa7b5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1319;--card:#161d26;--ink:#e6ebf1;
+--muted:#9aa7b5;--line:#26303c;--head:#0a1f36;--accent:#58a6ff;--hi:#f87171;--watch:#fbbf24;--hi-bg:#3a2415;--ok:#4ade80;
+--ok-bg:#15301f;--grid:#1f2832;--dot:#566474}}
+:root[data-theme="dark"]{--bg:#0e1319;--card:#161d26;--ink:#e6ebf1;--muted:#9aa7b5;--line:#26303c;
+--head:#0a1f36;--accent:#58a6ff;--hi:#f87171;--watch:#fbbf24;--hi-bg:#3a2415;--ok:#4ade80;--ok-bg:#15301f;--grid:#1f2832;--dot:#566474}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--head);color:#fff;padding:22px 16px}
+header .in,main{max-width:1100px;margin:0 auto}
+header h1{font-size:1.45rem;font-weight:650}
+header p{color:#b8c6d6;font-size:.88rem;margin-top:4px}
+main{padding:18px 16px 40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px}
+h2{font-size:1.1rem;margin-bottom:4px}
+.note{color:var(--muted);font-size:.85rem;margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.kpi b{display:block;font-size:1.6rem;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:.82rem}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;
+padding:6px 14px;font:inherit;font-size:.88rem;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{text-align:left;color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase;
+letter-spacing:.03em;padding:6px 8px;border-bottom:2px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th.n{text-align:right}td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sub{color:var(--muted);font-size:.78rem}
+.pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:.76rem;margin:1px 2px 1px 0;
+background:var(--bg);border:1px solid var(--line)}
+.hi{color:var(--hi);font-weight:650}
+.yes{background:var(--hi-bg);color:var(--hi)}.no{background:var(--ok-bg);color:var(--ok)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.8rem;color:var(--muted);margin:6px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+input[type=search]{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;
+background:var(--bg);color:var(--ink);width:100%;max-width:280px;margin-bottom:10px}
+ul.do{padding-left:18px}ul.do li{margin:4px 0}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:.8rem;
+padding:5px 8px;border-radius:6px;display:none;max-width:260px;z-index:5}
+footer{color:var(--muted);font-size:.8rem;max-width:1100px;margin:0 auto;padding:0 16px 30px}
+a{color:var(--accent)}
+</style></head><body>
+<header><div class="in"><h1>Port Disruption Watch</h1>
+<p id="asof"></p></div></header>
+<main>
+<div class="kpis" id="kpis"></div>
+
+<section class="card">
+<h2>Ports to watch</h2>
+<p class="note" id="alertsNote"></p>
+<div class="tabs" role="tablist" id="tabs"></div>
+<div class="wrap"><table id="alerts"></table></div>
+</section>
+
+<section class="card">
+<h2>What to do with an alert</h2>
+<ul class="do">
+<li><b>Shippers and forwarders:</b> for cargo due at a flagged port, check the terminal's notices and your carrier's advisories, and hold a booking at one of the listed nearby ports that isn't flagged.</li>
+<li><b>Planners:</b> add buffer to delivery dates that depend on a flagged port. A 20% chance means about 1 in 5 of these weeks sees calls fall by 30% or more.</li>
+<li><b>Analysts:</b> "why" shows which signals pushed the chance up. "Calls already falling" is the strongest signal; a storm alert on its own is weaker than it looks.</li>
+<li><b>Everyone:</b> most disruptions are not foreseeable from this data<span id="catch"></span>. Use it to decide where to look first, not as a forecast of everything.</li>
+</ul>
+</section>
+
+<section class="card">
+<h2>Map</h2>
+<p class="note" id="mapNote"></p>
+<div class="legend"><span><i style="background:var(--hi)"></i>alert</span>
+<span><i style="background:var(--watch)"></i>watch: 5%+ chance</span>
+<span><i style="background:var(--dot)"></i>other</span><span>Size: usual calls a week</span></div>
+<svg id="map" viewBox="0 0 1000 440" role="img" aria-label="World map of ports coloured by chance of a disruption"></svg>
+</section>
+
+<section class="card">
+<h2>Where the risk is</h2>
+<p class="note">Expected number of disrupted ports by region: the sum of every port's chance.</p>
+<div class="wrap"><table id="regions"></table></div>
+</section>
+
+<section class="card">
+<h2>Track record</h2>
+<p class="note" id="recordNote"></p>
+<svg id="recordChart" viewBox="0 0 1000 220" role="img" aria-label="Disruptions per week and how many were on an alert list"></svg>
+<div class="legend"><span><i style="background:var(--hi)"></i>disruptions on an alert list</span>
+<span><i style="background:var(--dot)"></i>disruptions missed</span><span>Hover a bar for the week</span></div>
+<div class="cols" style="margin-top:14px">
+<div><h3 style="font-size:.95rem;margin-bottom:6px">Latest alerts and what happened</h3>
+<div class="wrap"><table id="recent"></table></div></div>
+<div><h3 style="font-size:.95rem;margin-bottom:6px">Are the chances honest?</h3>
+<p class="note">When the model said a chance in this range, how often a disruption followed.</p>
+<table id="calib"></table></div>
+</div>
+</section>
+
+<section class="card">
+<h2>How this works</h2>
+<p class="note" style="margin:0">A <b>disruption</b> is a week when a port's ship calls fall at least 30% below its usual level (the median of the 13 weeks before) and far enough to stand out from its normal week-to-week swings, and the port didn't drop the same way a year earlier (so regular holiday dips don't count).
+Every Tuesday IMF PortWatch publishes port calls up to the previous week. Right after, a model trained on 2020 onward (a LightGBM classifier) gives each port a chance of a disruption in three weeks: last week (already over, but its data isn't out), this week and next week.
+Inputs: recent calls against normal, past drops, time of year and holidays, storm and disaster alerts from GDACS, traffic through the nearest chokepoints, and nearby ports' calls.
+Alerts are the top 1% of ports each week. The track record uses only predictions made without seeing the outcome: 2023 to the model's launch is a backtest (retrained every 12 weeks on past data only), after that the live weekly runs.
+Known gap: typhoons often reach ports before GDACS lists them, so typhoon disruptions are mostly missed.</p>
+</section>
+</main>
+<footer>Data: <a href="https://portwatch.imf.org">IMF PortWatch</a> (port calls, chokepoints, GDACS disaster events). Not affiliated with the IMF. Warnings history: <a href="https://huggingface.co/datasets/ZanderL1337/port-disruption-warnings">Hugging Face</a>. Code: <a href="https://github.com/Zanderl1987/ShippingDataPipeline">GitHub</a>. <span id="gen"></span></footer>
+<div id="tip"></div>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const D=JSON.parse(document.getElementById('data').textContent);
+const WATCH=0.05;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct=(x,d=0)=>x==null?'-':(100*x).toFixed(d)+'%';
+const fmtDate=s=>new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
+const wk=s=>'week of '+fmtDate(s);
+const P=Object.fromEntries(D.ports.map(p=>[p.port_id,p]));
+const S=D.record.summary;
+$('asof').textContent=`Port data through the ${wk(D.origin)}, released ${fmtDate(D.release)}. Next update after the next Tuesday release.`;
+$('gen').textContent=`Page built ${D.generated}.`;
+
+const flagged=h=>D.chances[h].filter(r=>r.flagged);
+const kpis=[
+ [flagged(2).length,`ports on alert this week (${wk(D.horizons[2].week)})`],
+ [flagged(3).length,`ports on alert next week`],
+ [S?pct(S.precision):'-',S?`of past alerts were followed by a disruption, vs ${pct(S.base_rate,1)} for a random port`:'no track record yet'],
+ [S?pct(S.caught/S.disruptions):'-',S?`of disruptions were on at least one of the 3 weekly alert lists (last ${S.weeks} weeks)`:''],
+];
+$('kpis').innerHTML=kpis.map(([b,s])=>`<div class="kpi"><b>${b}</b><span>${esc(s)}</span></div>`).join('');
+
+let H='2';
+const tabs=$('tabs');
+tabs.innerHTML=['2','3','1'].map(h=>`<button role="tab" data-h="${h}">${D.horizons[h].name} <span class="sub" style="color:inherit;opacity:.8">${fmtDate(D.horizons[h].week)}</span></button>`).join('');
+tabs.onclick=e=>{const b=e.target.closest('button');if(b){H=b.dataset.h;draw();}};
+
+function alerts(){
+ const rows=D.chances[H].slice().sort((a,b)=>b.chance-a.chance);
+ const show=rows.filter(r=>r.flagged||r.chance>=WATCH).slice(0,25);
+ $('alertsNote').textContent=`${D.horizons[H].name} (${wk(D.horizons[H].week)}). Alerts are the top ${pct(D.budget)} of ${rows.length} ports; also shown: other ports with a 5% chance or more (the average port-week: under 1%). "Normal" is the port's own rate of disruptions.`+(H==='1'?' This week is already over, but its data comes out next Tuesday.':'');
+ $('alerts').innerHTML='<thead><tr><th>Port</th><th class="n">Chance</th><th class="n">vs normal</th><th class="n">Usual calls/wk</th><th class="n">Latest week vs usual</th><th>Why</th><th>Nearby ports not flagged</th></tr></thead><tbody>'+
+ show.map(r=>{const p=P[r.port_id]||{};
+  const last=p.last_drop_pct==null?'-':(p.last_drop_pct>0?'−':'+')+Math.abs(100*p.last_drop_pct).toFixed(0)+'%';
+  const alts=(r.alternatives||[]).map(a=>`${esc(a.name)} <span class="sub">${a.km.toFixed(0)} km</span>`).join('<br>')||'<span class="sub">none within '+D.alt_km+' km</span>';
+  return `<tr><td>${r.flagged?'<span class="pill yes">alert</span> ':''}<b>${esc(p.port_name)}</b><br><span class="sub">${esc(p.country)}${p.industry_top1?' · '+esc(p.industry_top1):''}</span></td>
+  <td class="n ${r.flagged?'hi':''}">${pct(r.chance,1)}</td><td class="n">${r.lift==null?'-':r.lift.toFixed(1)+'x'}</td>
+  <td class="n">${p.normal_calls==null?'-':p.normal_calls.toFixed(0)}</td><td class="n">${last}</td>
+  <td>${(r.reasons||[]).map(x=>`<span class="pill">${esc(x)}</span>`).join('')}</td><td>${r.flagged?alts:''}</td></tr>`}).join('')+'</tbody>';
+}
+
+const tip=$('tip');
+function map(){
+ const w=1000,h=440,N=75,Sx=-60,xy=(la,lo)=>[(lo+180)/360*w,(N-la)/(N-Sx)*h];
+ let g='';for(let lo=-150;lo<=180;lo+=30){const[x]=xy(0,lo);g+=`<line x1="${x}" y1="0" x2="${x}" y2="${h}"/>`}
+ for(const la of[60,30,0,-30]){const[,y]=xy(la,0);g+=`<line x1="0" y1="${y}" x2="${w}" y2="${y}"/>`}
+ const rows=D.chances[H].slice().sort((a,b)=>(a.flagged-b.flagged)||(a.chance-b.chance));
+ let dots='';
+ for(const r of rows){const p=P[r.port_id];if(!p||p.latitude==null||p.latitude>N||p.latitude<Sx)continue;
+  const[x,y]=xy(p.latitude,p.longitude),rad=Math.min(2+Math.sqrt(p.normal_calls||0)*0.35,9);
+  const col=r.flagged?'var(--hi)':(r.chance>=WATCH?'var(--watch)':'var(--dot)');
+  dots+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${col}" data-id="${r.port_id}" data-c="${r.chance}"/>`}
+ $('map').innerHTML=`<g stroke="var(--grid)">${g}</g><g fill-opacity=".8" stroke="var(--card)" stroke-width=".5">${dots}</g>`;
+ $('mapNote').textContent=`${D.horizons[H].name}: every port's chance of a disruption. Hover or tap a dot.`;
+}
+$('map').addEventListener('pointermove',e=>{const c=e.target.closest('circle');if(!c){tip.style.display='none';return}
+ const p=P[c.dataset.id];tip.innerHTML=`<b>${esc(p.port_name)}</b>, ${esc(p.country)}<br>${pct(+c.dataset.c,1)} chance · ${(p.normal_calls||0).toFixed(0)} calls/wk`;
+ tip.style.display='block';tip.style.left=Math.min(e.clientX+12,innerWidth-270)+'px';tip.style.top=(e.clientY+12)+'px'});
+$('map').addEventListener('pointerleave',()=>tip.style.display='none');
+
+function regions(){
+ const rows=D.regions.filter(r=>String(r.horizon)===H);
+ $('regions').innerHTML='<thead><tr><th>Region</th><th class="n">Ports</th><th class="n">Expected disruptions</th><th class="n">Alerts</th></tr></thead><tbody>'+
+ rows.map(r=>`<tr><td>${esc(r.continent||'unknown')}</td><td class="n">${r.ports}</td><td class="n">${r.expected.toFixed(1)}</td><td class="n">${r.flagged}</td></tr>`).join('')+'</tbody>';
+}
+
+function record(){
+ const R=D.record;
+ if(!S){$('catch').textContent=`: the alert lists caught ${pct(S.caught/S.disruptions)} of them`;
+ $('recordNote').textContent='No past warnings with known outcomes yet.';return}
+ $('recordNote').textContent=`Target weeks ${fmtDate(S.first)} to ${fmtDate(S.last)}: ${S.alerts.toLocaleString()} alerts, ${S.hits.toLocaleString()} followed by a disruption (${pct(S.precision,1)}; a random port-week: ${pct(S.base_rate,1)}). ${S.caught.toLocaleString()} of ${S.disruptions.toLocaleString()} disruptions were on an alert list.`;
+ const W=R.weeks,w=1000,h=220,pad=24,bw=(w-pad)/Math.max(W.length,1),max=Math.max(...W.map(r=>r.disruptions),1);
+ let bars='';W.forEach((r,i)=>{const x=pad+i*bw,ha=(h-30)*r.disruptions/max,hh=(h-30)*r.caught/max;
+  bars+=`<rect x="${x.toFixed(1)}" y="${(h-20-ha).toFixed(1)}" width="${Math.max(bw-1,1).toFixed(1)}" height="${ha.toFixed(1)}" fill="var(--dot)"><title>${wk(r.target_week)}: ${r.disruptions} disruptions, ${r.caught} on an alert list; ${r.hits} of ${r.alerts} alerts right</title></rect>`+
+  `<rect x="${x.toFixed(1)}" y="${(h-20-hh).toFixed(1)}" width="${Math.max(bw-1,1).toFixed(1)}" height="${hh.toFixed(1)}" fill="var(--hi)" pointer-events="none"/>`;
+  if(r.target_week.slice(5,10)<='01-07'&&r.target_week.slice(5,7)==='01')bars+=`<text x="${x}" y="${h-4}" font-size="11" fill="var(--muted)">${r.target_week.slice(0,4)}</text>`});
+ $('recordChart').innerHTML=`<text x="0" y="12" font-size="11" fill="var(--muted)">${max}</text>${bars}`;
+ $('recent').innerHTML='<thead><tr><th>Week</th><th>Port</th><th class="n">Said</th><th>Result</th></tr></thead><tbody>'+
+ R.recent.slice(0,15).map(r=>`<tr><td class="sub">${fmtDate(r.target_week)}</td><td>${esc(r.port_name)}<br><span class="sub">${esc(r.country)}</span></td><td class="n">${pct(r.chance,0)}</td><td>${r.happened?`<span class="pill yes">dropped ${pct(r.drop_pct)}</span>`:'<span class="pill no">normal</span>'}</td></tr>`).join('')+'</tbody>';
+ $('calib').innerHTML='<thead><tr><th>Model said</th><th class="n">Port-weeks</th><th class="n">Happened</th></tr></thead><tbody>'+
+ R.calibration.map(r=>`<tr><td>${esc(r.bin)}</td><td class="n">${r.n.toLocaleString()}</td><td class="n">${pct(r.happened,1)}</td></tr>`).join('')+'</tbody>';
+}
+
+function draw(){for(const b of tabs.children)b.setAttribute('aria-selected',b.dataset.h===H);alerts();map();regions();}
+draw();record();
+</script></body></html>

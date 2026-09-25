@@ -259,12 +259,16 @@ def build_features(
     profiles: pl.DataFrame,
     chokepoints: pl.DataFrame,
     origins: list[date],
+    labelled_only: bool = True,
 ) -> pl.DataFrame:
-    """KEYS, the target (``y``, ``big``, ``size_band``) and FEATURES."""
+    """KEYS, the target (``y``, ``big``, ``size_band``) and FEATURES. With
+    ``labelled_only=False`` rows whose target is still ahead are kept (``y``
+    null): that is what a live warning scores."""
     grid = weekly_grid(weekly)
     labels = label_drops(grid)
     events = prepare_events(raw_events)
-    rows = warning_rows(labels, event_exposure(events, profiles), origins)
+    rows = warning_rows(labels, event_exposure(events, profiles), origins,
+                        labelled_only=labelled_only)
     fx = forecast.build_features(grid, profiles, origins, require_actual=False).drop(
         "actual", "target"
     )
