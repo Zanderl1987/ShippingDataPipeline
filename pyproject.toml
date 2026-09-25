@@ -26,6 +26,11 @@ dev = [
 hf = [
     "huggingface_hub>=0.35",
 ]
+ml = [
+    "holidays>=0.60",
+    "lightgbm>=4.5",
+    "numpy>=2.0",
+]
 
 [tool.ruff]
 target-version = "py311"
@@ -43,6 +48,13 @@ strict = true
 ignore_missing_imports = true
 disallow_untyped_defs = true
 disallow_any_unimported = false
+
+# numpy >= 2.5's stubs use 3.12-only syntax, which mypy rejects when checking
+# for 3.11. Treat numpy (pulled in by the optional `ml` extra) as untyped.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

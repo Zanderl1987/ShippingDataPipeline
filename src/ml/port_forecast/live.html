@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Port Forecast Training</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #677285; --line: #e3e7ee;
+  --model: #2563eb; --ref: #d97706; --other: #94a3b8; --train: #7c3aed;
+  --good: #15803d; --ok: #a16207; --bad: #b91c1c;
+  --good-bg: #dcfce7; --ok-bg: #fef3c7; --bad-bg: #fee2e2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1419; --panel: #171d25; --ink: #e6e9ef; --muted: #8b95a7; --line: #273040;
+    --model: #60a5fa; --ref: #fbbf24; --other: #64748b; --train: #a78bfa;
+    --good: #4ade80; --ok: #facc15; --bad: #f87171;
+    --good-bg: #14532d55; --ok-bg: #71350055; --bad-bg: #7f1d1d55;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 40px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 16px; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; }
+.pill { padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 13px;
+  background: var(--ok-bg); color: var(--ok); }
+.pill.done { background: var(--good-bg); color: var(--good); }
+.pill.failed { background: var(--bad-bg); color: var(--bad); }
+.meta { color: var(--muted); font-size: 13px; }
+.bar { flex: 1 1 240px; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--model); width: 0; transition: width .4s; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(12, 1fr); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+.s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; }
+.s6 { grid-column: span 6; } .s7 { grid-column: span 7; } .s8 { grid-column: span 8; } .s12 { grid-column: span 12; }
+@media (max-width: 900px) { .s3 { grid-column: span 6; } .s4, .s5, .s6, .s7, .s8 { grid-column: span 12; } }
+@media (max-width: 520px) { .s3 { grid-column: span 12; } }
+.kpi .v { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi .sub { color: var(--muted); font-size: 12px; }
+.chart { position: relative; height: 260px; }
+.chart.tall { height: 420px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
+th, td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 600; }
+.tbl { overflow-x: auto; }
+.r { border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+.r.good { background: var(--good-bg); color: var(--good); }
+.r.ok { background: var(--ok-bg); color: var(--ok); }
+.r.bad { background: var(--bad-bg); color: var(--bad); }
+.log { font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--muted); max-height: 220px;
+  overflow-y: auto; white-space: pre-wrap; margin: 0; }
+.note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.empty { color: var(--muted); padding: 30px 0; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Port traffic forecast — training</h1>
+    <span id="status" class="pill">connecting…</span>
+    <div class="bar" title="folds finished"><div id="bar"></div></div>
+    <span id="meta" class="meta"></span>
+  </header>
+
+  <div class="grid">
+    <div class="panel kpi s3"><h2>Model error (WAPE)</h2><div id="k-model" class="v">–</div>
+      <div class="sub">total miss as % of calls, all folds so far</div></div>
+    <div class="panel kpi s3"><h2>Bar: last-4-week average</h2><div id="k-ref" class="v">–</div>
+      <div class="sub">same rows</div></div>
+    <div class="panel kpi s3"><h2>Error vs the bar</h2><div id="k-ratio" class="v">–</div>
+      <div class="sub">below 0.90 = at least 10% better (the goal)</div></div>
+    <div class="panel kpi s3"><h2>Forecasts scored</h2><div id="k-n" class="v">–</div>
+      <div id="k-n-sub" class="sub"></div></div>
+
+    <div class="panel s7"><h2 id="curve-title">Current fold: training curve</h2>
+      <div class="chart"><canvas id="c-curve"></canvas></div>
+      <p class="note">WAPE in calls, by boosting round. Training stops when validation hasn't improved for a while; the best round is kept.</p></div>
+    <div class="panel s5"><h2>Error vs last-4-week average, per fold</h2>
+      <div class="chart"><canvas id="c-folds"></canvas></div>
+      <p class="note">Each fold trains on data up to its cutoff and forecasts the next 12 weeks. Below the dashed line = goal met.</p></div>
+
+    <div class="panel s12"><h2>Error vs last-4-week average, per forecast date</h2>
+      <div class="chart"><canvas id="c-origin"></canvas></div></div>
+
+    <div class="panel s4"><h2>By horizon</h2><div id="t-horizon" class="tbl"></div></div>
+    <div class="panel s4"><h2>By port size</h2><div id="t-size" class="tbl"></div></div>
+    <div class="panel s4"><h2>By year</h2><div id="t-year" class="tbl"></div></div>
+
+    <div class="panel s6"><h2>What the model leans on (share of gain)</h2>
+      <div class="chart tall"><canvas id="c-imp"></canvas></div></div>
+    <div class="panel s6"><h2>Folds</h2><div id="t-folds" class="tbl"></div>
+      <h2 style="margin-top:16px">Log</h2><pre id="log" class="log"></pre></div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const MODEL = "lightgbm", REF = "last_4";
+const SHOWN = [["lightgbm", "model"], ["last_4", "last 4 wk"], ["last_year", "last year"]];
+let base = "", charts = {};
+
+function fmt(x, d = 3) { return x == null || Number.isNaN(x) ? "–" : Number(x).toFixed(d); }
+function pct(x) { return x == null ? "–" : (100 * x).toFixed(1) + "%"; }
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function ratioCell(r) {
+  if (r == null) return "–";
+  const cls = r <= 0.9 ? "good" : r < 1 ? "ok" : "bad";
+  return `<span class="r ${cls}">${fmt(r)}</span>`;
+}
+
+function chartDefaults() {
+  Chart.defaults.color = css("--muted");
+  Chart.defaults.borderColor = css("--line");
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.animation = false;
+  Chart.defaults.maintainAspectRatio = false;
+}
+
+function lineChart(id, opts = {}) {
+  return new Chart($(id), {
+    type: "line", data: { labels: [], datasets: [] },
+    options: { interaction: { mode: "index", intersect: false }, elements: { point: { radius: 0 } },
+      plugins: { legend: { labels: { boxWidth: 12 } } }, scales: opts.scales || {} },
+  });
+}
+
+function setup() {
+  chartDefaults();
+  charts.curve = lineChart("c-curve", { scales: { x: { title: { display: true, text: "round" } } } });
+  charts.folds = new Chart($("c-folds"), {
+    type: "bar", data: { labels: [], datasets: [] },
+    options: { plugins: { legend: { labels: { boxWidth: 12 } } },
+      scales: { y: { suggestedMin: 0.6, suggestedMax: 1.1 } } },
+  });
+  charts.origin = lineChart("c-origin", { scales: { y: { suggestedMin: 0.6, suggestedMax: 1.6 } } });
+  charts.imp = new Chart($("c-imp"), {
+    type: "bar", data: { labels: [], datasets: [] },
+    options: { indexAxis: "y", plugins: { legend: { display: false } },
+      scales: { x: { ticks: { callback: (v) => (100 * v).toFixed(0) + "%" } } } },
+  });
+}
+
+function goalLine(n) {
+  return { label: "goal (0.90)", data: Array(n).fill(0.9), type: "line", borderColor: css("--good"),
+    borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false };
+}
+
+function table(rows, key, label) {
+  if (!rows || !rows.length) return `<div class="empty">waiting for the first fold</div>`;
+  let h = `<table><tr><th>${label}</th><th>n</th>` +
+    SHOWN.map(([m, l]) => `<th>${l}</th>`).join("") + `<th>vs bar</th></tr>`;
+  for (const r of rows) {
+    h += `<tr><td>${esc(r[key])}</td><td>${Number(r.n).toLocaleString()}</td>` +
+      SHOWN.map(([m]) => `<td>${pct(r["wape_" + m])}</td>`).join("") +
+      `<td>${ratioCell(r["vs_ref_" + MODEL])}</td></tr>`;
+  }
+  return h + "</table><p class=\"note\">WAPE (total miss as % of calls). \"vs bar\" = model error ÷ last-4-week error.</p>";
+}
+
+function render(s) {
+  const st = s.status || "";
+  const pill = $("status");
+  pill.textContent = st;
+  pill.className = "pill" + (st === "done" ? " done" : st.startsWith("failed") ? " failed" : "");
+
+  const folds = s.folds || [], nf = s.n_folds || 0;
+  const cur = s.current;
+  const within = cur && cur.iteration ? Math.min(0.95, cur.iteration / 800) : 0;
+  $("bar").style.width = nf ? (100 * Math.min(1, (folds.length + within) / nf)) + "%" : "0";
+  const started = new Date(s.started), updated = new Date(s.updated);
+  const elapsed = ((st === "done" ? updated : new Date()) - started) / 1000;
+  let eta = "";
+  if (folds.length && nf && st !== "done") {
+    const avg = folds.reduce((a, f) => a + f.seconds, 0) / folds.length;
+    eta = ` · ~${Math.ceil(avg * (nf - folds.length) / 60)} min left`;
+  }
+  $("meta").textContent = `fold ${Math.min(folds.length + (cur ? 1 : 0), nf)} of ${nf || "?"} · ` +
+    `${Math.floor(elapsed / 60)}m ${Math.floor(elapsed % 60)}s elapsed${eta} · updated ${updated.toLocaleTimeString()}`;
+
+  const sc = s.scores || {};
+  const all = sc.by_horizon || [];
+  if (all.length) {
+    const sum = (k) => all.reduce((a, r) => a + r[k], 0);
+    // Pool across horizons: WAPE = total error / total calls.
+    const calls = sum("calls");
+    const ae = (m) => all.reduce((a, r) => a + r["wape_" + m] * r.calls, 0);
+    $("k-model").textContent = pct(ae(MODEL) / calls);
+    $("k-ref").textContent = pct(ae(REF) / calls);
+    const ratio = ae(MODEL) / ae(REF);
+    $("k-ratio").innerHTML = ratioCell(ratio);
+    $("k-n").textContent = Number(sc.n).toLocaleString();
+    $("k-n-sub").textContent = `of ~${((s.data && s.data.eval_origins) || 0) * 4 * 2065 / 1000 | 0}K when done`;
+  }
+
+  // Live curve.
+  const curveSrc = cur ? cur.curve : (folds.length ? folds[folds.length - 1].curve : null);
+  const title = cur ? `Fold ${cur.fold}: training curve (cutoff ${cur.cutoff}, ${Number(cur.n_train).toLocaleString()} rows)`
+                    : folds.length ? `Last fold: training curve` : `Training curve`;
+  $("curve-title").textContent = title;
+  if (curveSrc) {
+    const n = Math.max(...Object.values(curveSrc).map((a) => a.length), 0);
+    const step = cur ? 1 : Math.max(1, Math.floor((folds[folds.length - 1].best_iteration || n) / n));
+    charts.curve.data.labels = Array.from({ length: n }, (_, i) => (i + 1) * step);
+    charts.curve.data.datasets = [
+      { label: "validation (held-out 8 weeks)", data: curveSrc.valid || [], borderColor: css("--model"), borderWidth: 2 },
+      { label: "training sample", data: curveSrc.train || [], borderColor: css("--train"), borderWidth: 1.5, borderDash: [4, 3] },
+    ];
+    charts.curve.update();
+  }
+
+  // Per-fold ratio bars.
+  const pooled = (f, m) => {
+    const c = f.by_horizon.reduce((a, r) => a + r.calls, 0);
+    return f.by_horizon.reduce((a, r) => a + r["wape_" + m] * r.calls, 0) / c;
+  };
+  charts.folds.data.labels = folds.map((f) => f.cutoff);
+  charts.folds.data.datasets = [
+    { label: "model ÷ last 4 wk", data: folds.map((f) => pooled(f, MODEL) / pooled(f, REF)),
+      backgroundColor: folds.map((f) => pooled(f, MODEL) / pooled(f, REF) <= 0.9 ? css("--good") : css("--model")) },
+    { label: "last year ÷ last 4 wk", data: folds.map((f) => pooled(f, "last_year") / pooled(f, REF)),
+      backgroundColor: css("--other") },
+    goalLine(folds.length),
+  ];
+  charts.folds.update();
+
+  // Per-origin ratio lines.
+  const bo = sc.by_origin || [];
+  charts.origin.data.labels = bo.map((r) => String(r.origin_week).slice(0, 10));
+  charts.origin.data.datasets = [
+    { label: "model", data: bo.map((r) => r["vs_ref_" + MODEL]), borderColor: css("--model"), borderWidth: 2, pointRadius: 2 },
+    { label: "same week last year", data: bo.map((r) => r["vs_ref_last_year"]), borderColor: css("--other"), borderWidth: 1.5 },
+    { label: "last 4 wk (the bar)", data: bo.map(() => 1), borderColor: css("--ref"), borderWidth: 1.5, borderDash: [2, 2] },
+    { ...goalLine(bo.length), type: undefined },
+  ];
+  charts.origin.update();
+
+  $("t-horizon").innerHTML = table(sc.by_horizon, "horizon", "weeks ahead");
+  $("t-size").innerHTML = table(sc.by_size, "size_band", "port size");
+  $("t-year").innerHTML = table(sc.by_year, "year", "year");
+
+  const imp = (s.importance || []).slice(0, 20);
+  charts.imp.data.labels = imp.map((r) => r.feature);
+  charts.imp.data.datasets = [{ data: imp.map((r) => r.share), backgroundColor: css("--model") }];
+  charts.imp.update();
+
+  $("t-folds").innerHTML = folds.length ? `<table><tr><th>cutoff</th><th>train rows</th><th>rounds</th><th>valid WAPE</th><th>test WAPE</th><th>vs bar</th><th>time</th></tr>` +
+    folds.map((f) => `<tr><td>${f.cutoff}</td><td>${Number(f.n_train).toLocaleString()}</td><td>${f.best_iteration}</td>` +
+      `<td>${pct(f.best_valid_wape)}</td><td>${pct(pooled(f, MODEL))}</td><td>${ratioCell(pooled(f, MODEL) / pooled(f, REF))}</td>` +
+      `<td>${f.seconds}s</td></tr>`).join("") + `</table>` : `<div class="empty">no folds finished yet</div>`;
+
+  const log = $("log");
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 20;
+  log.textContent = (s.log || []).join("\n");
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+async function locate() {
+  // Inside a run folder, progress.json sits next to the page; at the root,
+  // latest.txt names the newest run.
+  const here = await fetch("progress.json", { cache: "no-store", method: "HEAD" }).catch(() => null);
+  if (here && here.ok) return "";
+  const r = await fetch("latest.txt", { cache: "no-store" });
+  return (await r.text()).trim() + "/";
+}
+
+async function tick() {
+  try {
+    if (base === "" && !tick.located) { base = await locate(); tick.located = true; }
+    const r = await fetch(base + "progress.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const s = await r.json();
+    render(s);
+    if (s.status === "done" || String(s.status).startsWith("failed")) return; // stop polling
+  } catch (e) {
+    $("status").textContent = "waiting for progress.json…";
+  }
+  setTimeout(tick, 2000);
+}
+
+setup();
+tick();
+</script>
+</body>
+</html>
