@@ -34,7 +34,8 @@ def load_weekly_local() -> pl.DataFrame:
         return conn.execute(f"SELECT {WEEKLY_COLUMNS} FROM port_weekly").pl()
 
 
-def load_weekly_hf(revision: str = "main") -> pl.DataFrame:
+def hf_connection() -> duckdb.DuckDBPyConnection:
+    """An in-memory DuckDB that can read the HF dataset (``hf://`` paths)."""
     from huggingface_hub import get_token
 
     conn = duckdb.connect()  # in memory
@@ -42,10 +43,17 @@ def load_weekly_hf(revision: str = "main") -> pl.DataFrame:
     token = os.environ.get("HF_TOKEN") or get_token()
     if token:
         conn.execute(f"CREATE SECRET hf (TYPE huggingface, TOKEN '{token}')")
-    conn.execute(
-        "CREATE VIEW port_activity AS SELECT * FROM read_parquet("
-        f"'hf://datasets/{HF_REPO}@{revision}/port_activity/port_activity.parquet')"
-    )
+    return conn
+
+
+def hf_table(table: str, revision: str = "main") -> str:
+    return f"'hf://datasets/{HF_REPO}@{revision}/{table}/{table}.parquet'"
+
+
+def load_weekly_hf(revision: str = "main") -> pl.DataFrame:
+    conn = hf_connection()
+    source = hf_table("port_activity", revision)
+    conn.execute(f"CREATE VIEW port_activity AS SELECT * FROM read_parquet({source})")
     create_port_weekly(conn)
     return conn.execute(f"SELECT {WEEKLY_COLUMNS} FROM port_weekly").pl()
 
