@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oil Price Training</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #677285; --line: #e3e7ee;
+  --accent: #2563eb; --good: #15803d; --ok: #a16207; --bad: #b91c1c;
+  --good-bg: #dcfce7; --ok-bg: #fef3c7; --bad-bg: #fee2e2; --band: #94a3b833;
+  --m-no_change: #94a3b8; --m-drift: #a8a29e; --m-ridge_price: #d97706;
+  --m-ridge_price_stocks: #7c3aed; --m-ridge_full: #2563eb; --m-lgb_full: #0d9488;
+  --g-price: #d97706; --g-stock: #7c3aed; --g-ship: #2563eb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1419; --panel: #171d25; --ink: #e6e9ef; --muted: #8b95a7; --line: #273040;
+    --accent: #60a5fa; --good: #4ade80; --ok: #facc15; --bad: #f87171;
+    --good-bg: #14532d55; --ok-bg: #71350055; --bad-bg: #7f1d1d55; --band: #64748b33;
+    --m-no_change: #64748b; --m-drift: #78716c; --m-ridge_price: #fbbf24;
+    --m-ridge_price_stocks: #a78bfa; --m-ridge_full: #60a5fa; --m-lgb_full: #2dd4bf;
+    --g-price: #fbbf24; --g-stock: #a78bfa; --g-ship: #60a5fa;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1419; --panel: #171d25; --ink: #e6e9ef; --muted: #8b95a7; --line: #273040;
+  --accent: #60a5fa; --good: #4ade80; --ok: #facc15; --bad: #f87171;
+  --good-bg: #14532d55; --ok-bg: #71350055; --bad-bg: #7f1d1d55; --band: #64748b33;
+  --m-no_change: #64748b; --m-drift: #78716c; --m-ridge_price: #fbbf24;
+  --m-ridge_price_stocks: #a78bfa; --m-ridge_full: #60a5fa; --m-lgb_full: #2dd4bf;
+  --g-price: #fbbf24; --g-stock: #a78bfa; --g-ship: #60a5fa;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 40px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 12px; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; }
+.pill { padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 13px;
+  background: var(--ok-bg); color: var(--ok); }
+.pill.done { background: var(--good-bg); color: var(--good); }
+.pill.failed { background: var(--bad-bg); color: var(--bad); }
+.meta { color: var(--muted); font-size: 13px; }
+.bar { flex: 1 1 240px; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 0 0 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.controls .lbl { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em; margin-right: 6px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--ink); padding: 5px 12px; cursor: pointer;
+  font: inherit; font-size: 13px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: #fff; }
+.toggles { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+.toggles label { font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+select { font: inherit; font-size: 13px; background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(12, 1fr); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+.s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; }
+.s6 { grid-column: span 6; } .s7 { grid-column: span 7; } .s8 { grid-column: span 8; } .s12 { grid-column: span 12; }
+@media (max-width: 900px) { .s3 { grid-column: span 6; } .s4, .s5, .s6, .s7, .s8 { grid-column: span 12; } }
+@media (max-width: 520px) { .s3 { grid-column: span 12; } }
+.kpi .v { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi .sub { color: var(--muted); font-size: 12px; }
+.chart { position: relative; height: 280px; }
+.chart.tall { height: 460px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
+th, td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 600; }
+.tbl { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+.r { border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+.r.good { background: var(--good-bg); color: var(--good); }
+.r.ok { background: var(--ok-bg); color: var(--ok); }
+.r.bad { background: var(--bad-bg); color: var(--bad); }
+.log { font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--muted); max-height: 220px;
+  overflow-y: auto; white-space: pre-wrap; margin: 0; }
+.note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.empty { color: var(--muted); padding: 30px 0; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Do tanker flows predict Brent? — training</h1>
+    <span id="status" class="pill">connecting…</span>
+    <div class="bar" title="folds finished"><div id="bar"></div></div>
+    <span id="meta" class="meta"></span>
+  </header>
+
+  <div class="controls">
+    <span><span class="lbl">Weeks ahead</span><span class="seg" id="c-h"></span></span>
+    <span><span class="lbl">Period</span><select id="c-period"></select></span>
+    <span><span class="lbl">Models</span><span class="toggles" id="c-models"></span></span>
+  </div>
+
+  <div class="grid">
+    <div class="panel kpi s3"><h2>Full model vs no change</h2><div id="k-r2" class="v">–</div>
+      <div class="sub">R² vs "no change" · above 0 = better</div></div>
+    <div class="panel kpi s3"><h2>What tanker flows add</h2><div id="k-add" class="v">–</div>
+      <div class="sub">R² of full model minus price + stocks model</div></div>
+    <div class="panel kpi s3"><h2>Direction right</h2><div id="k-hit" class="v">–</div>
+      <div id="k-hit-sub" class="sub">full model</div></div>
+    <div class="panel kpi s3"><h2>Better than luck?</h2><div id="k-cw" class="v">–</div>
+      <div class="sub">Clark-West p vs no change · below 0.05 = yes</div></div>
+
+    <div class="panel s8"><h2>Running score vs "no change"</h2>
+      <div class="chart"><canvas id="c-cum"></canvas></div>
+      <p class="note">Cumulative squared error saved against always forecasting "no change". A line that climbs is beating it; a line that falls is doing worse. Steep steps show the weeks that decide the result.</p></div>
+    <div class="panel s4"><h2 id="curve-title">LightGBM: current fold</h2>
+      <div class="chart"><canvas id="c-curve"></canvas></div>
+      <p class="note">Squared error (in bp²) by boosting round. Rounds are picked where the validation year bottoms out, then the model is refit on everything known.</p></div>
+
+    <div class="panel s12"><h2>Predicted vs actual Brent change</h2>
+      <div class="chart"><canvas id="c-pred"></canvas></div>
+      <p class="note">Grey bars: what Brent actually did over the chosen horizon from each Friday. Lines: each model's forecast made that Friday. Right axis: Brent price.</p></div>
+
+    <div class="panel s6"><h2>Scores for the chosen horizon and period</h2><div id="t-scores" class="tbl"></div></div>
+    <div class="panel s6"><h2>R² vs no change, by year</h2><div id="t-year" class="tbl"></div></div>
+
+    <div class="panel s7"><h2>What the full model leans on</h2>
+      <div style="margin-bottom:8px"><span class="seg" id="c-imp"></span></div>
+      <div class="chart tall"><canvas id="c-imp-chart"></canvas></div>
+      <p class="note"><span class="sw" style="background:var(--g-price)"></span> price &nbsp; <span class="sw" style="background:var(--g-stock)"></span> US stocks &nbsp; <span class="sw" style="background:var(--g-ship)"></span> tanker flows / chokepoints. Ridge: average weight on standardised inputs (sign = direction of push). LightGBM: share of split gain.</p></div>
+    <div class="panel s5"><h2>Newest forecast</h2><div id="latest"></div>
+      <h2 style="margin-top:18px">Inputs</h2><div id="t-cov" class="tbl"></div></div>
+
+    <div class="panel s12"><h2>Retrains</h2><div id="t-folds" class="tbl"></div></div>
+    <div class="panel s12"><h2>Log</h2><pre id="log" class="log"></pre></div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const NAMES = { no_change: "no change", drift: "average past move", ridge_price: "price only",
+  ridge_price_stocks: "price + stocks", ridge_full: "full (+ tanker flows)", lgb_full: "LightGBM full" };
+const PRICE = ["r1", "r4", "r13", "r52", "vol4", "spread", "spread_chg4", "dd52"];
+const ui = { h: 1, period: "all", models: new Set(["ridge_price", "ridge_price_stocks", "ridge_full", "lgb_full"]), imp: "coef" };
+let S = null, base = "", charts = {};
+
+const fmt = (x, d = 3) => x == null || Number.isNaN(x) ? "–" : Number(x).toFixed(d);
+const pct = (x, d = 1) => x == null || Number.isNaN(x) ? "–" : (100 * x).toFixed(d) + "%";
+const signed = (x, d = 3) => x == null || Number.isNaN(x) ? "–" : (x > 0 ? "+" : "") + Number(x).toFixed(d);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const group = (f) => PRICE.includes(f) ? "--g-price" : f.startsWith("stock_") ? "--g-stock" : "--g-ship";
+const r2cls = (r) => r == null || Number.isNaN(r) ? "" : r > 0.02 ? "good" : r > 0 ? "ok" : "bad";
+const pcls = (p) => p == null || Number.isNaN(p) ? "" : p < 0.05 ? "good" : p < 0.2 ? "ok" : "bad";
+
+function phi(t) { // normal CDF (Abramowitz-Stegun 7.1.26 via erf)
+  const x = Math.abs(t) / Math.SQRT2, k = 1 / (1 + 0.3275911 * x);
+  const e = 1 - (((((1.061405429 * k - 1.453152027) * k) + 1.421413741) * k - 0.284496736) * k + 0.254829592) * k * Math.exp(-x * x);
+  return 0.5 * (1 + (t < 0 ? -e : e));
+}
+function stats(rows, m, h) {
+  const n = rows.length; if (!n) return null;
+  let sse0 = 0, sse = 0, hits = 0, nz = 0; const f = [];
+  for (const r of rows) {
+    const y = r.y, p = r[m];
+    sse0 += y * y; sse += (y - p) ** 2;
+    if (p !== 0) { nz++; if (Math.sign(p) === Math.sign(y)) hits++; }
+    f.push(y * y - ((y - p) ** 2 - p * p));
+  }
+  let cw = null;
+  if (m !== "no_change" && n >= 10) {
+    const mu = f.reduce((a, b) => a + b, 0) / n, d = f.map((v) => v - mu);
+    let v = d.reduce((a, b) => a + b * b, 0) / n;
+    for (let k = 1; k < h; k++) { let c = 0; for (let i = k; i < n; i++) c += d[i] * d[i - k]; v += 2 * (1 - k / h) * c / n; }
+    if (v > 0) cw = 1 - phi(mu / Math.sqrt(v / n));
+  }
+  return { n, r2: sse0 ? 1 - sse / sse0 : null, hit: nz ? hits / nz : null, cw };
+}
+function rowsFor(h, period) {
+  return (S.predictions || []).filter((r) => r.h === h && (period === "all" ||
+    (period === "no2026" ? r.origin < "2026" : r.origin.startsWith(period))));
+}
+
+function setup() {
+  Chart.defaults.color = css("--muted"); Chart.defaults.borderColor = css("--line");
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.animation = false; Chart.defaults.maintainAspectRatio = false;
+  const legend = { labels: { boxWidth: 12 } };
+  const time = { type: "category", ticks: { maxTicksLimit: 12, autoSkip: true } };
+  charts.cum = new Chart($("c-cum"), { type: "line", data: { labels: [], datasets: [] },
+    options: { interaction: { mode: "index", intersect: false }, elements: { point: { radius: 0 } },
+      plugins: { legend, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${signed(c.parsed.y, 4)}` } } },
+      scales: { x: time, y: { title: { display: true, text: "error saved (log-return²)" } } } } });
+  charts.curve = new Chart($("c-curve"), { type: "line", data: { labels: [], datasets: [] },
+    options: { interaction: { mode: "index", intersect: false }, elements: { point: { radius: 0 } },
+      plugins: { legend }, scales: { x: { title: { display: true, text: "round" }, ticks: { maxTicksLimit: 8 } } } } });
+  charts.pred = new Chart($("c-pred"), { data: { labels: [], datasets: [] },
+    options: { interaction: { mode: "index", intersect: false }, elements: { point: { radius: 0 } },
+      plugins: { legend, tooltip: { callbacks: { label: (c) => c.dataset.yAxisID === "p" ? `Brent $${fmt(c.parsed.y, 2)}` : `${c.dataset.label}: ${pct(c.parsed.y)}` } } },
+      scales: { x: time, y: { ticks: { callback: (v) => pct(v, 0) }, title: { display: true, text: "change over horizon" } },
+        p: { position: "right", grid: { display: false }, ticks: { callback: (v) => "$" + v } } } } });
+  charts.imp = new Chart($("c-imp-chart"), { type: "bar", data: { labels: [], datasets: [] },
+    options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { y: { ticks: { autoSkip: false, font: { size: 11 } } } } } });
+
+  $("c-h").innerHTML = [1, 2, 4].map((h) => `<button data-h="${h}">${h} week${h > 1 ? "s" : ""}</button>`).join("");
+  $("c-h").onclick = (e) => { if (e.target.dataset.h) { ui.h = +e.target.dataset.h; draw(); } };
+  $("c-imp").innerHTML = `<button data-k="coef">Ridge weights</button><button data-k="gain">LightGBM gain</button>`;
+  $("c-imp").onclick = (e) => { if (e.target.dataset.k) { ui.imp = e.target.dataset.k; draw(); } };
+  $("c-models").innerHTML = Object.keys(NAMES).filter((m) => m !== "no_change").map((m) =>
+    `<label><input type="checkbox" value="${m}" ${ui.models.has(m) ? "checked" : ""}><span class="sw" style="background:var(--m-${m})"></span>${NAMES[m]}</label>`).join("");
+  $("c-models").onchange = (e) => { e.target.checked ? ui.models.add(e.target.value) : ui.models.delete(e.target.value); draw(); };
+  $("c-period").onchange = (e) => { ui.period = e.target.value; draw(); };
+}
+
+function draw() {
+  if (!S) return;
+  const h = ui.h, shown = Object.keys(NAMES).filter((m) => ui.models.has(m));
+  document.querySelectorAll("#c-h button").forEach((b) => b.classList.toggle("on", +b.dataset.h === h));
+  document.querySelectorAll("#c-imp button").forEach((b) => b.classList.toggle("on", b.dataset.k === ui.imp));
+  const years = [...new Set((S.predictions || []).map((r) => r.origin.slice(0, 4)))].sort();
+  const opts = [["all", "All test weeks"], ["no2026", "Without 2026 (Hormuz)"], ...years.map((y) => [y, y])];
+  const sel = $("c-period");
+  if (sel.options.length !== opts.length) sel.innerHTML = opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+  sel.value = ui.period;
+
+  const rows = rowsFor(h, ui.period).sort((a, b) => a.origin < b.origin ? -1 : 1);
+  const st = {}; for (const m of Object.keys(NAMES)) st[m] = stats(rows, m, h);
+  const full = st.ridge_full, ps = st.ridge_price_stocks;
+  $("k-r2").innerHTML = full ? `<span class="r ${r2cls(full.r2)}">${signed(full.r2)}</span>` : "–";
+  $("k-add").innerHTML = full && ps ? `<span class="r ${r2cls(full.r2 - ps.r2)}">${signed(full.r2 - ps.r2)}</span>` : "–";
+  if (full && full.hit != null) {
+    const band = 1.96 * 0.5 / Math.sqrt(full.n / h);
+    $("k-hit").innerHTML = `<span class="r ${full.hit > 0.5 + band ? "good" : full.hit > 0.5 ? "ok" : "bad"}">${pct(full.hit)}</span>`;
+    $("k-hit-sub").textContent = `full model, ${full.n} weeks · luck alone reaches ${pct(0.5 + band)}`;
+  }
+  $("k-cw").innerHTML = full && full.cw != null ? `<span class="r ${pcls(full.cw)}">${fmt(full.cw)}</span>` : "–";
+
+  // Running score.
+  charts.cum.data.labels = rows.map((r) => r.origin);
+  charts.cum.data.datasets = shown.map((m) => {
+    let c = 0;
+    return { label: NAMES[m], borderColor: css(`--m-${m}`), borderWidth: m === "ridge_full" ? 2.5 : 1.5,
+      data: rows.map((r) => (c += r.y * r.y - (r.y - r[m]) ** 2)) };
+  });
+  charts.cum.update();
+
+  // Predictions vs actual, with Brent.
+  const price = new Map(S.prices || []);
+  charts.pred.data.labels = rows.map((r) => r.origin);
+  charts.pred.data.datasets = [
+    { type: "bar", label: "actual", data: rows.map((r) => r.y), backgroundColor: css("--band"), yAxisID: "y", order: 3 },
+    ...shown.map((m) => ({ type: "line", label: NAMES[m], data: rows.map((r) => r[m]), borderColor: css(`--m-${m}`),
+      borderWidth: 1.5, yAxisID: "y", order: 1 })),
+    { type: "line", label: "Brent", data: rows.map((r) => price.get(r.origin) ?? null), borderColor: css("--muted"),
+      borderDash: [4, 3], borderWidth: 1, yAxisID: "p", order: 2 },
+  ];
+  charts.pred.update();
+
+  $("t-scores").innerHTML = rows.length ? `<table><tr><th>model</th><th>weeks</th><th>R² vs no change</th><th>direction right</th><th>Clark-West p</th></tr>` +
+    Object.keys(NAMES).map((m) => { const s = st[m]; return `<tr><td><span class="sw" style="background:var(--m-${m})"></span> ${NAMES[m]}</td><td>${s.n}</td>` +
+      `<td>${m === "no_change" ? "0 (reference)" : `<span class="r ${r2cls(s.r2)}">${signed(s.r2)}</span>`}</td><td>${pct(s.hit)}</td>` +
+      `<td>${s.cw == null ? "–" : `<span class="r ${pcls(s.cw)}">${fmt(s.cw)}</span>`}</td></tr>`; }).join("") +
+    `</table><p class="note">Weeks overlap for 2- and 4-week horizons, so the effective sample is weeks ÷ horizon. Clark-West accounts for that.</p>`
+    : `<div class="empty">waiting for the first retrain</div>`;
+
+  const ys = years.map((y) => [y, rowsFor(h, y)]).filter(([, r]) => r.length);
+  const models = Object.keys(NAMES).filter((m) => m !== "no_change");
+  $("t-year").innerHTML = ys.length ? `<table><tr><th>year</th><th>weeks</th>${models.map((m) => `<th>${NAMES[m]}</th>`).join("")}</tr>` +
+    ys.map(([y, r]) => `<tr><td>${y}</td><td>${r.length}</td>` + models.map((m) => { const s = stats(r, m, h);
+      return `<td><span class="r ${r2cls(s.r2)}">${signed(s.r2, 2)}</span></td>`; }).join("") + `</tr>`).join("") + `</table>`
+    : `<div class="empty">waiting for the first retrain</div>`;
+
+  const imp = ((S.importance || {})[h] || []).slice().sort((a, b) => Math.abs(b[ui.imp]) - Math.abs(a[ui.imp])).slice(0, 25);
+  charts.imp.data.labels = imp.map((r) => r.feature);
+  charts.imp.data.datasets = [{ data: imp.map((r) => r[ui.imp]), backgroundColor: imp.map((r) => css(group(r.feature))) }];
+  charts.imp.update();
+
+  const L = S.latest;
+  $("latest").innerHTML = L ? `<p class="meta" style="margin:0 0 8px">From Friday ${L.origin}, Brent $${fmt(L.brent, 2)}. For checking the model, not a trading signal.</p>` +
+    `<table><tr><th>model</th>${[1, 2, 4].map((k) => `<th>${k} wk → ${L.h[k].target.slice(5)}</th>`).join("")}</tr>` +
+    models.map((m) => `<tr><td>${NAMES[m]}</td>${[1, 2, 4].map((k) => `<td>${pct(L.h[k][m], 2)}</td>`).join("")}</tr>`).join("") + `</table>`
+    : `<div class="empty">after the backtest finishes</div>`;
+}
+
+function render(s) {
+  S = s;
+  const st = s.status || "";
+  $("status").textContent = st;
+  $("status").className = "pill" + (st === "done" ? " done" : st.startsWith("failed") ? " failed" : "");
+  const folds = s.folds || [], nf = s.n_folds || 0, cur = s.current;
+  $("bar").style.width = nf ? (100 * Math.min(1, folds.length / nf)) + "%" : "0";
+  const started = new Date(s.started), updated = new Date(s.updated);
+  const elapsed = ((st === "done" ? updated : new Date()) - started) / 1000;
+  let eta = "";
+  if (folds.length && nf && st !== "done") {
+    const avg = folds.reduce((a, f) => a + f.seconds, 0) / folds.length;
+    eta = ` · ~${Math.max(1, Math.ceil(avg * (nf - folds.length)))}s left`;
+  }
+  $("meta").textContent = `fold ${folds.length} of ${nf || "?"} · ${Math.floor(elapsed / 60)}m ${Math.floor(elapsed % 60)}s elapsed${eta} · updated ${updated.toLocaleTimeString()}`;
+
+  const shownFold = cur || s.last_curve, src = shownFold ? shownFold.curve : null;
+  $("curve-title").textContent = shownFold ? `LightGBM${cur ? "" : ", last fold"}: cutoff ${shownFold.cutoff}, ${shownFold.h}-week, ${shownFold.n_train} weeks known` : "LightGBM";
+  if (src && (src.valid || []).length) {
+    const n = Math.max(...Object.values(src).map((a) => a.length));
+    charts.curve.data.labels = Array.from({ length: n }, (_, i) => i + 1);
+    charts.curve.data.datasets = [
+      { label: "validation year", data: src.valid || [], borderColor: css("--accent"), borderWidth: 2 },
+      { label: "training", data: src.train || [], borderColor: css("--muted"), borderWidth: 1.5, borderDash: [4, 3] },
+    ];
+    charts.curve.update();
+  }
+
+  $("t-folds").innerHTML = folds.length ? `<table><tr><th>cutoff</th><th>weeks ahead</th><th>weeks known</th><th>test weeks</th>` +
+    `<th>ridge α (price / +stocks / full)</th><th>valid R² full</th><th>LightGBM rounds</th><th>time</th></tr>` +
+    folds.slice().reverse().map((f) => `<tr><td>${f.cutoff}</td><td>${f.h}</td><td>${f.n_train}</td><td>${f.n_test}</td>` +
+      `<td>${f.alpha.ridge_price} / ${f.alpha.ridge_price_stocks} / ${f.alpha.ridge_full}</td>` +
+      `<td><span class="r ${r2cls(f.valid_r2.ridge_full)}">${signed(f.valid_r2.ridge_full)}</span></td><td>${f.rounds}</td><td>${f.seconds}s</td></tr>`).join("") + `</table>`
+    : `<div class="empty">no folds finished yet</div>`;
+
+  const cov = (s.data || {}).coverage || [];
+  $("t-cov").innerHTML = cov.length ? `<table><tr><th>series</th><th>from</th><th>to</th><th>rows</th></tr>` +
+    cov.map((c) => `<tr><td>${esc(c.series)}</td><td>${c.first}</td><td>${c.last}</td><td>${Number(c.rows).toLocaleString()}</td></tr>`).join("") + `</table>`
+    : `<div class="empty">loading data…</div>`;
+
+  const log = $("log"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 20;
+  log.textContent = (s.log || []).join("\n");
+  if (atBottom) log.scrollTop = log.scrollHeight;
+  draw();
+}
+
+async function locate() {
+  const here = await fetch("progress.json", { cache: "no-store", method: "HEAD" }).catch(() => null);
+  if (here && here.ok) return "";
+  const r = await fetch("latest.txt", { cache: "no-store" });
+  return (await r.text()).trim() + "/";
+}
+
+async function tick() {
+  try {
+    if (!tick.located) { base = await locate(); tick.located = true; }
+    const r = await fetch(base + "progress.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const s = await r.json();
+    render(s);
+    if (s.status === "done" || String(s.status).startsWith("failed")) return;
+  } catch (e) {
+    $("status").textContent = "waiting for progress.json…";
+  }
+  setTimeout(tick, 2000);
+}
+
+setup();
+tick();
+</script>
+</body>
+</html>
