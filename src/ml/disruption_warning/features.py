@@ -292,7 +292,9 @@ def build_features(
     )
 
 
-EVENT_COLUMNS = "event_id, event_type, alert_level, from_date, latitude, longitude, affected_ports"
+EVENT_COLUMNS = (
+    "event_id, event_name, event_type, alert_level, from_date, latitude, longitude, affected_ports"
+)
 CHOKEPOINT_COLUMNS = "chokepoint_id, transit_date, latitude, longitude, n_total"
 
 

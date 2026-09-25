@@ -98,4 +98,6 @@ published.
 
 `labels.py` (the disruption label), `baselines.py` and `backtest.py` (simple rules),
 `features.py`, `train.py` (backtest, live page at `localhost:8765/disruption/`),
-`predict.py` (weekly run), `dashboard.py`. Tests in `tests/ml/test_disruption_*.py`.
+`predict.py` (weekly run), `dashboard.py` (the page: click a port on the map, or search, for
+its calls, history, drivers and nearby storm alerts; scroll or pinch to zoom), `land_path.py`
+(the map's coastlines). Tests in `tests/ml/test_disruption_*.py`.

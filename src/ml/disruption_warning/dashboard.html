@@ -5,12 +5,12 @@
 <meta name="description" content="Weekly early warning of sudden drops in port calls at ~660 ports worldwide, from IMF PortWatch data.">
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--ink:#1c2430;--muted:#5d6b7c;--line:#e3e7ec;--head:#0f2a47;
---accent:#1f6feb;--hi:#c81e1e;--watch:#d97706;--hi-bg:#fff1e8;--ok:#15803d;--ok-bg:#e8f6ed;--grid:#e9edf1;--dot:#9aa7b5}
+--accent:#1f6feb;--hi:#c81e1e;--watch:#d97706;--hi-bg:#fff1e8;--ok:#15803d;--ok-bg:#e8f6ed;--grid:#e9edf1;--dot:#9aa7b5;--sea:#eef3f8;--land:#dde3ea;--coast:#c3ccd6;--c1:#1f6feb;--c2:#b45309;--c3:#15803d;--c4:#7c3aed;--c5:#be185d}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1319;--card:#161d26;--ink:#e6ebf1;
 --muted:#9aa7b5;--line:#26303c;--head:#0a1f36;--accent:#58a6ff;--hi:#f87171;--watch:#fbbf24;--hi-bg:#3a2415;--ok:#4ade80;
---ok-bg:#15301f;--grid:#1f2832;--dot:#566474}}
+--ok-bg:#15301f;--grid:#1f2832;--dot:#566474;--sea:#111a24;--land:#1f2a36;--coast:#2c3a49;--c1:#58a6ff;--c2:#fbbf24;--c3:#4ade80;--c4:#c4b5fd;--c5:#f472b6}}
 :root[data-theme="dark"]{--bg:#0e1319;--card:#161d26;--ink:#e6ebf1;--muted:#9aa7b5;--line:#26303c;
---head:#0a1f36;--accent:#58a6ff;--hi:#f87171;--watch:#fbbf24;--hi-bg:#3a2415;--ok:#4ade80;--ok-bg:#15301f;--grid:#1f2832;--dot:#566474}
+--head:#0a1f36;--accent:#58a6ff;--hi:#f87171;--watch:#fbbf24;--hi-bg:#3a2415;--ok:#4ade80;--ok-bg:#15301f;--grid:#1f2832;--dot:#566474;--sea:#111a24;--land:#1f2a36;--coast:#2c3a49;--c1:#58a6ff;--c2:#fbbf24;--c3:#4ade80;--c4:#c4b5fd;--c5:#f472b6}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
 header{background:var(--head);color:#fff;padding:22px 16px}
@@ -49,6 +49,45 @@ background:var(--bg);color:var(--ink);width:100%;max-width:280px;margin-bottom:1
 ul.do{padding-left:18px}ul.do li{margin:4px 0}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:.8rem;
 padding:5px 8px;border-radius:6px;display:none;max-width:260px;z-index:5}
+.maptools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.maptools input[type=search]{margin:0}
+.zoom{display:flex;gap:4px}
+.zoom button,.linkbtn,.close{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--bg);
+color:var(--ink);border-radius:8px;padding:4px 10px;cursor:pointer;min-width:34px}
+.zoom button:hover,.close:hover{border-color:var(--accent)}
+.mapbox{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sea)}
+#map{touch-action:none;cursor:grab;user-select:none}
+#map.drag{cursor:grabbing}
+#map .land{fill:var(--land);stroke:var(--coast);stroke-width:.6;vector-effect:non-scaling-stroke}
+#map .grid line{stroke:var(--grid);stroke-width:1;vector-effect:non-scaling-stroke}
+#map circle{cursor:pointer}
+#map .sel{fill:none;stroke:var(--accent);stroke-width:2.5;vector-effect:non-scaling-stroke;pointer-events:none}
+#map text.lbl{fill:var(--ink);paint-order:stroke;stroke:var(--card);stroke-width:3px;
+stroke-linejoin:round;pointer-events:none;vector-effect:non-scaling-stroke}
+.maphint{position:absolute;right:8px;bottom:6px;font-size:.72rem;color:var(--muted);pointer-events:none}
+.portlink{background:none;border:0;padding:0;font:inherit;font-weight:650;color:var(--ink);cursor:pointer;
+text-align:left;text-decoration:underline dotted var(--muted);text-underline-offset:3px}
+.portlink:hover{color:var(--accent)}
+.detail{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:16px;background:var(--bg)}
+.detail h3{font-size:1.15rem}
+.dhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:10px}
+.dgrid h4{font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px}
+.hz{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.hz div{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.hz div.on{border-color:var(--accent)}
+.hz b{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.hz span{font-size:.75rem;color:var(--muted)}
+.kv{display:grid;grid-template-columns:minmax(100px,42%) 1fr;gap:2px 12px;font-size:.86rem}
+.kv dt{color:var(--muted)}.kv dd{font-variant-numeric:tabular-nums}
+.bar{display:grid;grid-template-columns:150px 1fr;gap:8px;align-items:center;font-size:.8rem;margin:3px 0}
+.bar .tr{position:relative;height:12px;background:var(--card);border:1px solid var(--line);border-radius:3px}
+.bar .tr i{position:absolute;top:0;bottom:0}
+.bar .tr .mid{left:50%;width:1px;background:var(--muted)}
+.mix{display:flex;height:14px;border-radius:4px;overflow:hidden;border:1px solid var(--line);margin:4px 0}
+.mixkey{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.76rem;color:var(--muted)}
+.mixkey i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+ul.plain{list-style:none;font-size:.86rem}ul.plain li{padding:3px 0;border-bottom:1px solid var(--line)}
 footer{color:var(--muted);font-size:.8rem;max-width:1100px;margin:0 auto;padding:0 16px 30px}
 a{color:var(--accent)}
 </style></head><body>
@@ -74,13 +113,21 @@ a{color:var(--accent)}
 </ul>
 </section>
 
-<section class="card">
+<section class="card" id="mapCard">
 <h2>Map</h2>
 <p class="note" id="mapNote"></p>
+<div class="maptools">
+<input type="search" id="find" list="portList" placeholder="Find a port or country" aria-label="Find a port">
+<datalist id="portList"></datalist>
+<div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zreset">Reset</button></div>
+</div>
 <div class="legend"><span><i style="background:var(--hi)"></i>alert</span>
 <span><i style="background:var(--watch)"></i>watch: 5%+ chance</span>
 <span><i style="background:var(--dot)"></i>other</span><span>Size: usual calls a week</span></div>
-<svg id="map" viewBox="0 0 1000 440" role="img" aria-label="World map of ports coloured by chance of a disruption"></svg>
+<div class="mapbox"><svg id="map" viewBox="0 0 1000 440" role="img" aria-label="World map of ports coloured by chance of a disruption. Scroll or pinch to zoom, drag to move, click a port for details.">
+<path class="land" d="__LAND__"/><g class="grid" id="grid"></g><g id="dots" fill-opacity=".85"></g><g id="labels"></g><circle class="sel" id="selRing" r="0"/></svg>
+<span class="maphint" id="maphint">Scroll or pinch to zoom · drag to move · click a port</span></div>
+<div id="detail" class="detail" hidden></div>
 </section>
 
 <section class="card">
@@ -151,30 +198,180 @@ function alerts(){
  show.map(r=>{const p=P[r.port_id]||{};
   const last=p.last_drop_pct==null?'-':(p.last_drop_pct>0?'−':'+')+Math.abs(100*p.last_drop_pct).toFixed(0)+'%';
   const alts=(r.alternatives||[]).map(a=>`${esc(a.name)} <span class="sub">${a.km.toFixed(0)} km</span>`).join('<br>')||'<span class="sub">none within '+D.alt_km+' km</span>';
-  return `<tr><td>${r.flagged?'<span class="pill yes">alert</span> ':''}<b>${esc(p.port_name)}</b><br><span class="sub">${esc(p.country)}${p.industry_top1?' · '+esc(p.industry_top1):''}</span></td>
+  return `<tr><td>${r.flagged?'<span class="pill yes">alert</span> ':''}<button class="portlink" data-port="${esc(r.port_id)}">${esc(p.port_name)}</button><br><span class="sub">${esc(p.country)}${p.industry_top1?' · '+esc(p.industry_top1):''}</span></td>
   <td class="n ${r.flagged?'hi':''}">${pct(r.chance,1)}</td><td class="n">${r.lift==null?'-':r.lift.toFixed(1)+'x'}</td>
   <td class="n">${p.normal_calls==null?'-':p.normal_calls.toFixed(0)}</td><td class="n">${last}</td>
   <td>${(r.reasons||[]).map(x=>`<span class="pill">${esc(x)}</span>`).join('')}</td><td>${r.flagged?alts:''}</td></tr>`}).join('')+'</tbody>';
 }
 
 const tip=$('tip');
+// --- map: equirectangular, 75N to 60S; must match land_path.py -------------
+const MW=1000,MH=440,MN=75,MS=-60,KMAX=24;
+const xy=(la,lo)=>[(lo+180)/360*MW,(MN-la)/(MN-MS)*MH];
+const svg=$('map');
+let vb={x:0,y:0,w:MW,h:MH},SEL=null;
+const zoomK=()=>MW/vb.w;
+const baseR=p=>Math.min(2+Math.sqrt(p.normal_calls||0)*0.35,9);
+const colour=r=>r.flagged?'var(--hi)':(r.chance>=WATCH?'var(--watch)':'var(--dot)');
+const chanceOf=(id,h=H)=>D.chances[h].find(r=>r.port_id===id);
 function map(){
- const w=1000,h=440,N=75,Sx=-60,xy=(la,lo)=>[(lo+180)/360*w,(N-la)/(N-Sx)*h];
- let g='';for(let lo=-150;lo<=180;lo+=30){const[x]=xy(0,lo);g+=`<line x1="${x}" y1="0" x2="${x}" y2="${h}"/>`}
- for(const la of[60,30,0,-30]){const[,y]=xy(la,0);g+=`<line x1="0" y1="${y}" x2="${w}" y2="${y}"/>`}
+ let g='';for(let lo=-150;lo<=180;lo+=30){const[x]=xy(0,lo);g+=`<line x1="${x}" y1="-50" x2="${x}" y2="${MH+50}"/>`}
+ for(const la of[60,30,0,-30]){const[,y]=xy(la,0);g+=`<line x1="-50" y1="${y}" x2="${MW+50}" y2="${y}"/>`}
+ $('grid').innerHTML=g;
  const rows=D.chances[H].slice().sort((a,b)=>(a.flagged-b.flagged)||(a.chance-b.chance));
  let dots='';
- for(const r of rows){const p=P[r.port_id];if(!p||p.latitude==null||p.latitude>N||p.latitude<Sx)continue;
-  const[x,y]=xy(p.latitude,p.longitude),rad=Math.min(2+Math.sqrt(p.normal_calls||0)*0.35,9);
-  const col=r.flagged?'var(--hi)':(r.chance>=WATCH?'var(--watch)':'var(--dot)');
-  dots+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${col}" data-id="${r.port_id}" data-c="${r.chance}"/>`}
- $('map').innerHTML=`<g stroke="var(--grid)">${g}</g><g fill-opacity=".8" stroke="var(--card)" stroke-width=".5">${dots}</g>`;
- $('mapNote').textContent=`${D.horizons[H].name}: every port's chance of a disruption. Hover or tap a dot.`;
+ for(const r of rows){const p=P[r.port_id];if(!p||p.latitude==null)continue;
+  const[x,y]=xy(p.latitude,p.longitude);
+  dots+=`<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${baseR(p)}" data-r="${baseR(p)}" fill="${colour(r)}" data-id="${esc(r.port_id)}" stroke="var(--card)"/>`}
+ $('dots').innerHTML=dots;
+ $('mapNote').textContent=`${D.horizons[H].name}: every port's chance of a disruption. Click a port for its calls, history and what drives its chance.`;
+ view();
 }
-$('map').addEventListener('pointermove',e=>{const c=e.target.closest('circle');if(!c){tip.style.display='none';return}
- const p=P[c.dataset.id];tip.innerHTML=`<b>${esc(p.port_name)}</b>, ${esc(p.country)}<br>${pct(+c.dataset.c,1)} chance · ${(p.normal_calls||0).toFixed(0)} calls/wk`;
+// Dots and labels keep their on-screen size while the map zooms.
+function view(){
+ const k=zoomK();
+ svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+ const s=1/Math.pow(k,.75);
+ for(const c of $('dots').children){c.setAttribute('r',(c.dataset.r*s).toFixed(3));c.setAttribute('stroke-width',(.5/k).toFixed(3))}
+ let lbl='';
+ if(k>=2){const fs=11/k,placed=[];
+  const rank=r=>(r.port_id===SEL?9:0)+(r.flagged?4:0)+r.chance;
+  const rows=D.chances[H].filter(r=>r.port_id===SEL||r.flagged||(k>=3.5&&r.chance>=WATCH)||k>=6).sort((a,b)=>rank(b)-rank(a));
+  for(const r of rows){const p=P[r.port_id];if(!p||p.latitude==null)continue;
+   const[x,y]=xy(p.latitude,p.longitude);
+   if(x<vb.x||x>vb.x+vb.w||y<vb.y||y>vb.y+vb.h)continue;
+   const bx=x+baseR(p)*s+2/k,bw=p.port_name.length*fs*.55,box=[bx,y-fs*.6,bx+bw,y+fs*.5];
+   if(placed.some(q=>box[0]<q[2]&&q[0]<box[2]&&box[1]<q[3]&&q[1]<box[3]))continue;
+   placed.push(box);
+   lbl+=`<text class="lbl" x="${bx.toFixed(2)}" y="${(y+fs/3).toFixed(2)}" font-size="${fs.toFixed(3)}">${esc(p.port_name)}</text>`}}
+ $('labels').innerHTML=lbl;
+ const ring=$('selRing'),p=SEL&&P[SEL];
+ if(p&&p.latitude!=null){const[x,y]=xy(p.latitude,p.longitude);ring.setAttribute('cx',x);ring.setAttribute('cy',y);ring.setAttribute('r',baseR(p)*s+3/k)}else ring.setAttribute('r',0);
+ $('maphint').style.display=k>1.01||SEL?'none':'';
+}
+function clampView(){
+ vb.w=Math.min(MW,Math.max(MW/KMAX,vb.w));vb.h=vb.w*MH/MW;
+ vb.x=Math.min(MW-vb.w,Math.max(0,vb.x));vb.y=Math.min(MH-vb.h,Math.max(0,vb.y));
+}
+function zoomAt(f,cx,cy){ // f>1 zooms in, around map point (cx,cy)
+ const w=Math.min(MW,Math.max(MW/KMAX,vb.w/f)),r=w/vb.w;
+ vb={x:cx-(cx-vb.x)*r,y:cy-(cy-vb.y)*r,w,h:w*MH/MW};clampView();view();
+}
+function toMap(e){const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse())}
+function centreOn(la,lo,k){const[x,y]=xy(la,lo);const w=MW/k;vb={x:x-w/2,y:y-w*MH/MW/2,w,h:w*MH/MW};clampView();view()}
+svg.addEventListener('wheel',e=>{e.preventDefault();const p=toMap(e);zoomAt(Math.exp(-e.deltaY*(e.deltaMode?0.05:0.0022)),p.x,p.y)},{passive:false});
+svg.addEventListener('dblclick',e=>{const p=toMap(e);zoomAt(e.shiftKey?0.5:2,p.x,p.y)});
+$('zin').onclick=()=>zoomAt(1.8,vb.x+vb.w/2,vb.y+vb.h/2);
+$('zout').onclick=()=>zoomAt(1/1.8,vb.x+vb.w/2,vb.y+vb.h/2);
+$('zreset').onclick=()=>{vb={x:0,y:0,w:MW,h:MH};view()};
+// Drag to pan, two fingers to pinch; a press that barely moves is a click.
+const ptrs=new Map();let moved=0,pinch=null;
+svg.addEventListener('pointerdown',e=>{svg.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;
+ if(ptrs.size===2){const[a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y)}}});
+svg.addEventListener('pointermove',e=>{
+ if(ptrs.has(e.pointerId)){const last=ptrs.get(e.pointerId),dx=e.clientX-last.x,dy=e.clientY-last.y;
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved+=Math.abs(dx)+Math.abs(dy);
+  if(ptrs.size===1&&moved>4){svg.classList.add('drag');const sc=vb.w/svg.getBoundingClientRect().width;vb.x-=dx*sc;vb.y-=dy*sc;clampView();view()}
+  else if(ptrs.size===2&&pinch){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);
+   const m=toMap({clientX:(a.x+b.x)/2,clientY:(a.y+b.y)/2});zoomAt(d/pinch.d,m.x,m.y);pinch.d=d}
+  tip.style.display='none';return}
+ const c=e.target.closest('circle[data-id]');if(!c){tip.style.display='none';return}
+ const p=P[c.dataset.id],r=chanceOf(c.dataset.id);
+ tip.innerHTML=`<b>${esc(p.port_name)}</b>, ${esc(p.country)}<br>${pct(r.chance,1)} chance · ${(p.normal_calls||0).toFixed(0)} calls/wk<br><span style="opacity:.75">click for details</span>`;
  tip.style.display='block';tip.style.left=Math.min(e.clientX+12,innerWidth-270)+'px';tip.style.top=(e.clientY+12)+'px'});
-$('map').addEventListener('pointerleave',()=>tip.style.display='none');
+function release(e){if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;
+ if(!ptrs.size){svg.classList.remove('drag');
+  if(moved<=4&&e.type==='pointerup'){const el=document.elementFromPoint(e.clientX,e.clientY),c=el&&el.closest('circle[data-id]');if(c)select(c.dataset.id,false)}}}
+svg.addEventListener('pointerup',release);svg.addEventListener('pointercancel',release);
+svg.addEventListener('pointerleave',()=>tip.style.display='none');
+
+// --- find a port -------------------------------------------------------------
+const label=p=>`${p.port_name}, ${p.country}`;
+const byLabel=Object.fromEntries(D.ports.map(p=>[label(p).toLowerCase(),p.port_id]));
+$('portList').innerHTML=D.ports.slice().sort((a,b)=>label(a).localeCompare(label(b))).map(p=>`<option value="${esc(label(p))}">`).join('');
+$('find').addEventListener('change',e=>{const v=e.target.value.trim().toLowerCase();if(!v)return;
+ let id=byLabel[v];
+ if(!id){const same=D.ports.filter(p=>p.port_name.toLowerCase()===v);if(same.length===1)id=same[0].port_id}
+ if(!id){const hit=D.ports.filter(p=>label(p).toLowerCase().includes(v));
+  if(hit.length===1)id=hit[0].port_id;
+  else if(hit.length){const la=hit.map(p=>p.latitude).filter(x=>x!=null),lo=hit.map(p=>p.longitude).filter(x=>x!=null);
+   const[x0,y0]=xy(Math.max(...la),Math.min(...lo)),[x1,y1]=xy(Math.min(...la),Math.max(...lo));
+   const w=Math.max((x1-x0)*1.3,(y1-y0)*1.3*MW/MH,MW/KMAX*2);vb={x:(x0+x1)/2-w/2,y:(y0+y1)/2-w*MH/MW/2,w,h:w*MH/MW};clampView();view();return}}
+ if(id)select(id,true)});
+document.addEventListener('click',e=>{const b=e.target.closest('.portlink');if(b){select(b.dataset.port,true);$('mapCard').scrollIntoView({behavior:'smooth',block:'start'})}});
+
+// --- drill-down --------------------------------------------------------------
+const TYPES={TC:'tropical cyclone',EQ:'earthquake',FL:'flood',VO:'volcano',WF:'wildfire',TS:'tsunami',DR:'drought'};
+const MIX=[['vessel_count_container','container','--c1'],['vessel_count_dry_bulk','dry bulk','--c2'],['vessel_count_tanker','tanker','--c3'],['vessel_count_general_cargo','general cargo','--c4'],['vessel_count_roro','ro-ro','--c5']];
+function select(id,zoom){
+ const p=P[id];if(!p)return;SEL=id;
+ try{history.replaceState(null,'','#port='+encodeURIComponent(id))}catch(_){}
+ if(zoom&&p.latitude!=null)centreOn(p.latitude,p.longitude,Math.max(zoomK(),6));else view();
+ detail();
+}
+function callsChart(d){
+ const W=D.detail.weeks;if(!d||!d.calls||!W.length)return'<p class="sub">No weekly calls on record.</p>';
+ const n=W.length,extra=3,w=640,h=170,l=34,r=8,t=10,b=22,cw=(w-l-r)/(n+extra);
+ const vals=[...d.calls,...d.usual].filter(v=>v!=null),max=Math.max(...vals,1)*1.1;
+ const X=i=>l+cw*(i+.5),Y=v=>t+(h-t-b)*(1-v/max);
+ const line=a=>{let s='',pen=false;a.forEach((v,i)=>{if(v==null){pen=false;return}s+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);pen=true});return s};
+ let g=`<line x1="${l}" x2="${w-r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/><text x="${l-4}" y="${t+8}" font-size="10" text-anchor="end" fill="var(--muted)">${Math.round(max/1.1)}</text><text x="${l-4}" y="${Y(0)}" font-size="10" text-anchor="end" fill="var(--muted)">0</text>`;
+ // The three weeks being scored, shaded, with the chance on top.
+ ['1','2','3'].forEach(hz=>{const c=chanceOf(SEL,hz),i=n-1+Number(hz),x=X(i)-cw/2;
+  g+=`<rect x="${x}" y="${t}" width="${cw}" height="${h-t-b}" fill="${c&&c.flagged?'var(--hi-bg)':'var(--card)'}" stroke="var(--line)"><title>${D.horizons[hz].name} (${wk(D.horizons[hz].week)}): ${c?pct(c.chance,1):'-'} chance of a disruption</title></rect>`;
+});
+ g+=`<path d="${line(d.usual)}" fill="none" stroke="var(--muted)" stroke-dasharray="4 3" stroke-width="1.2"/>`;
+ g+=`<path d="${line(d.calls)}" fill="none" stroke="var(--accent)" stroke-width="1.8"/>`;
+ d.calls.forEach((v,i)=>{const m=d.marks[i];if(v==null)return;
+  if(m==='D'||m==='S')g+=`<circle cx="${X(i)}" cy="${Y(v)}" r="3.5" fill="${m==='D'?'var(--hi)':'var(--watch)'}"/>`;
+  g+=`<rect x="${X(i)-cw/2}" y="${t}" width="${cw}" height="${h-t-b}" fill="transparent"><title>${wk(W[i])}: ${v} calls, usual ${d.usual[i]??'-'}${m==='D'?' · disruption':m==='S'?' · seasonal drop (same as last year)':''}</title></rect>`});
+ W.forEach((s,i)=>{if(s.slice(8,10)<='07'&&(i===0||s.slice(5,7)!==W[i-1].slice(5,7))&&['01','04','07','10'].includes(s.slice(5,7)))
+  g+=`<text x="${X(i)}" y="${h-6}" font-size="10" text-anchor="middle" fill="var(--muted)">${new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{month:'short',year:'2-digit',timeZone:'UTC'})}</text>`});
+ return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Ship calls per week at this port over the last year">${g}</svg>
+ <div class="legend"><span><i style="background:var(--accent)"></i>calls a week</span><span><i style="background:var(--muted)"></i>usual (dashed)</span><span><i style="background:var(--hi)"></i>disruption</span><span><i style="background:var(--watch)"></i>seasonal drop</span><span>Shaded: last, this and next week (red = alert)</span></div>`;
+}
+function drivers(){
+ const r=chanceOf(SEL);if(!r||!r.drivers)return'';
+ const G=D.driver_groups.map((g,i)=>[g,r.drivers[i]]).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+ const m=Math.max(...G.map(x=>Math.abs(x[1])),0.5);
+ return `<h4>What moved the chance (${esc(D.horizons[H].name.toLowerCase())})</h4><p class="sub" style="margin-bottom:6px">Compared with an average port-week. Red raises the chance, green lowers it.</p>`+
+ G.map(([g,v])=>{const wd=45*Math.abs(v)/m;return `<div class="bar"><span>${esc(g)}</span><div class="tr" title="${v>0?'+':''}${v.toFixed(2)} (log-odds)"><i class="mid"></i><i style="${v>=0?'left:50%':'right:50%'};width:${wd}%;background:${v>=0?'var(--hi)':'var(--ok)'}"></i></div></div>`}).join('');
+}
+const share=x=>x==null?'-':(x<1?x.toFixed(1):x.toFixed(0))+'%'; // PortWatch gives percents
+function detail(){
+ const el=$('detail'),p=P[SEL];if(!p){el.hidden=true;return}
+ const d=D.detail.ports[SEL]||{};
+ const hz=['1','2','3'].map(h=>{const c=chanceOf(SEL,h);return `<div class="${h===H?'on':''}"><span>${esc(D.horizons[h].name)}</span><b class="${c&&c.flagged?'hi':''}">${c?pct(c.chance,1):'-'}</b><span>${c&&c.lift!=null?c.lift.toFixed(1)+'x its normal':''}${c&&c.flagged?' · <span class="hi">alert</span>':''}</span></div>`}).join('');
+ const r=chanceOf(SEL);
+ const alts=(r&&r.alternatives||[]).map(a=>`${esc(a.name)} <span class="sub">${a.km.toFixed(0)} km</span>`).join(', ');
+ const last=p.last_drop_pct==null?'-':(p.last_drop_pct>0?'−':'+')+Math.abs(100*p.last_drop_pct).toFixed(0)+'%';
+ const inds=[p.industry_top1,p.industry_top2,p.industry_top3].filter(Boolean).map(esc).join(', ');
+ const tot=MIX.reduce((s,[k])=>s+(p[k]||0),0);
+ const mix=tot?`<div class="mix">${MIX.map(([k,,c])=>p[k]?`<i style="width:${100*p[k]/tot}%;background:var(${c})" title="${p[k]} ${k.slice(13)}"></i>`:'').join('')}</div><div class="mixkey">${MIX.filter(([k])=>p[k]).map(([k,n,c])=>`<span><i style="background:var(${c})"></i>${n} ${pct(p[k]/tot)}</span>`).join('')}</div>`:'<p class="sub">No ship-type profile.</p>';
+ const rec=d.record;
+ const past=(d.past||[]).map(([w,x])=>`<li>${wk(w)} <span class="sub">calls ${pct(x)} below usual</span></li>`).join('');
+ const ev=(d.events||[]).map(e=>`<li><span class="pill ${e.level==='RED'?'yes':''}">${esc((e.level||'').toLowerCase())}</span> ${esc(e.name||TYPES[e.type]||e.type)} <span class="sub">${esc(TYPES[e.type]||e.type)} · from ${fmtDate(e.from_date)} · ${e.km==null?'lists this port':e.km.toFixed(0)+' km away'}</span></li>`).join('');
+ el.innerHTML=`<div class="dhead"><div><h3>${esc(p.port_name)}</h3><span class="sub">${esc(p.country)} · ${esc(p.continent||'')}${p.locode?' · '+esc(p.locode):''}</span></div>
+ <div class="zoom"><button class="close" id="dzoom">Zoom to port</button><button class="close" id="dclose" aria-label="Close details">✕</button></div></div>
+ <div class="hz">${hz}</div>
+ ${r&&r.reasons&&r.reasons.length?`<p style="margin-top:8px;font-size:.86rem">Why: ${r.reasons.map(x=>`<span class="pill">${esc(x)}</span>`).join('')}</p>`:''}
+ ${alts?`<p class="sub" style="margin-top:4px">Nearby ports not flagged: ${alts}</p>`:''}
+ <div style="margin-top:12px"><h4 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:4px">Ship calls, last ${D.detail.weeks.length} weeks</h4>${callsChart(d)}</div>
+ <div class="dgrid">
+ <div>${drivers()}</div>
+ <div><h4>Port</h4><dl class="kv"><dt>Usual calls/week</dt><dd>${p.normal_calls==null?'-':p.normal_calls.toFixed(0)}</dd>
+ <dt>Latest week</dt><dd>${p.last_calls??'-'} calls (${last} vs usual)</dd>
+ ${p.share_country_maritime_import!=null?`<dt>Share of ${esc(p.country)}'s sea trade</dt><dd>${share(p.share_country_maritime_import)} of imports, ${share(p.share_country_maritime_export)} of exports</dd>`:''}
+ ${inds?`<dt>Main cargo</dt><dd>${inds}</dd>`:''}</dl>
+ <h4 style="margin-top:10px">Ship types calling</h4>${mix}</div>
+ <div><h4>Track record here</h4>${rec?`<p style="font-size:.86rem">Since ${fmtDate(D.detail.record_first)}: ${rec[0]} alerts, ${rec[1]} followed by a disruption. ${rec[2]} disruption week${rec[2]===1?'':'s'}, ${rec[3]} caught by an alert.</p>`:'<p class="sub">No past warnings for this port.</p>'}
+ <h4 style="margin-top:10px">Past disruptions${d.past_n?` (${d.past_n} in all PortWatch data)`:""}</h4>${past?`<ul class="plain">${past}</ul>`:'<p class="sub">None in the data.</p>'}</div>
+ <div><h4>Storm and disaster alerts nearby</h4><p class="sub" style="margin-bottom:4px">GDACS events from the ${D.event_days} days before release, within 800 km or naming the port.</p>${ev?`<ul class="plain">${ev}</ul>`:'<p class="sub">None.</p>'}</div>
+ </div>`;
+ el.hidden=false;
+ $('dclose').onclick=()=>{SEL=null;el.hidden=true;try{history.replaceState(null,'',location.pathname+location.search)}catch(_){}view()};
+ $('dzoom').onclick=()=>{if(p.latitude!=null)centreOn(p.latitude,p.longitude,8)};
+}
 
 function regions(){
  const rows=D.regions.filter(r=>String(r.horizon)===H);
@@ -184,8 +381,8 @@ function regions(){
 
 function record(){
  const R=D.record;
- if(!S){$('catch').textContent=`: the alert lists caught ${pct(S.caught/S.disruptions)} of them`;
- $('recordNote').textContent='No past warnings with known outcomes yet.';return}
+ if(!S){$('recordNote').textContent='No past warnings with known outcomes yet.';return}
+ $('catch').textContent=`: the alert lists caught ${pct(S.caught/S.disruptions)} of them`;
  $('recordNote').textContent=`Target weeks ${fmtDate(S.first)} to ${fmtDate(S.last)}: ${S.alerts.toLocaleString()} alerts, ${S.hits.toLocaleString()} followed by a disruption (${pct(S.precision,1)}; a random port-week: ${pct(S.base_rate,1)}). ${S.caught.toLocaleString()} of ${S.disruptions.toLocaleString()} disruptions were on an alert list.`;
  const W=R.weeks,w=1000,h=220,pad=24,bw=(w-pad)/Math.max(W.length,1),max=Math.max(...W.map(r=>r.disruptions),1);
  let bars='';W.forEach((r,i)=>{const x=pad+i*bw,ha=(h-30)*r.disruptions/max,hh=(h-30)*r.caught/max;
@@ -194,11 +391,12 @@ function record(){
   if(r.target_week.slice(5,10)<='01-07'&&r.target_week.slice(5,7)==='01')bars+=`<text x="${x}" y="${h-4}" font-size="11" fill="var(--muted)">${r.target_week.slice(0,4)}</text>`});
  $('recordChart').innerHTML=`<text x="0" y="12" font-size="11" fill="var(--muted)">${max}</text>${bars}`;
  $('recent').innerHTML='<thead><tr><th>Week</th><th>Port</th><th class="n">Said</th><th>Result</th></tr></thead><tbody>'+
- R.recent.slice(0,15).map(r=>`<tr><td class="sub">${fmtDate(r.target_week)}</td><td>${esc(r.port_name)}<br><span class="sub">${esc(r.country)}</span></td><td class="n">${pct(r.chance,0)}</td><td>${r.happened?`<span class="pill yes">dropped ${pct(r.drop_pct)}</span>`:'<span class="pill no">normal</span>'}</td></tr>`).join('')+'</tbody>';
+ R.recent.slice(0,15).map(r=>`<tr><td class="sub">${fmtDate(r.target_week)}</td><td>${P[r.port_id]?`<button class="portlink" data-port="${esc(r.port_id)}">${esc(r.port_name)}</button>`:esc(r.port_name)}<br><span class="sub">${esc(r.country)}</span></td><td class="n">${pct(r.chance,0)}</td><td>${r.happened?`<span class="pill yes">dropped ${pct(r.drop_pct)}</span>`:'<span class="pill no">normal</span>'}</td></tr>`).join('')+'</tbody>';
  $('calib').innerHTML='<thead><tr><th>Model said</th><th class="n">Port-weeks</th><th class="n">Happened</th></tr></thead><tbody>'+
  R.calibration.map(r=>`<tr><td>${esc(r.bin)}</td><td class="n">${r.n.toLocaleString()}</td><td class="n">${pct(r.happened,1)}</td></tr>`).join('')+'</tbody>';
 }
 
-function draw(){for(const b of tabs.children)b.setAttribute('aria-selected',b.dataset.h===H);alerts();map();regions();}
+function draw(){for(const b of tabs.children)b.setAttribute('aria-selected',b.dataset.h===H);alerts();map();regions();if(SEL)detail();}
 draw();record();
+{const m=/port=([^&]+)/.exec(location.hash);if(m)select(decodeURIComponent(m[1]),true);}
 </script></body></html>

@@ -11,10 +11,13 @@ import pytest
 from src.ml.disruption_warning import dashboard
 from src.ml.disruption_warning.features import FEATURES
 from src.ml.disruption_warning.predict import (
+    DRIVER_GROUPS,
     REASONS,
+    Forecast,
     flag_top,
     forecast,
     merge_history,
+    nearby_events,
     reasons,
     to_history,
     track_record,
@@ -109,3 +112,60 @@ def test_forecast_scores_the_newest_week_and_renders(tmp_path) -> None:  # noqa:
     data = json.loads(blob.group(1))
     assert data["origin"] == _week(199).isoformat() and len(data["ports"]) == len(ports)
     assert data["record"]["summary"] is None
+    # Drill-down: every group's push, a year of calls per port, the coastline.
+    assert all(len(r["drivers"]) == len(DRIVER_GROUPS) for r in data["chances"]["2"])
+    detail = data["detail"]
+    assert set(detail["ports"]) == set(ports)
+    one = detail["ports"]["p0"]
+    assert len(one["calls"]) == len(one["usual"]) == len(one["marks"]) == len(detail["weeks"])
+    assert "__LAND__" not in page and 'class="land" d="M' in page
+
+
+def test_nearby_events_keeps_recent_close_or_listed_events() -> None:
+    raw = pl.DataFrame([
+        # near p0, recent; listed twice (PortWatch + GeoPulse), once as RED
+        {"event_id": "a", "event_name": "Storm A", "event_type": "TC", "alert_level": "Orange",
+         "from_date": datetime(2026, 3, 1), "latitude": 0.0, "longitude": 1.0,
+         "affected_ports": None},
+        {"event_id": "a", "event_name": None, "event_type": "TC", "alert_level": "Red",
+         "from_date": datetime(2026, 3, 2), "latitude": None, "longitude": None,
+         "affected_ports": None},
+        # far away but names p1
+        {"event_id": "b", "event_name": "Quake B", "event_type": "EQ", "alert_level": "Orange",
+         "from_date": datetime(2026, 3, 5), "latitude": 50.0, "longitude": 50.0,
+         "affected_ports": "p9; p1"},
+        # too old, and a drought
+        {"event_id": "c", "event_name": "Old", "event_type": "TC", "alert_level": "Red",
+         "from_date": datetime(2025, 1, 1), "latitude": 0.0, "longitude": 0.0,
+         "affected_ports": None},
+        {"event_id": "d", "event_name": "Dry", "event_type": "DR", "alert_level": "Red",
+         "from_date": datetime(2026, 3, 5), "latitude": 0.0, "longitude": 0.0,
+         "affected_ports": None},
+    ])
+    ports = pl.DataFrame({"port_id": ["p0", "p1"], "latitude": [0.0, -40.0],
+                          "longitude": [0.0, 120.0]})
+    out = nearby_events(raw, ports, date(2026, 3, 20))
+    got = {(r["port_id"], r["name"], r["level"]) for r in out.iter_rows(named=True)}
+    assert got == {("p0", "Storm A", "RED"), ("p1", "Quake B", "ORANGE")}
+    assert nearby_events(raw.head(0), ports, date(2026, 3, 20)).is_empty()
+
+
+def test_port_details_line_up_weeks_and_count_the_record() -> None:
+    w = [date(2026, 1, 5), date(2026, 1, 12)]
+    calls = pl.DataFrame({"port_id": ["p0", "p0", "p1"], "week_start": [w[0], w[1], w[1]],
+                          "y": [50.0, 10.0, 7.0], "base": [48.0, 49.0, 7.0],
+                          "is_disruption": [False, True, None],
+                          "is_seasonal": [False, False, None], "drop_pct": [0.0, 0.8, None]})
+    fc = Forecast(origin=w[1], release=w[1], warnings=pl.DataFrame(), rounds=1,
+                  trained_rows=1, calls=calls,
+                  past=calls.filter(pl.col("is_disruption").fill_null(False))
+                  .select("port_id", "week_start", "drop_pct"))
+    record = pl.DataFrame({"port_id": ["p0", "p0", "p0"], "target_week": [w[1]] * 3,
+                           "flagged": [True, False, True], "happened": [True] * 3})
+    out = dashboard.port_details(fc, record)
+    assert out["weeks"] == [d.isoformat() for d in w]
+    p0, p1 = out["ports"]["p0"], out["ports"]["p1"]
+    assert p0["calls"] == [50.0, 10.0] and p0["marks"] == ".D"
+    assert p1["calls"] == [None, 7.0] and p1["marks"] == ".."
+    assert p0["past_n"] == 1 and p0["past"] == [["2026-01-12", 0.8]]
+    assert p0["record"] == [2, 2, 1, 1]  # 2 alerts, both right; 1 disruption week, caught

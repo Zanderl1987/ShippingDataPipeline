@@ -22,14 +22,20 @@ from __future__ import annotations
 import argparse
 import io
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import polars as pl
 
-from src.ml.disruption_warning.baselines import RELEASE_LAG_DAYS, _km, weekly_origins
+from src.ml.disruption_warning.baselines import (
+    MAX_KM,
+    RELEASE_LAG_DAYS,
+    SKIP_EVENT_TYPES,
+    _km,
+    weekly_origins,
+)
 from src.ml.disruption_warning.evaluate import BUDGET
 from src.ml.disruption_warning.features import (
     CHOKEPOINTS,
@@ -72,6 +78,18 @@ from IMF PortWatch data. The same page is on GitHub Pages.
 #: Alternatives offered for a flagged port: this close, and at most this likely to drop.
 ALTERNATIVE_KM = 500.0
 ALTERNATIVE_MAX_CHANCE = 0.02
+#: Drill-down on the page: weeks of calls shown per port, and how far back
+#: (days before release) a storm or disaster alert still counts as nearby.
+CALL_WEEKS = 52
+EVENT_LOOKBACK_DAYS = 42
+#: Port profile columns carried to the page when the table has them.
+PROFILE_COLUMNS = [
+    "port_name", "country", "continent", "latitude", "longitude", "locode",
+    "industry_top1", "industry_top2", "industry_top3",
+    "vessel_count_total", "vessel_count_container", "vessel_count_dry_bulk",
+    "vessel_count_general_cargo", "vessel_count_roro", "vessel_count_tanker",
+    "share_country_maritime_import", "share_country_maritime_export",
+]
 
 #: Plain-language names for groups of inputs, used to say why a port is flagged.
 REASONS: dict[str, list[str]] = {
@@ -104,6 +122,12 @@ class Forecast:
     warnings: pl.DataFrame
     rounds: int
     trained_rows: int
+    #: Per scored port: the last ``CALL_WEEKS`` weeks of calls and their labels.
+    calls: pl.DataFrame = field(default_factory=pl.DataFrame)
+    #: Per scored port: every disruption week in the data.
+    past: pl.DataFrame = field(default_factory=pl.DataFrame)
+    #: Storm and disaster alerts near each port in the weeks before release.
+    nearby_events: pl.DataFrame = field(default_factory=pl.DataFrame)
 
 
 def live_origin(labels: pl.DataFrame) -> date:
@@ -114,12 +138,21 @@ def live_origin(labels: pl.DataFrame) -> date:
     return last
 
 
-def reasons(contrib: Any, top: int = 2) -> list[list[str]]:
-    """Per row, the input groups that pushed its chance up the most."""
+DRIVER_GROUPS = [*REASONS, _OTHER]
+
+
+def group_contributions(contrib: Any) -> dict[str, Any]:
+    """Per input group (``DRIVER_GROUPS``), its summed push on each row's
+    log-odds."""
     names = FEATURES
     groups = {g: [names.index(f) for f in fs] for g, fs in REASONS.items()}
     groups[_OTHER] = [i for i, f in enumerate(names) if f not in _GROUPED]
-    sums = {g: contrib[:, idx].sum(axis=1) for g, idx in groups.items()}
+    return {g: contrib[:, idx].sum(axis=1) for g, idx in groups.items()}
+
+
+def reasons(contrib: Any, top: int = 2) -> list[list[str]]:
+    """Per row, the input groups that pushed its chance up the most."""
+    sums = group_contributions(contrib)
     out = []
     for r in range(contrib.shape[0]):
         ranked = sorted(((v[r], g) for g, v in sums.items()), reverse=True)
@@ -156,6 +189,49 @@ def alternatives(warn: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+EVENT_SCHEMA = {"port_id": pl.Utf8, "name": pl.Utf8, "type": pl.Utf8, "level": pl.Utf8,
+                "from_date": pl.Date, "km": pl.Float64}
+
+
+def nearby_events(raw: pl.DataFrame, ports: pl.DataFrame, release: date) -> pl.DataFrame:
+    """GDACS events that started in the ``EVENT_LOOKBACK_DAYS`` before
+    ``release`` and are within ``MAX_KM`` of a port or list it."""
+    start = release - timedelta(days=EVENT_LOOKBACK_DAYS)
+    name = (pl.col("event_name").drop_nulls().first() if "event_name" in raw.columns
+            else pl.lit(None, pl.Utf8))
+    recent = (
+        raw.filter(~pl.col("event_type").is_in(SKIP_EVENT_TYPES))
+        .with_columns(pl.col("from_date").cast(pl.Date))
+        .filter(pl.col("from_date").is_between(start, release))
+        .group_by("event_id")
+        .agg(
+            name.alias("name"),
+            pl.col("event_type").first().alias("type"),
+            pl.when((pl.col("alert_level").str.to_uppercase() == "RED").any())
+            .then(pl.lit("RED")).otherwise(pl.lit("ORANGE")).alias("level"),
+            pl.col("from_date").min(),
+            pl.col("latitude").drop_nulls().first().alias("ev_lat"),
+            pl.col("longitude").drop_nulls().first().alias("ev_lon"),
+            pl.col("affected_ports").cast(pl.Utf8).drop_nulls().first().alias("listed"),
+        )
+    )
+    if recent.is_empty():
+        return pl.DataFrame(schema=EVENT_SCHEMA)
+    return (
+        recent.join(ports.select("port_id", "latitude", "longitude"), how="cross")
+        .with_columns(
+            _km(pl.col("ev_lat"), pl.col("ev_lon"), pl.col("latitude"), pl.col("longitude"))
+            .round(0).alias("km"),
+            pl.col("listed").fill_null("").str.split(";")
+            .list.eval(pl.element().str.strip_chars())
+            .list.contains(pl.col("port_id")).alias("is_listed"),
+        )
+        .filter((pl.col("km") <= MAX_KM) | pl.col("is_listed"))
+        .select(*EVENT_SCHEMA)
+        .sort("port_id", "from_date", descending=[False, True])
+    )
+
+
 def forecast(
     weekly: pl.DataFrame,
     events: pl.DataFrame,
@@ -189,7 +265,10 @@ def forecast(
         if past["happened"].sum() >= MIN_CALIBRATION_POSITIVES:
             chance = apply_platt(chance, *fit_platt(past["chance"].to_numpy(),
                                                     past["happened"].to_numpy()))
-    why = reasons(fitted.contributions(live))
+    contrib = fitted.contributions(live)
+    why = reasons(contrib)
+    sums = group_contributions(contrib)
+    drivers = [[round(float(sums[g][r]), 2) for g in DRIVER_GROUPS] for r in range(len(why))]
     state = labels.filter(pl.col("week_start") == origin).select(
         "port_id",
         pl.col("y").alias("last_calls"),
@@ -198,23 +277,36 @@ def forecast(
     )
     warn = (
         live.select("origin_week", "target_week", "horizon", "port_id", "size_band", "base_rate")
-        .with_columns(pl.Series("chance", chance), pl.Series("reasons", why))
+        .with_columns(pl.Series("chance", chance), pl.Series("reasons", why),
+                      pl.Series("drivers", drivers, dtype=pl.List(pl.Float64)))
         .join(state, on="port_id", how="left")
         .join(
-            profiles.select("port_id", "port_name", "country", "continent", "latitude",
-                            "longitude", "industry_top1"),
+            profiles.select("port_id", *[c for c in PROFILE_COLUMNS if c in profiles.columns]),
             on="port_id", how="left",
         )
         .with_columns((pl.col("chance") / pl.col("base_rate")).alias("lift"))
     )
     warn = warn.with_columns(flag_top(warn).alias("flagged"))
     warn = warn.join(alternatives(warn), on=["horizon", "port_id"], how="left")
+    release = origin + timedelta(days=RELEASE_LAG_DAYS)
+    scored = labels.join(eligible, on="port_id", how="semi")
+    calls = scored.filter(pl.col("week_start") > origin - timedelta(weeks=CALL_WEEKS)).select(
+        "port_id", "week_start", "y", "base", "is_disruption", "is_seasonal", "drop_pct")
+    past = scored.filter(pl.col("is_disruption").fill_null(False)).select(
+        "port_id", "week_start", "drop_pct")
+    located = warn.filter(
+        (pl.col("horizon") == 2) & pl.col("latitude").is_not_null()
+        & pl.col("longitude").is_not_null()
+    )
     return Forecast(
         origin=origin,
-        release=origin + timedelta(days=RELEASE_LAG_DAYS),
+        release=release,
         warnings=warn.sort("horizon", "chance", descending=[False, True]),
         rounds=fitted.rounds,
         trained_rows=known.height,
+        calls=calls,
+        past=past,
+        nearby_events=nearby_events(events, located, release),
     )
 
 

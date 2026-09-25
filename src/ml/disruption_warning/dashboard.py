@@ -15,7 +15,13 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from src.ml.disruption_warning.evaluate import BUDGET
-from src.ml.disruption_warning.predict import ALTERNATIVE_KM, rows_json
+from src.ml.disruption_warning.predict import (
+    ALTERNATIVE_KM,
+    DRIVER_GROUPS,
+    EVENT_LOOKBACK_DAYS,
+    PROFILE_COLUMNS,
+    rows_json,
+)
 
 if TYPE_CHECKING:
     from src.ml.disruption_warning.predict import Forecast
@@ -23,9 +29,71 @@ if TYPE_CHECKING:
 #: The track record shown: this many weeks of target weeks.
 RECORD_WEEKS = 104
 PAGE = Path(__file__).with_name("dashboard.html")
+#: Coastlines for the map: an SVG path in the page's own projection
+#: (Natural Earth 1:50m land, public domain; built by ``land_path.py``).
+LAND = Path(__file__).with_name("land_path.txt")
 RECENT_ORIGINS = 6
 CALIBRATION_BINS = [0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.4, 1.0]
 HORIZON_NAMES = {1: "Last week", 2: "This week", 3: "Next week"}
+#: Past disruptions listed per port in the drill-down.
+PAST_SHOWN = 6
+
+
+def _num(v: Any, digits: int = 1) -> Any:
+    return None if v is None or v != v else round(float(v), digits)
+
+
+def port_details(fc: Forecast, record: pl.DataFrame) -> dict[str, Any]:
+    """What the page shows when a port is clicked, keyed by port_id.
+
+    ``weeks`` is shared; each port's ``calls``/``usual`` line up with it, and
+    ``marks`` has one letter per week: D = disruption, S = seasonal drop."""
+    out: dict[str, dict[str, Any]] = {}
+    weeks: list[str] = []
+    if not fc.calls.is_empty():
+        wk = sorted(fc.calls["week_start"].unique().to_list())
+        weeks = [w.isoformat() for w in wk]
+        index = {w: i for i, w in enumerate(wk)}
+        for (pid,), g in fc.calls.sort("week_start").group_by("port_id", maintain_order=True):
+            calls: list[Any] = [None] * len(wk)
+            usual: list[Any] = [None] * len(wk)
+            marks = ["."] * len(wk)
+            for r in g.iter_rows(named=True):
+                i = index[r["week_start"]]
+                calls[i], usual[i] = _num(r["y"], 0), _num(r["base"], 0)
+                if r["is_disruption"]:
+                    marks[i] = "D"
+                elif r["is_seasonal"]:
+                    marks[i] = "S"
+            out[str(pid)] = {"calls": calls, "usual": usual, "marks": "".join(marks)}
+    if not fc.past.is_empty():
+        for (pid,), g in fc.past.sort("week_start", descending=True).group_by(
+                "port_id", maintain_order=True):
+            d = out.setdefault(str(pid), {})
+            d["past_n"] = g.height
+            d["past"] = [[r["week_start"].isoformat(), _num(r["drop_pct"], 3)]
+                         for r in g.head(PAST_SHOWN).iter_rows(named=True)]
+    if not record.is_empty():
+        per_port = record.group_by("port_id").agg(
+            pl.col("flagged").sum().alias("alerts"),
+            (pl.col("flagged") & pl.col("happened")).sum().alias("hits"),
+            pl.col("target_week").filter(pl.col("happened")).n_unique().alias("disruptions"),
+            pl.col("target_week").filter(pl.col("happened") & pl.col("flagged")).n_unique()
+            .alias("caught"),
+        )
+        for r in per_port.iter_rows(named=True):
+            out.setdefault(str(r["port_id"]), {})["record"] = [
+                r["alerts"], r["hits"], r["disruptions"], r["caught"]]
+    if not fc.nearby_events.is_empty():
+        for (pid,), g in fc.nearby_events.group_by("port_id", maintain_order=True):
+            out.setdefault(str(pid), {})["events"] = rows_json(
+                g.select("name", "type", "level", "from_date", "km"))
+    scored = set(fc.warnings["port_id"].to_list()) if "port_id" in fc.warnings.columns else None
+    if scored is not None:
+        out = {k: v for k, v in out.items() if k in scored}
+    first = record["target_week"].min() if not record.is_empty() else None
+    return {"weeks": weeks, "ports": out,
+            "record_first": first.isoformat() if isinstance(first, date) else None}
 
 
 def _record(record: pl.DataFrame) -> dict[str, Any]:
@@ -91,10 +159,12 @@ def _record(record: pl.DataFrame) -> dict[str, Any]:
 
 def payload(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame) -> dict[str, Any]:
     w = fc.warnings
+    extra = [c for c in PROFILE_COLUMNS
+             if c in w.columns and c not in ("latitude", "longitude")]
     ports = w.filter(pl.col("horizon") == 2).select(
-        "port_id", "port_name", "country", "continent",
+        "port_id", *extra,
         pl.col("latitude", "longitude").round(2), pl.col("normal_calls").round(1),
-        "last_calls", pl.col("last_drop_pct").round(3), "industry_top1",
+        "last_calls", pl.col("last_drop_pct").round(3),
     )
     names = dict(zip(ports["port_id"], ports["port_name"], strict=True))
     countries = dict(zip(ports["port_id"], ports["country"], strict=True))
@@ -124,12 +194,16 @@ def payload(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame) -> dict[s
                 w.filter(pl.col("horizon") == h).select(
                     "port_id", pl.col("chance").round(4), pl.col("lift").round(1), "flagged",
                     "reasons", "alternatives",
+                    *(["drivers"] if "drivers" in w.columns else []),
                 )
             )
             for h in (1, 2, 3)
         },
         "regions": rows_json(regions),
         "record": rec,
+        "driver_groups": DRIVER_GROUPS,
+        "event_days": EVENT_LOOKBACK_DAYS,
+        "detail": port_details(fc, record),
         "history_rows": history.height,
         "model": {"rounds": fc.rounds, "trained_rows": fc.trained_rows},
     }
@@ -140,7 +214,9 @@ def render(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame) -> str:
     # A "</" inside the JSON would end the script block early.
     data = data.replace("</", "<\\/")
     page = PAGE.read_text(encoding="utf-8")
-    return page.replace("__TITLE__", html.escape(TITLE)).replace("__DATA__", data)
+    land = LAND.read_text(encoding="utf-8").strip() if LAND.exists() else ""
+    return (page.replace("__TITLE__", html.escape(TITLE)).replace("__LAND__", land)
+            .replace("__DATA__", data))
 
 
 TITLE = "Port Disruption Watch"
