@@ -82,7 +82,7 @@ class Progress:
     """The run's state as JSON, rewritten atomically so the page never reads
     half a file."""
 
-    def __init__(self, run_dir: Path, config: TrainConfig) -> None:
+    def __init__(self, run_dir: Path, config: Any) -> None:  # any dataclass config
         self.path = run_dir / "progress.json"
         self.state: dict[str, Any] = {
             "status": "loading data",
