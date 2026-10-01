@@ -81,3 +81,38 @@ def test_sparkline_breaks_at_gaps() -> None:
 def test_build_html_with_no_data() -> None:
     page = build_html(DashboardData([], {}, [], None, None))
     assert "Not shown yet" in page
+
+
+def _grain_row(week: int) -> dict:
+    return {
+        "commodity": "Soybeans", "marketing_year": "2026/2027", "my_week": week,
+        "week_ending": date(2026, 9, 17), "commitments_mt": 21_200_000,
+        "commitments_vs_prior_year_pct": 93.9, "commitments_vs_avg5_pct": 11.7,
+        "shipped_mt": 1_000_000, "outstanding_mt": 20_200_000,
+        "net_sales_4wk_avg_mt": 1_637_000, "pace_projection_mt": 55_500_000,
+    }
+
+
+def test_grain_section_brackets_early_projection_and_flags_new_buyers() -> None:
+    data = DashboardData([], {}, [], None, None, grain_now=[_grain_row(3)])
+    data.grain_buyers["Soybeans"] = [
+        {"country": "CHINA, PEOPLES REPUBLIC OF", "commitments_mt": 10_170_000,
+         "share_of_commitments_pct": 48.0, "commitments_prior_year_mt": None,
+         "commitments_vs_prior_year_pct": None},
+        {"country": "A<b>", "commitments_mt": 1_810_000, "share_of_commitments_pct": 8.5,
+         "commitments_prior_year_mt": 2_290_000, "commitments_vs_prior_year_pct": -21.0},
+    ]
+    page = build_html(data)
+    assert "Corn and soybean demand" in page
+    assert "21.20" in page and "+94%" in page and "1,637" in page
+    assert "(55.50)" in page  # week 3: too early to trust
+    assert '<span class="up">new</span>' in page and "-21%" in page
+    assert "A&lt;b&gt;" in page and "A<b>" not in page
+
+    later = build_html(DashboardData([], {}, [], None, None, grain_now=[_grain_row(20)]))
+    assert "(55.50)" not in later and "55.50" in later
+
+
+def test_grain_section_without_data() -> None:
+    page = build_html(DashboardData([], {}, [], None, None))
+    assert "No export sales data yet" in page

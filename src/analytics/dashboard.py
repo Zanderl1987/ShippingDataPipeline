@@ -10,6 +10,10 @@ Sections:
 - Port activity (``port_congestion_proxy`` + ``port_profiles``): a world map of
   the last 7 days' port calls against each port's 90-day average, and the
   biggest risers and fallers. This is activity, not waiting time.
+- Corn and soybean demand (``grain_export_pace``, ``grain_export_destinations``,
+  ``grain_trade_monthly``): this season's US export bookings against last
+  season and the 5-year average, the biggest buyers, and the latest Census
+  month with price per ton.
 
 Not shown, and why: freight rates (no rate source has a key yet) and
 AISStream vessel density (each run records a 60-second sample, so counts
@@ -23,7 +27,7 @@ from __future__ import annotations
 import argparse
 import html
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -86,6 +90,15 @@ class DashboardData:
     ports: list[Row]
     chokepoint_as_of: date | None
     ports_as_of: date | None
+    #: latest grain_export_pace row per commodity
+    grain_now: list[Row] = field(default_factory=list)
+    #: commodity -> per season week: this season's commitments, last season's,
+    #: and the 5-year average (the earlier seasons cover the whole year)
+    grain_curves: dict[str, list[Row]] = field(default_factory=dict)
+    #: commodity -> biggest buyers in the latest week
+    grain_buyers: dict[str, list[Row]] = field(default_factory=dict)
+    #: latest Census month per product and flow
+    grain_monthly: list[Row] = field(default_factory=list)
 
 
 def _rows(conn: duckdb.DuckDBPyConnection, sql: str, params: list[Any] | None = None) -> list[Row]:
@@ -145,7 +158,53 @@ def load_data(conn: duckdb.DuckDBPyConnection) -> DashboardData:
         )
         if ports:
             ports_as_of = max(p["as_of"] for p in ports)
-    return DashboardData(chokepoints, sparklines, ports, cp_as_of, ports_as_of)
+    data = DashboardData(chokepoints, sparklines, ports, cp_as_of, ports_as_of)
+    _load_grain(conn, data)
+    return data
+
+
+#: Buyers listed per commodity.
+GRAIN_TOP_BUYERS = 8
+
+
+def _load_grain(conn: duckdb.DuckDBPyConnection, data: DashboardData) -> None:
+    if _has_table(conn, "grain_export_pace"):
+        data.grain_now = _rows(conn, """
+            SELECT * FROM grain_export_pace
+            QUALIFY row_number() OVER (
+                PARTITION BY commodity ORDER BY week_ending DESC, marketing_year DESC) = 1
+            ORDER BY commodity
+        """)
+        for now in data.grain_now:
+            # Earlier seasons over every week, so this season's line can be
+            # read against where they ended up.
+            start = int(now["marketing_year"][:4])
+            data.grain_curves[now["commodity"]] = _rows(conn, """
+                SELECT my_week,
+                    max(commitments_mt) FILTER (WHERE season = ?) AS commitments_mt,
+                    max(commitments_mt) FILTER (WHERE season = ? - 1)
+                        AS commitments_prior_year_mt,
+                    CASE WHEN count(*) FILTER (WHERE season BETWEEN ? - 5 AND ? - 1) = 5
+                         THEN avg(commitments_mt) FILTER (WHERE season BETWEEN ? - 5 AND ? - 1)
+                    END AS commitments_avg5_mt
+                FROM (SELECT *, CAST(left(marketing_year, 4) AS INTEGER) AS season
+                      FROM grain_export_pace WHERE commodity = ?)
+                GROUP BY my_week ORDER BY my_week
+            """, [start] * 6 + [now["commodity"]])
+    if _has_table(conn, "grain_export_destinations"):
+        for now in data.grain_now:
+            data.grain_buyers[now["commodity"]] = _rows(conn, """
+                SELECT * FROM grain_export_destinations
+                WHERE commodity = ? AND marketing_year = ? AND my_week = ?
+                ORDER BY commitments_mt DESC NULLS LAST LIMIT ?
+            """, [now["commodity"], now["marketing_year"], now["my_week"],
+                  GRAIN_TOP_BUYERS])
+    if _has_table(conn, "grain_trade_monthly"):
+        data.grain_monthly = _rows(conn, """
+            SELECT * FROM grain_trade_monthly
+            QUALIFY period_date = max(period_date) OVER (PARTITION BY product, flow)
+            ORDER BY flow DESC, product
+        """)
 
 
 # ── Rendering ──────────────────────────────────────────────────────────────
@@ -318,6 +377,144 @@ def _port_section(data: DashboardData) -> str:
     return _card("Port activity", body)
 
 
+#: Before this marketing-year week the pace projection backtests no better
+#: than repeating last season's total (see src/analytics/grain_demand.py).
+GRAIN_PROJECTION_FIRST_WEEK = 13
+
+
+def _mmt(value: float | None) -> str:
+    return "—" if value is None else f"{value / 1e6:,.2f}"
+
+
+def _thousand(value: float | None) -> str:
+    return "—" if value is None else f"{value / 1e3:,.0f}"
+
+
+def _grain_chart(points: list[Row], w: int = 480, h: int = 160) -> str:
+    """This season's commitments (solid) over last season (dashed) and the
+    5-year average (dotted), by marketing-year week."""
+    keys = ["commitments_mt", "commitments_prior_year_mt", "commitments_avg5_mt"]
+    values = [p[k] for p in points for k in keys if p[k] is not None]
+    if not points or not values:
+        return ""
+    top = max(values) or 1.0
+    last_week = max(max(p["my_week"] for p in points), 2)
+    pad = 4
+
+    def xy(week: int, value: float) -> str:
+        x = pad + (week - 1) / (last_week - 1) * (w - 2 * pad)
+        y = h - pad - value / top * (h - 2 * pad)
+        return f"{x:.1f},{y:.1f}"
+
+    def line(key: str) -> str:
+        pts = [xy(p["my_week"], p[key]) for p in points if p[key] is not None]
+        return f'<polyline points="{" ".join(pts)}"/>' if len(pts) > 1 else ""
+
+    return (
+        f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" '
+        'aria-label="Export commitments by week of the season: this season solid, last '
+        'season dashed, 5-year average dotted">'
+        f'<rect x="0" y="0" width="{w}" height="{h}" fill="#f7fafc"/>'
+        f'<g fill="none" stroke="{_NORMAL}" stroke-width="1.5" stroke-dasharray="2 3">'
+        f"{line(keys[2])}</g>"
+        f'<g fill="none" stroke="{_NORMAL}" stroke-width="1.5" stroke-dasharray="6 3">'
+        f"{line(keys[1])}</g>"
+        f'<g fill="none" stroke="#1a365d" stroke-width="2.5">{line(keys[0])}</g>'
+        f'<text x="{w - pad}" y="14" text-anchor="end" font-size="11" fill="#718096">'
+        f"top: {top / 1e6:,.1f} million t</text></svg>"
+    )
+
+
+def _buyer_change(buyer: Row) -> str:
+    # USDA lists a country only once it has bought, so no row a year ago means
+    # nothing was booked then.
+    if buyer["commitments_prior_year_mt"] is None and buyer["commitments_mt"]:
+        return '<span class="up">new</span>'
+    return _pct(buyer["commitments_vs_prior_year_pct"])
+
+
+def _grain_section(data: DashboardData) -> str:
+    title = "Corn and soybean demand"
+    if not data.grain_now:
+        return _card(title, "<p class='note'>No export sales data yet.</p>")
+    rows = []
+    for g in data.grain_now:
+        projection = _mmt(g["pace_projection_mt"])
+        if g["my_week"] < GRAIN_PROJECTION_FIRST_WEEK:
+            projection = (
+                f"<span class='flat' title='Too early in the season to be reliable'>"
+                f"({projection})</span>"
+            )
+        rows.append(
+            f"<tr><td>{html.escape(g['commodity'])}<div class='flat'>"
+            f"{html.escape(g['marketing_year'])}, week {g['my_week']}</div></td>"
+            f"<td class='num'>{_mmt(g['commitments_mt'])}</td>"
+            f"<td class='num'>{_pct(g['commitments_vs_prior_year_pct'])}</td>"
+            f"<td class='num'>{_pct(g['commitments_vs_avg5_pct'])}</td>"
+            f"<td class='num'>{_mmt(g['shipped_mt'])}</td>"
+            f"<td class='num'>{_mmt(g['outstanding_mt'])}</td>"
+            f"<td class='num'>{_thousand(g['net_sales_4wk_avg_mt'])}</td>"
+            f"<td class='num'>{projection}</td></tr>"
+        )
+    as_of = max(g["week_ending"] for g in data.grain_now)
+    body = (
+        f"<p class='note'>USDA weekly export sales to the week ending {as_of}. "
+        "Committed = tons shipped this season plus tons sold but not yet shipped; "
+        "buyers book ahead, so this leads shipments. Each season is compared at the "
+        "same week (seasons start September 1). Million metric tons unless noted.</p>"
+        "<table><tr><th>Crop</th><th>Committed</th><th>vs last season</th>"
+        "<th>vs 5-yr avg</th><th>Shipped</th><th>Sold, not shipped</th>"
+        "<th>New sales, 4-wk avg (thousand t/wk)</th><th>Season projection</th></tr>"
+        + "".join(rows)
+        + "</table><p class='note' style='margin-top:8px'>Season projection: "
+        "committed so far divided by the share of a season's exports usually booked by "
+        f"this week. Shown in brackets before week {GRAIN_PROJECTION_FIRST_WEEK} "
+        "(early December): until then it has been no more accurate than repeating last "
+        "season's total.</p>"
+    )
+    charts = []
+    for g in data.grain_now:
+        buyer_rows = "".join(
+            f"<tr><td>{html.escape(b['country'])}</td>"
+            f"<td class='num'>{_mmt(b['commitments_mt'])}</td>"
+            f"<td class='num'>{_num(b['share_of_commitments_pct'], 0)}%</td>"
+            f"<td class='num'>{_buyer_change(b)}</td></tr>"
+            for b in data.grain_buyers.get(g["commodity"], [])
+        )
+        charts.append(
+            "<div><h3 style='font-size:1rem;margin:12px 0 4px'>"
+            f"{html.escape(g['commodity'])}: committed so far this season</h3>"
+            + _grain_chart(data.grain_curves.get(g["commodity"], []))
+            + "<table style='margin-top:8px'><tr><th>Buyer</th><th>Committed</th>"
+            "<th>Share</th><th>vs last season</th></tr>" + buyer_rows + "</table></div>"
+        )
+    body += (
+        "<div class='legend'><span>Solid: this season</span><span>Dashed: last season"
+        "</span><span>Dotted: 5-year average</span><span>UNKNOWN: a buyer USDA has not "
+        "named yet, often China</span></div>"
+        "<div class='cols'>" + "".join(charts) + "</div>"
+    )
+    if data.grain_monthly:
+        month_rows = "".join(
+            f"<tr><td>{html.escape(m['product'].replace('_', ' '))}</td>"
+            f"<td>{html.escape(m['flow'])}</td><td>{m['period_date']:%b %Y}</td>"
+            f"<td class='num'>{_thousand(m['quantity_mt'])}</td>"
+            f"<td class='num'>{_pct(m['quantity_vs_prior_year_pct'])}</td>"
+            f"<td class='num'>{_pct(m['quantity_vs_avg5_pct'])}</td>"
+            f"<td class='num'>{_num(m['usd_per_mt'], 0)}</td>"
+            f"<td class='num'>{_num(m['usd_per_mt_prior_year'], 0)}</td></tr>"
+            for m in data.grain_monthly
+        )
+        body += (
+            "<p class='note' style='margin-top:16px'>Official monthly trade from the US "
+            "Census, about five weeks behind. Exports are US-grown only.</p>"
+            "<table><tr><th>Product</th><th>Flow</th><th>Month</th>"
+            "<th>Thousand t</th><th>vs year ago</th><th>vs 5-yr avg</th>"
+            "<th>$/t</th><th>$/t year ago</th></tr>" + month_rows + "</table>"
+        )
+    return _card(title, body)
+
+
 def _card(title: str, body: str) -> str:
     return f'<div class="card"><h2>{html.escape(title)}</h2>{body}</div>'
 
@@ -330,10 +527,12 @@ def build_html(data: DashboardData, generated_at: datetime | None = None) -> str
         f"<title>Shipping Data Dashboard</title><style>{CSS}</style></head><body>"
         "<div class='header'><h1>Shipping Data Dashboard</h1>"
         f"<div class='sub'>Generated {generated}. Chokepoint and port data from IMF PortWatch; "
-        "hazards from GDACS via PortWatch.</div></div>"
+        "hazards from GDACS via PortWatch; grain from USDA export sales and the US "
+        "Census.</div></div>"
         "<div class='container'>"
         + _chokepoint_section(data)
         + _port_section(data)
+        + _grain_section(data)
         + _card(
             "Not shown yet",
             "<p class='note'>Freight rates: no rate source has an API key yet. Vessel "

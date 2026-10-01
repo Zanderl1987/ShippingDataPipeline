@@ -6,6 +6,7 @@ ANALYTICS_VERSIONS = {
     "chokepoint_daily": "0.1.0",
     "congestion": "0.1.0",
     "port_weekly": "0.1.0",
+    "grain_demand": "0.1.0",
     "routes": "0.1.0",
     "trade_flow": "0.1.0",
     "reports": "0.2.0",

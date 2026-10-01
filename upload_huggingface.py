@@ -42,6 +42,19 @@ TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES} | {
         "Derived: port calls and cargo per port per week (Mon-Sun) from port_activity; "
         "weeks with is_complete_week = false are partial"
     ),
+    "grain_export_pace": (
+        "Derived: corn and soybean export commitments per marketing-year week vs the "
+        "prior year and 5-year average, plus a pace-based season projection "
+        "(unreliable before about week 13)"
+    ),
+    "grain_export_destinations": (
+        "Derived: corn and soybean export commitments per buying country per week, "
+        "share of total, vs the same week a year earlier"
+    ),
+    "grain_trade_monthly": (
+        "Derived: monthly US corn, soybean, soybean meal and soybean oil exports and "
+        "imports (Census): metric tons, USD, USD/ton, vs prior year and 5-year average"
+    ),
     "port_congestion_proxy": "Derived: each port's latest 7-day vs 90-day average port calls",
     "curated_ais_positions": "Derived: ais_positions joined with vessel and port details",
     "curated_vessels": "Derived: vessels with vessel age added",

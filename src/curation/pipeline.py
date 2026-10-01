@@ -145,6 +145,14 @@ def run_enrichment(
         if errors is not None:
             errors.append(f"Enrichment port_weekly failed: {e}")
 
+    try:
+        from src.analytics.grain_demand import create_grain_demand
+        results.update(create_grain_demand(conn))
+    except Exception as e:
+        logger.error("Enrichment grain_demand failed: %s", e)
+        if errors is not None:
+            errors.append(f"Enrichment grain_demand failed: {e}")
+
     return results
 
 
