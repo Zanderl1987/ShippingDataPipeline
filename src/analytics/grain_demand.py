@@ -18,8 +18,11 @@ at week 4, 16% at week 13, 8% at week 26, 3% at week 39; soybeans 18%, 13%,
 better than last year's number and should not be read as a forecast.
 
 ``grain_export_destinations`` -- the same weekly figures per buying
-country, with the country's share of all commitments. "UNKNOWN" is real
-sales to a buyer USDA has not named yet (often China), not a total.
+country, with the country's share of all commitments and its usual share at
+this week (average of the five seasons before; a season it did not buy in
+counts as 0). "UNKNOWN" is real sales to a buyer USDA has not named yet
+(often China), not a total. The buyer mix is for monitoring only: it did not
+improve the season forecast (src/ml/grain_forecast/README.md).
 
 ``grain_trade_monthly`` -- monthly US exports and imports from the Census
 (``us_trade_products``) for corn, soybeans, soybean meal and soybean oil:
@@ -189,23 +192,50 @@ def create_grain_export_destinations(conn: duckdb.DuckDBPyConnection) -> int:
                 sum(weekly_exports) AS weekly_exports_mt
             FROM s
             GROUP BY ALL
+        ),
+        sh AS (
+            SELECT *,
+                commitments_mt / nullif(sum(commitments_mt) OVER (
+                    PARTITION BY commodity, marketing_year, my_week), 0) AS share
+            FROM c
+        ),
+        -- A country's average share at this week over the 5 seasons before.
+        -- USDA lists a country only once it has bought, so a season without
+        -- a row counts as a share of 0.
+        usual AS (
+            SELECT cur.commodity, cur.my_start_year, cur.my_week, cur.country,
+                coalesce(sum(prev.share), 0) / {BASELINE_YEARS} AS share_avg5
+            FROM sh cur
+            LEFT JOIN sh prev
+              ON prev.commodity = cur.commodity
+             AND prev.country = cur.country
+             AND prev.my_week = cur.my_week
+             AND prev.my_start_year BETWEEN cur.my_start_year - {BASELINE_YEARS}
+                                        AND cur.my_start_year - 1
+            WHERE cur.my_start_year - {BASELINE_YEARS} >= (
+                SELECT min(my_start_year) FROM c WHERE c.commodity = cur.commodity)
+            GROUP BY ALL
         )
         SELECT
             c.commodity, c.marketing_year, c.my_week, c.week_ending, c.country,
             c.commitments_mt, c.shipped_mt, c.outstanding_mt,
             c.net_sales_mt, c.weekly_exports_mt,
-            round(100 * c.commitments_mt / nullif(sum(c.commitments_mt) OVER (
-                PARTITION BY c.commodity, c.marketing_year, c.my_week), 0), 1)
-                AS share_of_commitments_pct,
+            round(100 * c.share, 1) AS share_of_commitments_pct,
+            round(100 * u.share_avg5, 1) AS share_avg5_pct,
             p.commitments_mt AS commitments_prior_year_mt,
             {_pct("c.commitments_mt", "p.commitments_mt")}
                 AS commitments_vs_prior_year_pct
-        FROM c
+        FROM sh c
         LEFT JOIN c p
           ON p.commodity = c.commodity
          AND p.country = c.country
          AND p.my_week = c.my_week
          AND p.my_start_year = c.my_start_year - 1
+        LEFT JOIN usual u
+          ON u.commodity = c.commodity
+         AND u.my_start_year = c.my_start_year
+         AND u.my_week = c.my_week
+         AND u.country = c.country
         ORDER BY c.commodity, c.week_ending, c.commitments_mt DESC
     """)
     count = _count(conn, DESTINATIONS_TABLE)

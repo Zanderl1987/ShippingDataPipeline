@@ -49,7 +49,7 @@ TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES} | {
     ),
     "grain_export_destinations": (
         "Derived: corn and soybean export commitments per buying country per week, "
-        "share of total, vs the same week a year earlier"
+        "share of total and usual share (5-season average), vs a year earlier"
     ),
     "grain_export_forecast": (
         "Derived: forecast of this season's total US corn and soybean exports at each "

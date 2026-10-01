@@ -96,14 +96,30 @@ of sample:
 - **Fitting the blend weight on absolute instead of squared error.**
 - **Adding the 5-year-average total as a third blend input.**
 - **Fitted pace weights for corn,** both with and without USDA.
+- **The buyer mix**, tested four ways against the USDA-anchored forecast,
+  2014-2025:
+  - **China's share of commitments, against its usual share at that week.**
+    No gain.
+  - **China plus UNKNOWN (often China), against its usual share.** No gain.
+  - **Buyer concentration (sum of squared shares), against usual.** No gain.
+  - **A pace estimate computed separately for China plus UNKNOWN and for
+    everyone else,** each with its own usual booking timing.
 
-About a dozen variants were compared on the same seasons, which is some
+  The split pace is the interesting one. On its own it is much better than
+  plain pace for soybeans early in the season: 12.0 vs 17.3% median miss in
+  Sep-Oct, 6.1 vs 12.1% in Nov-Dec. So China's early booking is real. But
+  inside the forecast it did not help: the soybean average miss went from 7.3
+  to 8.0% in Sep-Oct, and the worst miss from 21 to 30%. USDA's projection
+  evidently already reflects who is buying. For corn there were only 7
+  seasons with enough Chinese buying to test. The buyer mix stays on the
+  dashboard for monitoring: `grain_export_destinations.share_avg5_pct` is
+  each buyer's usual share.
+
+About sixteen variants were compared on the same seasons, which is some
 selection risk. The model kept has at most two parameters per week.
 
 ## Limits and next steps
 
-- **No buyer mix:** buyer concentration, such as China's share of soybean
-  sales, is not used yet.
 - **Short USDA history:** WASDE vintages start in April 2010, so the USDA
   version is tested on only 12 seasons.
 - **Different measure from USDA:** the target is the export sales program's

@@ -435,6 +435,10 @@ def _grain_chart(points: list[Row], w: int = 480, h: int = 160) -> str:
     )
 
 
+def _share(value: float | None) -> str:
+    return "—" if value is None else f"{value:,.0f}%"
+
+
 def _buyer_change(buyer: Row) -> str:
     # USDA lists a country only once it has bought, so no row a year ago means
     # nothing was booked then.
@@ -503,6 +507,7 @@ def _grain_section(data: DashboardData) -> str:
             f"<tr><td>{html.escape(b['country'])}</td>"
             f"<td class='num'>{_mmt(b['commitments_mt'])}</td>"
             f"<td class='num'>{_num(b['share_of_commitments_pct'], 0)}%</td>"
+            f"<td class='num'>{_share(b.get('share_avg5_pct'))}</td>"
             f"<td class='num'>{_buyer_change(b)}</td></tr>"
             for b in data.grain_buyers.get(g["commodity"], [])
         )
@@ -511,12 +516,14 @@ def _grain_section(data: DashboardData) -> str:
             f"{html.escape(g['commodity'])}: committed so far this season</h3>"
             + _grain_chart(data.grain_curves.get(g["commodity"], []))
             + "<table style='margin-top:8px'><tr><th>Buyer</th><th>Committed</th>"
-            "<th>Share</th><th>vs last season</th></tr>" + buyer_rows + "</table></div>"
+            "<th>Share</th><th>Usual share</th><th>vs last season</th></tr>"
+            + buyer_rows + "</table></div>"
         )
     body += (
         "<div class='legend'><span>Solid: this season</span><span>Dashed: last season"
         "</span><span>Dotted: 5-year average</span><span>UNKNOWN: a buyer USDA has not "
-        "named yet, often China</span></div>"
+        "named yet, often China</span><span>Usual share: average at this week over the "
+        "previous 5 seasons</span></div>"
         "<div class='cols'>" + "".join(charts) + "</div>"
     )
     if data.grain_monthly:

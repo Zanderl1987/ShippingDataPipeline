@@ -154,3 +154,27 @@ def test_enrichment_builds_grain_tables(conn, three_seasons) -> None:
     assert results["grain_export_pace"] == 5
     assert results["grain_export_destinations"] == 7
     assert results["grain_trade_monthly"] == 0
+
+
+def test_destinations_usual_share_counts_missing_seasons_as_zero(conn) -> None:
+    rows = []
+    for year in range(2015, 2021):  # 2015-2019 are the five seasons before 2020
+        week1 = date(year, 9, 7)
+        rows.append((week1, f"{year}/{year + 1}", "Soybeans", "MEXICO", 0, 75, 75, 1))
+        # China bought in only two of the five earlier seasons.
+        china = 25 if year in (2016, 2018, 2020) else 0
+        if china:
+            rows.append((week1, f"{year}/{year + 1}", "Soybeans", "CHINA", 0, china, china, 1))
+    _sales(conn, rows)
+    create_grain_export_destinations(conn)
+    got = {r["country"]: r for r in _rows(conn, """
+        SELECT * FROM grain_export_destinations WHERE marketing_year = '2020/2021'
+    """)}
+    assert got["CHINA"]["share_of_commitments_pct"] == 25.0
+    # 25% in 2016 and 2018, absent (0) in 2015, 2017, 2019: 10% on average.
+    assert got["CHINA"]["share_avg5_pct"] == 10.0
+    assert got["MEXICO"]["share_avg5_pct"] == 90.0
+    # Seasons without five earlier ones get no usual share.
+    early = _rows(conn, "SELECT share_avg5_pct FROM grain_export_destinations "
+                        "WHERE marketing_year = '2019/2020'")
+    assert {r["share_avg5_pct"] for r in early} == {None}

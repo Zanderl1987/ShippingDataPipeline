@@ -100,7 +100,8 @@ def test_grain_section_brackets_early_forecast_and_flags_new_buyers() -> None:
     data = DashboardData([], {}, [], None, None, grain_now=[_grain_row(3)])
     data.grain_buyers["Soybeans"] = [
         {"country": "CHINA, PEOPLES REPUBLIC OF", "commitments_mt": 10_170_000,
-         "share_of_commitments_pct": 48.0, "commitments_prior_year_mt": None,
+         "share_of_commitments_pct": 48.0, "share_avg5_pct": 36.1,
+         "commitments_prior_year_mt": None,
          "commitments_vs_prior_year_pct": None},
         {"country": "A<b>", "commitments_mt": 1_810_000, "share_of_commitments_pct": 8.5,
          "commitments_prior_year_mt": 2_290_000, "commitments_vs_prior_year_pct": -21.0},
@@ -112,6 +113,7 @@ def test_grain_section_brackets_early_forecast_and_flags_new_buyers() -> None:
     assert "45.86" in page and "released 2026-09-11" in page
     assert "(44.23" not in page  # soybeans: usable from week 1
     assert '<span class="up">new</span>' in page and "-21%" in page
+    assert "36%" in page and "Usual share" in page
     assert "A&lt;b&gt;" in page and "A<b>" not in page
 
     with patch.dict("src.analytics.dashboard.RELIABLE_FROM_WEEK", {"Corn": 9}):
