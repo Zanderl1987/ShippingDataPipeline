@@ -153,6 +153,15 @@ def run_enrichment(
         if errors is not None:
             errors.append(f"Enrichment grain_demand failed: {e}")
 
+    if "grain_export_pace" in results:
+        try:
+            from src.ml.grain_forecast.model import create_grain_export_forecast
+            results["grain_export_forecast"] = create_grain_export_forecast(conn)
+        except Exception as e:
+            logger.error("Enrichment grain_export_forecast failed: %s", e)
+            if errors is not None:
+                errors.append(f"Enrichment grain_export_forecast failed: {e}")
+
     return results
 
 

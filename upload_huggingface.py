@@ -51,6 +51,10 @@ TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES} | {
         "Derived: corn and soybean export commitments per buying country per week, "
         "share of total, vs the same week a year earlier"
     ),
+    "grain_export_forecast": (
+        "Derived: forecast of this season's total US corn and soybean exports at each "
+        "week so far, with a likely range (src/ml/grain_forecast)"
+    ),
     "grain_trade_monthly": (
         "Derived: monthly US corn, soybean, soybean meal and soybean oil exports and "
         "imports (Census): metric tons, USD, USD/ton, vs prior year and 5-year average"

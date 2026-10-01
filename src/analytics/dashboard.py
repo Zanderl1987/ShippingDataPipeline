@@ -35,6 +35,7 @@ from typing import Any
 import duckdb
 
 from src.config import settings
+from src.ml.grain_forecast.model import RELIABLE_FROM_WEEK
 from src.storage.writer import get_db_path
 
 logger = logging.getLogger(__name__)
@@ -175,6 +176,16 @@ def _load_grain(conn: duckdb.DuckDBPyConnection, data: DashboardData) -> None:
                 PARTITION BY commodity ORDER BY week_ending DESC, marketing_year DESC) = 1
             ORDER BY commodity
         """)
+        has_forecast = _has_table(conn, "grain_export_forecast")
+        for now in data.grain_now:
+            found = _rows(conn, """
+                SELECT forecast_mt, forecast_low_mt, forecast_high_mt
+                FROM grain_export_forecast
+                WHERE commodity = ? AND marketing_year = ? AND my_week = ?
+            """, [now["commodity"], now["marketing_year"], now["my_week"]]) \
+                if has_forecast else []
+            now.update(found[0] if found else
+                       dict.fromkeys(["forecast_mt", "forecast_low_mt", "forecast_high_mt"]))
         for now in data.grain_now:
             # Earlier seasons over every week, so this season's line can be
             # read against where they ended up.
@@ -377,9 +388,6 @@ def _port_section(data: DashboardData) -> str:
     return _card("Port activity", body)
 
 
-#: Before this marketing-year week the pace projection backtests no better
-#: than repeating last season's total (see src/analytics/grain_demand.py).
-GRAIN_PROJECTION_FIRST_WEEK = 13
 
 
 def _mmt(value: float | None) -> str:
@@ -439,11 +447,18 @@ def _grain_section(data: DashboardData) -> str:
         return _card(title, "<p class='note'>No export sales data yet.</p>")
     rows = []
     for g in data.grain_now:
-        projection = _mmt(g["pace_projection_mt"])
-        if g["my_week"] < GRAIN_PROJECTION_FIRST_WEEK:
-            projection = (
-                f"<span class='flat' title='Too early in the season to be reliable'>"
-                f"({projection})</span>"
+        forecast = _mmt(g["forecast_mt"])
+        if g["forecast_low_mt"] is not None:
+            forecast += (
+                f"<div class='flat'>{_mmt(g['forecast_low_mt'])} to "
+                f"{_mmt(g['forecast_high_mt'])}</div>"
+            )
+        if g["forecast_mt"] is not None and g["my_week"] < RELIABLE_FROM_WEEK.get(
+            g["commodity"], 1
+        ):
+            forecast = (
+                "<span class='flat' title='Too early in the season to beat last "
+                f"season&#39;s total'>({forecast})</span>"
             )
         rows.append(
             f"<tr><td>{html.escape(g['commodity'])}<div class='flat'>"
@@ -454,7 +469,7 @@ def _grain_section(data: DashboardData) -> str:
             f"<td class='num'>{_mmt(g['shipped_mt'])}</td>"
             f"<td class='num'>{_mmt(g['outstanding_mt'])}</td>"
             f"<td class='num'>{_thousand(g['net_sales_4wk_avg_mt'])}</td>"
-            f"<td class='num'>{projection}</td></tr>"
+            f"<td class='num'>{forecast}</td></tr>"
         )
     as_of = max(g["week_ending"] for g in data.grain_now)
     body = (
@@ -464,13 +479,15 @@ def _grain_section(data: DashboardData) -> str:
         "same week (seasons start September 1). Million metric tons unless noted.</p>"
         "<table><tr><th>Crop</th><th>Committed</th><th>vs last season</th>"
         "<th>vs 5-yr avg</th><th>Shipped</th><th>Sold, not shipped</th>"
-        "<th>New sales, 4-wk avg (thousand t/wk)</th><th>Season projection</th></tr>"
+        "<th>New sales, 4-wk avg (thousand t/wk)</th><th>Season forecast, likely range</th>"
+        "</tr>"
         + "".join(rows)
-        + "</table><p class='note' style='margin-top:8px'>Season projection: "
-        "committed so far divided by the share of a season's exports usually booked by "
-        f"this week. Shown in brackets before week {GRAIN_PROJECTION_FIRST_WEEK} "
-        "(early December): until then it has been no more accurate than repeating last "
-        "season's total.</p>"
+        + "</table><p class='note' style='margin-top:8px'>Season forecast: total tons "
+        "the US will ship this season, from how far booking has got compared with past "
+        "seasons (src/ml/grain_forecast). In past seasons the final total fell inside "
+        "the likely range about 3 times in 4. Shown in brackets while it has not yet "
+        "beaten simply repeating last season's total (corn before week "
+        f"{RELIABLE_FROM_WEEK['Corn']}, early November).</p>"
     )
     charts = []
     for g in data.grain_now:
