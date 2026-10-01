@@ -152,8 +152,9 @@ Upstream terms still apply to each source's data. In particular:
   This product uses the Census Bureau Data API but is not endorsed or certified
   by the Census Bureau.
 - `us_export_sales`, `usda_wasde`: **Source: U.S. Department of Agriculture**
-  (Foreign Agricultural Service export sales via AgTransport; Office of the
-  Chief Economist WASDE report data), public domain.
+  (Foreign Agricultural Service export sales via AgTransport; World Agricultural
+  Outlook Board WASDE reports via the National Agricultural Library's ESMIS),
+  public domain.
 """
 
 

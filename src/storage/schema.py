@@ -239,7 +239,7 @@ USDA_WASDE = TableSchema(
     version="0.1.0",
     description=(
         "USDA monthly WASDE supply and demand estimates, every line of every report "
-        "since April 2010 as published at the time (each release is a vintage)"
+        "since September 2010 as published at the time (each release is a vintage)"
     ),
     raw_sql="""
 CREATE TABLE IF NOT EXISTS usda_wasde (

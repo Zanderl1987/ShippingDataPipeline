@@ -40,30 +40,42 @@ miss against the final total, in percent. "USDA" is USDA's projection with the
 same level correction, so the gap in how the two count exports does not count
 against it.
 
-Seasons 2014/15 to 2025/26 (11-12 per row):
+Seasons 2015/16 to 2025/26 (11 per row):
 
 | Crop | Stage | Last season | Pace | USDA | Forecast | Final inside range |
 |---|---|---|---|---|---|---|
-| Soybeans | weeks 1-8 (Sep-Oct) | 11.2 | 19.1 | 7.8 | **5.3** | 100% |
-| Soybeans | weeks 9-17 (Nov-Dec) | 11.2 | 12.6 | 6.7 | **4.7** | 100% |
-| Soybeans | weeks 18-30 (Jan-Mar) | 11.2 | 6.3 | 4.3 | **4.0** | 100% |
-| Soybeans | weeks 31-53 (Apr-Aug) | 10.9 | 1.4 | 1.9 | **1.3** | 89% |
+| Soybeans | weeks 1-8 (Sep-Oct) | 11.2 | 19.1 | 7.8 | **5.7** | 98% |
+| Soybeans | weeks 9-17 (Nov-Dec) | 11.2 | 12.6 | 6.8 | **4.8** | 100% |
+| Soybeans | weeks 18-30 (Jan-Mar) | 11.2 | 6.5 | **4.1** | 4.5 | 100% |
+| Soybeans | weeks 31-53 (Apr-Aug) | 11.2 | 1.5 | 2.4 | **1.3** | 88% |
 | Corn | weeks 1-8 (Sep-Oct) | 16.8 | 28.4 | **15.4** | **15.4** | 75% |
-| Corn | weeks 9-17 (Nov-Dec) | 16.8 | 16.9 | **9.6** | **9.6** | 74% |
-| Corn | weeks 18-30 (Jan-Mar) | 16.8 | 8.0 | **6.1** | **6.1** | 85% |
-| Corn | weeks 31-53 (Apr-Aug) | 16.3 | **1.8** | 3.1 | 3.1 | 78% |
+| Corn | weeks 9-17 (Nov-Dec) | 16.8 | 16.9 | **9.5** | **9.5** | 74% |
+| Corn | weeks 18-30 (Jan-Mar) | 16.8 | 8.1 | **6.0** | **6.0** | 85% |
+| Corn | weeks 31-53 (Apr-Aug) | 16.8 | **1.7** | 3.1 | 3.1 | 78% |
 
-- **Soybeans:** the forecast beats USDA's projection at every stage of the
-  season. Its average miss is also lower at every stage: 7.3 vs 8.4% in
-  Sep-Oct, 1.9 vs 2.6% in Apr-Aug. Its worst miss is never larger: 20.6 vs
-  27.9% in Sep-Oct.
+- **Soybeans:** the forecast beats USDA's projection in three of four stages.
+  In Jan-Mar its median miss is 0.4 points worse (4.5 vs 4.1%), within noise
+  over 11 seasons. Its average miss is lower at every stage: 7.3 vs 8.4% in
+  Sep-Oct, 5.2 vs 6.2% in Nov-Dec, 4.8 vs 5.2% in Jan-Mar, 2.0 vs 2.7% in
+  Apr-Aug. Its worst miss is never larger: 19.9 vs 28.1% in Sep-Oct.
 - **Corn:** moving USDA's projection toward pace made it worse before April.
   Corn's sales pace generalizes poorly: its totals swing far more than
   soybeans' (+110% after the 2012 drought, -62% the next season). From April
-  pace alone is better (1.8% vs 3.1%). Both are within about 3% by then, so
+  pace alone is better (1.7% vs 3.1%). Both are within about 3% by then, so
   the rule was not tuned further to these seasons.
 - **Likely range:** it is cautious for soybeans, where the final total almost
   always fell inside it. For corn it held the final total about 3 times in 4.
+
+### Change of WASDE source (2026-10-01)
+
+The figures above use WASDE reports from USDA's ESMIS library, which the
+pipeline now collects (usda.gov blocks GitHub's servers). The first version of
+these results used usda.gov's CSV copies, as collected then. That collection
+lacked five reports (January-April and November 2021) and had five more from
+2010 (April-August, before ESMIS has XML). With the complete 2021 record,
+USDA's own Jan-Mar soybean miss falls from 4.3 to 4.1%, and the forecast's
+rises from 4.0 to 4.5%, so the earlier "beats USDA at every stage" did not
+hold. The buyer-mix tests below were run on the earlier data.
 
 ### Before USDA was added
 
@@ -120,8 +132,8 @@ selection risk. The model kept has at most two parameters per week.
 
 ## Limits and next steps
 
-- **Short USDA history:** WASDE vintages start in April 2010, so the USDA
-  version is tested on only 12 seasons.
+- **Short USDA history:** WASDE vintages start in September 2010, so the USDA
+  version is tested on only 11 seasons.
 - **Different measure from USDA:** the target is the export sales program's
   season total. USDA's figure, and Census customs totals, run a few percent
   higher.
