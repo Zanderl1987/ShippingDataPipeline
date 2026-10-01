@@ -461,8 +461,19 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Auth** | Free, instant API key at `api.census.gov/data/key_signup.html` |
 | **Format** | REST JSON — list of lists, header row first (Census's standard shape across every Bureau API) |
 | **Endpoints** | `exports/hs` (fields `E_COMMODITY`/`ALL_VAL_MO`) and `imports/hs` (fields `I_COMMODITY`/`GEN_VAL_MO`, i.e. General Imports total value) — confirmed via each endpoint's own keyless `variables.json` and the API's published example query, not guessed |
-| **Collector** | `src/collectors/census_trade.py` — `collect_trade_data(period=..., comm_lvl="HS2", flows=("X","M"))`. Built 2026-08-28. **Not live-verified** — `CENSUS_API_KEY` was not yet registered, so the metadata/field names are confirmed but the authenticated response body is not. Verify against a real response the first time a key lands. |
-| **Verdict** | **GO — BUILT, pending key.** Wired into `collect_all.py` as `census_trade` (monthly, `requires_key="census_api_key"`, SKIPs cleanly until `CENSUS_API_KEY` is set). Writes to the shared `trade_flow` table (reporter_code="US", currency="USD") alongside UN Comtrade and Eurostat Comext. |
+| **Collector** | `src/collectors/census_trade.py` — `collect_trade_data(periods=...)`. Rebuilt and live-verified 2026-09-30 (key registered that day; CI secret `CENSUS_API_KEY`). |
+| **Tables** | `us_trade_products`: every HS10 product, world total, monthly — general + consumption value and quantity (with units), dutiable value, calculated duty, CIF, charges, vessel/air/container value and weight; exports fetched as DF=1 (domestic) and DF=2 (foreign re-exports). `us_trade_partners`: HS2 chapter × individual partner country, monthly — value, consumption value, duty, mode value/weight. |
+| **Gotchas (live-measured 2026-09-30)** | Quantities exist only at HS10 (unit is blank at HS6 and above). The country list mixes in the world total (`-`) and overlapping groups (`0003` EU, `0020` USMCA, `0022` OECD ... all codes starting `0`); they are dropped from `us_trade_partners`. All-chapters × all-countries in one request hits a ~150 s server timeout (exports 500 every time), so partners are fetched one chapter at a time; `time=from YYYY-MM to YYYY-MM` ranges are fast (ch. 84 exports 2013–2026 in ~21 s). A bad/unactivated key answers 302 → `invalid_key.html`, a missing key 302 → `missing_key.html`. Census's monthly series was annual-revised 2026-06-20 (2023–25). |
+| **Verdict** | **GO — LIVE.** `census_trade` in `collect_all.py` (monthly). Normal runs re-fetch the last 4 months; July/August runs re-fetch 40 months to take in the June annual revision; CI with `SDP_ALLOW_BULK_BACKFILL` and an empty table fetches 2013-01 onward. No longer writes to `trade_flow` — that table is annual-grain and would have overwritten each month with the next. |
+
+### 5.3b USDA weekly export sales (AgTransport Socrata `wnn7-29tu`)
+
+| Field | Detail |
+|-------|--------|
+| **Data** | Weekly US export sales of corn, soybeans and wheat (by class) by destination country, 1999-06 → present: shipments, net new sales, and booked-but-unshipped outstanding sales for the current and next marketing year — an order book for US grain exports |
+| **Access** | Keyless Socrata mirror of USDA FAS Export Sales Reporting. The full 40-commodity program is only on FAS's own query system (`apps.fas.usda.gov/esrqs`). |
+| **Collector** | `src/collectors/usda_export_sales.py` → `us_export_sales`. Weekly; re-fetches the last 8 weeks; full history (~330K rows) only in CI bulk backfill. Live-verified 2026-09-30. |
+| **Verdict** | **GO — LIVE.** |
 
 ### 5.4 Eurostat Comext (international trade in goods) `ec.europa.eu/eurostat/api/comext/dissemination/sdmx/2.1`
 

@@ -278,6 +278,18 @@ def get_collectors() -> list[CollectorDef]:
         logger.debug("census_trade collector not available: %s", e)
 
     try:
+        from src.collectors.usda_export_sales import collect_export_sales
+        collectors.append(
+            CollectorDef(
+                name="usda_export_sales",
+                collect_fn=collect_export_sales,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.debug("usda_export_sales collector not available: %s", e)
+
+    try:
         from src.collectors.fred_oil import collect_oil_prices as collect_fred_oil_prices
         collectors.append(
             CollectorDef(

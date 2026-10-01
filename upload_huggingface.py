@@ -129,6 +129,10 @@ Upstream terms still apply to each source's data. In particular:
   of charge from the IMF. Columns are renamed and retyped; values are unaltered.
 - `disruption_events` also derives from GDACS, the Global Disaster Alert and
   Coordination System (https://www.gdacs.org).
+- `us_trade_products`, `us_trade_partners`: **Source: U.S. Census Bureau,
+  International Trade** (https://www.census.gov/foreign-trade/), public domain.
+  This product uses the Census Bureau Data API but is not endorsed or certified
+  by the Census Bureau.
 """
 
 

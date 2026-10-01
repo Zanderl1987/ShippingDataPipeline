@@ -133,7 +133,7 @@ TRADE_FLOW = TableSchema(
     ],
     version="0.1.0",
     description=(
-        "International trade flow data (UN Comtrade, Eurostat Comext, US Census) -- "
+        "Annual international trade flow data (UN Comtrade, Eurostat Comext) -- "
         "check the currency column, values are not all USD"
     ),
     raw_sql="""
@@ -148,6 +148,116 @@ CREATE TABLE IF NOT EXISTS trade_flow (
     currency        VARCHAR DEFAULT 'USD',
     source          VARCHAR,
     ingested_at     TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+US_TRADE_PRODUCTS = TableSchema(
+    name="us_trade_products",
+    partition_cols=["year"],
+    dedup_keys=["period_date", "flow_code", "export_origin", "commodity_code", "source"],
+    version="0.1.0",
+    description=(
+        "US monthly imports/exports for every HS10 product, world total (US Census) -- "
+        "value, quantity + unit, duty, CIF, and value/weight by vessel, air, container; "
+        "exports split domestic vs foreign-origin re-exports"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS us_trade_products (
+    period_date             DATE,
+    year                    INTEGER,
+    month                   INTEGER,
+    flow_code               VARCHAR,
+    export_origin           VARCHAR,
+    commodity_code          VARCHAR,
+    commodity_desc          VARCHAR,
+    value_usd               DOUBLE,
+    consumption_value_usd   DOUBLE,
+    quantity_1              DOUBLE,
+    unit_1                  VARCHAR,
+    quantity_2              DOUBLE,
+    unit_2                  VARCHAR,
+    consumption_quantity_1  DOUBLE,
+    consumption_quantity_2  DOUBLE,
+    dutiable_value_usd      DOUBLE,
+    calculated_duty_usd     DOUBLE,
+    cif_value_usd           DOUBLE,
+    charges_usd             DOUBLE,
+    vessel_value_usd        DOUBLE,
+    vessel_weight_kg        DOUBLE,
+    air_value_usd           DOUBLE,
+    air_weight_kg           DOUBLE,
+    container_value_usd     DOUBLE,
+    container_weight_kg     DOUBLE,
+    source                  VARCHAR,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+US_TRADE_PARTNERS = TableSchema(
+    name="us_trade_partners",
+    partition_cols=["year"],
+    dedup_keys=["period_date", "flow_code", "commodity_code", "partner_code", "source"],
+    version="0.1.0",
+    description=(
+        "US monthly imports/exports by HS2 chapter and individual partner country "
+        "(US Census) -- regional groups and the world total are excluded"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS us_trade_partners (
+    period_date             DATE,
+    year                    INTEGER,
+    month                   INTEGER,
+    flow_code               VARCHAR,
+    commodity_code          VARCHAR,
+    commodity_desc          VARCHAR,
+    partner_code            VARCHAR,
+    partner_name            VARCHAR,
+    value_usd               DOUBLE,
+    consumption_value_usd   DOUBLE,
+    calculated_duty_usd     DOUBLE,
+    vessel_value_usd        DOUBLE,
+    vessel_weight_kg        DOUBLE,
+    air_value_usd           DOUBLE,
+    air_weight_kg           DOUBLE,
+    container_value_usd     DOUBLE,
+    container_weight_kg     DOUBLE,
+    source                  VARCHAR,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
+US_EXPORT_SALES = TableSchema(
+    name="us_export_sales",
+    partition_cols=["source"],
+    dedup_keys=[
+        "week_ending", "marketing_year", "commodity", "wheat_class", "country", "source",
+    ],
+    version="0.1.0",
+    description=(
+        "USDA weekly US export sales of corn, soybeans and wheat by destination -- "
+        "shipments plus booked-but-unshipped (outstanding) sales, metric tons"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS us_export_sales (
+    week_ending                 DATE,
+    marketing_year              VARCHAR,
+    commodity                   VARCHAR,
+    wheat_class                 VARCHAR,
+    country                     VARCHAR,
+    unit                        VARCHAR,
+    weekly_exports              DOUBLE,
+    accumulated_exports         DOUBLE,
+    outstanding_sales           DOUBLE,
+    gross_new_sales             DOUBLE,
+    net_sales                   DOUBLE,
+    total_commitments           DOUBLE,
+    next_my_outstanding_sales   DOUBLE,
+    next_my_net_sales           DOUBLE,
+    source                      VARCHAR,
+    ingested_at                 TIMESTAMP DEFAULT now()
 );
 """,
 )
@@ -1051,6 +1161,9 @@ ALL_TABLES: list[TableSchema] = [
     MARINE_WEATHER,
     WEATHER,
     TRADE_FLOW,
+    US_TRADE_PRODUCTS,
+    US_TRADE_PARTNERS,
+    US_EXPORT_SALES,
     FREIGHT_RATES,
     CHOKEPOINT_STATUS,
     OIL_INVENTORIES,
