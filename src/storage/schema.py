@@ -229,6 +229,39 @@ CREATE TABLE IF NOT EXISTS us_trade_partners (
 """,
 )
 
+USDA_WASDE = TableSchema(
+    name="usda_wasde",
+    partition_cols=["release_year"],
+    dedup_keys=[
+        "release_date", "report_title", "attribute", "reliability_projection",
+        "commodity", "region", "market_year", "period", "unit", "source",
+    ],
+    version="0.1.0",
+    description=(
+        "USDA monthly WASDE supply and demand estimates, every line of every report "
+        "since April 2010 as published at the time (each release is a vintage)"
+    ),
+    raw_sql="""
+CREATE TABLE IF NOT EXISTS usda_wasde (
+    release_date            DATE,
+    release_year            INTEGER,
+    wasde_number            INTEGER,
+    report_title            VARCHAR,
+    attribute               VARCHAR,
+    reliability_projection  VARCHAR,
+    commodity               VARCHAR,
+    region                  VARCHAR,
+    market_year             VARCHAR,
+    proj_est_flag           VARCHAR,
+    period                  VARCHAR,
+    value                   DOUBLE,
+    unit                    VARCHAR,
+    source                  VARCHAR,
+    ingested_at             TIMESTAMP DEFAULT now()
+);
+""",
+)
+
 US_EXPORT_SALES = TableSchema(
     name="us_export_sales",
     partition_cols=["source"],
@@ -1164,6 +1197,7 @@ ALL_TABLES: list[TableSchema] = [
     US_TRADE_PRODUCTS,
     US_TRADE_PARTNERS,
     US_EXPORT_SALES,
+    USDA_WASDE,
     FREIGHT_RATES,
     CHOKEPOINT_STATUS,
     OIL_INVENTORIES,

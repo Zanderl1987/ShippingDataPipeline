@@ -290,6 +290,18 @@ def get_collectors() -> list[CollectorDef]:
         logger.debug("usda_export_sales collector not available: %s", e)
 
     try:
+        from src.collectors.usda_wasde import collect_wasde
+        collectors.append(
+            CollectorDef(
+                name="usda_wasde",
+                collect_fn=collect_wasde,
+                schedule="weekly",
+            )
+        )
+    except ImportError as e:
+        logger.debug("usda_wasde collector not available: %s", e)
+
+    try:
         from src.collectors.fred_oil import collect_oil_prices as collect_fred_oil_prices
         collectors.append(
             CollectorDef(

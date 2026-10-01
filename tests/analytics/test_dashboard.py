@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from unittest.mock import patch
 
 import duckdb
 
@@ -91,6 +92,7 @@ def _grain_row(week: int, crop: str = "Soybeans") -> dict:
         "shipped_mt": 1_000_000, "outstanding_mt": 20_200_000,
         "net_sales_4wk_avg_mt": 1_637_000, "forecast_mt": 44_230_000,
         "forecast_low_mt": 39_480_000, "forecast_high_mt": 51_010_000,
+        "usda_mt": 45_860_000, "usda_release_date": date(2026, 9, 11),
     }
 
 
@@ -107,13 +109,19 @@ def test_grain_section_brackets_early_forecast_and_flags_new_buyers() -> None:
     assert "Corn and soybean demand" in page
     assert "21.20" in page and "+94%" in page and "1,637" in page
     assert "44.23" in page and "39.48 to 51.01" in page
+    assert "45.86" in page and "released 2026-09-11" in page
     assert "(44.23" not in page  # soybeans: usable from week 1
     assert '<span class="up">new</span>' in page and "-21%" in page
     assert "A&lt;b&gt;" in page and "A<b>" not in page
 
-    corn = build_html(DashboardData([], {}, [], None, None, grain_now=[_grain_row(3, "Corn")]))
-    assert "(44.23" in corn  # corn in week 3: too early to beat last season
-    later = build_html(DashboardData([], {}, [], None, None, grain_now=[_grain_row(20, "Corn")]))
+    with patch.dict("src.analytics.dashboard.RELIABLE_FROM_WEEK", {"Corn": 9}):
+        early = build_html(
+            DashboardData([], {}, [], None, None, grain_now=[_grain_row(3, "Corn")])
+        )
+        later = build_html(
+            DashboardData([], {}, [], None, None, grain_now=[_grain_row(20, "Corn")])
+        )
+    assert "(44.23" in early  # before the week it starts beating last season
     assert "(44.23" not in later and "44.23" in later
 
 

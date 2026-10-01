@@ -53,7 +53,8 @@ TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES} | {
     ),
     "grain_export_forecast": (
         "Derived: forecast of this season's total US corn and soybean exports at each "
-        "week so far, with a likely range (src/ml/grain_forecast)"
+        "week so far, anchored on USDA's WASDE projection, with a likely range "
+        "(src/ml/grain_forecast)"
     ),
     "grain_trade_monthly": (
         "Derived: monthly US corn, soybean, soybean meal and soybean oil exports and "
@@ -150,6 +151,9 @@ Upstream terms still apply to each source's data. In particular:
   International Trade** (https://www.census.gov/foreign-trade/), public domain.
   This product uses the Census Bureau Data API but is not endorsed or certified
   by the Census Bureau.
+- `us_export_sales`, `usda_wasde`: **Source: U.S. Department of Agriculture**
+  (Foreign Agricultural Service export sales via AgTransport; Office of the
+  Chief Economist WASDE report data), public domain.
 """
 
 

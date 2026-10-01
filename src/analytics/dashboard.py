@@ -179,13 +179,15 @@ def _load_grain(conn: duckdb.DuckDBPyConnection, data: DashboardData) -> None:
         has_forecast = _has_table(conn, "grain_export_forecast")
         for now in data.grain_now:
             found = _rows(conn, """
-                SELECT forecast_mt, forecast_low_mt, forecast_high_mt
+                SELECT forecast_mt, forecast_low_mt, forecast_high_mt,
+                       usda_mt, usda_release_date
                 FROM grain_export_forecast
                 WHERE commodity = ? AND marketing_year = ? AND my_week = ?
             """, [now["commodity"], now["marketing_year"], now["my_week"]]) \
                 if has_forecast else []
             now.update(found[0] if found else
-                       dict.fromkeys(["forecast_mt", "forecast_low_mt", "forecast_high_mt"]))
+                       dict.fromkeys(["forecast_mt", "forecast_low_mt", "forecast_high_mt",
+                                      "usda_mt", "usda_release_date"]))
         for now in data.grain_now:
             # Earlier seasons over every week, so this season's line can be
             # read against where they ended up.
@@ -469,9 +471,12 @@ def _grain_section(data: DashboardData) -> str:
             f"<td class='num'>{_mmt(g['shipped_mt'])}</td>"
             f"<td class='num'>{_mmt(g['outstanding_mt'])}</td>"
             f"<td class='num'>{_thousand(g['net_sales_4wk_avg_mt'])}</td>"
+            f"<td class='num'>{_mmt(g['usda_mt'])}</td>"
             f"<td class='num'>{forecast}</td></tr>"
         )
     as_of = max(g["week_ending"] for g in data.grain_now)
+    releases = [g["usda_release_date"] for g in data.grain_now if g.get("usda_release_date")]
+    usda_when = f" (released {max(releases)})" if releases else ""
     body = (
         f"<p class='note'>USDA weekly export sales to the week ending {as_of}. "
         "Committed = tons shipped this season plus tons sold but not yet shipped; "
@@ -479,15 +484,18 @@ def _grain_section(data: DashboardData) -> str:
         "same week (seasons start September 1). Million metric tons unless noted.</p>"
         "<table><tr><th>Crop</th><th>Committed</th><th>vs last season</th>"
         "<th>vs 5-yr avg</th><th>Shipped</th><th>Sold, not shipped</th>"
-        "<th>New sales, 4-wk avg (thousand t/wk)</th><th>Season forecast, likely range</th>"
+        "<th>New sales, 4-wk avg (thousand t/wk)</th><th>USDA projection</th>"
+        "<th>Season forecast, likely range</th>"
         "</tr>"
         + "".join(rows)
-        + "</table><p class='note' style='margin-top:8px'>Season forecast: total tons "
-        "the US will ship this season, from how far booking has got compared with past "
-        "seasons (src/ml/grain_forecast). In past seasons the final total fell inside "
-        "the likely range about 3 times in 4. Shown in brackets while it has not yet "
-        "beaten simply repeating last season's total (corn before week "
-        f"{RELIABLE_FROM_WEEK['Corn']}, early November).</p>"
+        + "</table><p class='note' style='margin-top:8px'>USDA projection: US "
+        f"exports for the season in USDA's latest monthly WASDE report{usda_when}. "
+        "Season forecast: total tons the export sales program will record this season "
+        "(src/ml/grain_forecast). It starts from USDA's projection, corrected for USDA "
+        "counting exports 2-4% higher, and for soybeans moves it toward the pace of "
+        "sales since. In 2014-2025 it missed the final total by a median 5% in "
+        "September and October and 1-3% from April. Shown in brackets while it has not "
+        "yet beaten simply repeating last season's total.</p>"
     )
     charts = []
     for g in data.grain_now:

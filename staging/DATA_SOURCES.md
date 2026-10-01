@@ -475,6 +475,16 @@ Each source is categorized by data type and rated across the axes that matter fo
 | **Collector** | `src/collectors/usda_export_sales.py` → `us_export_sales`. Weekly; re-fetches the last 8 weeks; full history (~330K rows) only in CI bulk backfill. Live-verified 2026-09-30. |
 | **Verdict** | **GO — LIVE.** |
 
+### 5.3c USDA WASDE, every report as published (`usda.gov/sites/default/files/documents/`)
+
+| Field | Detail |
+|-------|--------|
+| **Data** | USDA's monthly World Agricultural Supply and Demand Estimates: production, use, trade and stocks for grains, oilseeds, cotton, sugar, meat and dairy, US and world, each line as it appeared on release day (April 2010 →). One row per release × line, so every vintage is kept: what USDA expected at the time, the fair benchmark for any forecast. ~4,900 rows per report. |
+| **Access** | Keyless CSV files from USDA's Office of the Chief Economist ("Historical WASDE Report Data" page). 2010-04 → 2015-12 and 2016-01 → 2020-12 are one ZIP each; from 2021-01 one CSV per month, `oce-wasde-report-data-YYYY-MM.csv`, with a corrected reissue named `...-V2.csv`. |
+| **Gotchas** | usda.gov's bot filter returns 403 to non-browser clients (no User-Agent, or a bare one on the ZIPs), so requests send ordinary browser headers. The listing page itself is 403 to scripts, so file names are built, not scraped. A month with no file returns usda.gov's HTML 404 page. October 2025 has no report (cancelled in the government shutdown). US exports are in the world tables in million metric tons (`World Corn Supply and Use`, `World Soybean Supply and Use`, commodity `Oilseed, Soybean`); the US tables give corn in million bushels. USDA's season export totals run 2-4% above the export sales program's. |
+| **Collector** | `src/collectors/usda_wasde.py` → `usda_wasde`. Weekly; re-fetches the last 3 months (for V2 reissues); archives and missing months since 2021 only in CI bulk backfill. Live-verified 2026-10-01: 934,122 rows, 190 reports, 2010-04-09 → 2026-09-11, no duplicate keys, rerun idempotent. |
+| **Verdict** | **GO — LIVE.** Used as the anchor of `src/ml/grain_forecast`. |
+
 ### 5.4 Eurostat Comext (international trade in goods) `ec.europa.eu/eurostat/api/comext/dissemination/sdmx/2.1`
 
 | Field | Detail |
