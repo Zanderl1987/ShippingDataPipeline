@@ -14,21 +14,24 @@ count exports does not count against it.
 from __future__ import annotations
 
 import argparse
+from datetime import date, timedelta
 
 import duckdb
 import polars as pl
 
-from src.analytics.grain_demand import create_grain_export_pace
+from src.analytics.grain_demand import COMMODITIES, create_grain_export_pace
 from src.ml.grain_forecast.model import forecast_seasons, season_frame
 from src.storage.writer import get_db_path
 
 HF_REPO = "ZanderL1337/shipping-data-pipeline"
-STAGES = [(1, 8, "weeks 1-8 (Sep-Oct)"), (9, 17, "weeks 9-17 (Nov-Dec)"),
-          (18, 30, "weeks 18-30 (Jan-Mar)"), (31, 53, "weeks 31-53 (Apr-Aug)")]
+#: Stages of the season in marketing-year weeks; for corn and soybeans they are
+#: Sep-Oct, Nov-Dec, Jan-Mar and Apr-Aug, for wheat Jun-Jul, Aug-Sep, Oct-Dec
+#: and Jan-May.
+STAGES = [(1, 8), (9, 17), (18, 30), (31, 53)]
 MODELS = {"last_season_mt": "last season", "pace_projection_mt": "pace",
           "usda_alone_mt": "USDA", "forecast_mt": "forecast"}
-#: USDA's projection alone (pace weight 0), level-corrected, for both crops.
-USDA_ALONE = {("Corn", "usda"): 0.0, ("Soybeans", "usda"): 0.0,
+#: USDA's projection alone (pace weight 0), level-corrected, for every crop.
+USDA_ALONE = {("Corn", "usda"): 0.0, ("Soybeans", "usda"): 0.0, ("Wheat", "usda"): 0.0,
               ("Corn", "last_season"): 1.0}
 
 
@@ -56,8 +59,9 @@ def run(frame: pl.DataFrame) -> pl.DataFrame:
 def score(forecasts: pl.DataFrame) -> pl.DataFrame:
     done = forecasts.filter(pl.col("final_mt").is_not_null())
     stage = pl.lit(None, dtype=pl.Utf8)
-    for lo, hi, name in reversed(STAGES):
-        stage = pl.when(pl.col("my_week").is_between(lo, hi)).then(pl.lit(name)).otherwise(stage)
+    for lo, hi in reversed(STAGES):
+        stage = (pl.when(pl.col("my_week").is_between(lo, hi))
+                 .then(pl.lit(f"weeks {lo:>2}-{hi}")).otherwise(stage))
     done = done.with_columns(stage.alias("stage"))
     return done.group_by("commodity", "anchor", "stage").agg(
         pl.col("marketing_year").n_unique().alias("seasons"),
@@ -67,7 +71,20 @@ def score(forecasts: pl.DataFrame) -> pl.DataFrame:
         ],
         (pl.col("final_mt").is_between(pl.col("forecast_low_mt"), pl.col("forecast_high_mt"))
          .mean() * 100).round(0).alias("in range %"),
+    ).with_columns(
+        pl.struct("commodity", "stage").map_elements(
+            lambda r: _months(r["commodity"], r["stage"]), return_dtype=pl.Utf8,
+        ).alias("months"),
     ).sort("commodity", "anchor", "stage", descending=[False, True, False])
+
+
+def _months(commodity: str, stage: str) -> str:
+    """'Sep-Oct' for weeks 1-8 of a season starting in September."""
+    lo, hi = (int(w) for w in stage.removeprefix("weeks ").split("-"))
+    start = date(2001, COMMODITIES.get(commodity, 9), 1)
+    first = start + timedelta(days=(lo - 1) * 7 + 6)  # the month a stage's first week ends in
+    last = start + timedelta(days=min(hi * 7, 365) - 1)
+    return f"{first:%b}-{last:%b}"
 
 
 def main(argv: list[str] | None = None) -> None:

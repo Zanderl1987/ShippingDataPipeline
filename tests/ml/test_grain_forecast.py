@@ -151,3 +151,31 @@ def test_season_frame_uses_the_wasde_published_before_the_sales_data() -> None:
     # Week 1 sales came out Sep 11, before the Sep 12 WASDE; week 2 after it.
     assert frame["usda_mt"].to_list() == [47e6, 46e6]
     assert frame["usda_release_date"].to_list() == [date(2025, 8, 12), date(2025, 9, 12)]
+
+
+def test_season_frame_reads_each_crops_wasde_line() -> None:
+    conn = duckdb.connect()
+    conn.execute("""
+        CREATE TABLE grain_export_pace AS SELECT * FROM (VALUES
+            ('Wheat', '2025/2026', 14, DATE '2025-09-04', 10.0, 20.0, NULL),
+            ('Wheat', '2024/2025', 14, DATE '2024-09-05', 10.0, 20.0, 21.0),
+            ('Corn', '2025/2026', 1, DATE '2025-09-04', 10.0, 70.0, NULL),
+            ('Corn', '2024/2025', 1, DATE '2024-09-05', 10.0, 70.0, 60.0)
+        ) t(commodity, marketing_year, my_week, week_ending, commitments_mt,
+            pace_projection_mt, final_shipped_mt)
+    """)
+    conn.execute("""
+        CREATE TABLE usda_wasde AS SELECT * FROM (VALUES
+            (DATE '2025-08-12', 'World Wheat Supply and Use', 'Exports', NULL,
+             'Wheat', 'United States', '2025/26', 'Annual', 23.8, 'Million Metric Tons'),
+            (DATE '2025-08-12', 'World Corn Supply and Use', 'Exports', NULL,
+             'Corn', 'United States', '2025/26', 'Annual', 72.4, 'Million Metric Tons'),
+            -- The US table in bushels is not used.
+            (DATE '2025-08-12', 'U.S. Wheat Supply and Use', 'Exports', NULL,
+             'Wheat', 'United States', '2025/26', 'Annual', 875.0, 'Million Bushels')
+        ) t(release_date, report_title, attribute, reliability_projection, commodity,
+            region, market_year, period, value, unit)
+    """)
+    frame = season_frame(conn).filter(pl.col("marketing_year") == "2025/2026")
+    got = dict(zip(frame["commodity"], frame["usda_mt"], strict=True))
+    assert got == {"Corn": pytest.approx(72.4e6), "Wheat": pytest.approx(23.8e6)}

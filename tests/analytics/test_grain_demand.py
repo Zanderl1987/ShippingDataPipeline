@@ -54,7 +54,7 @@ def three_seasons(conn) -> None:
         # 2025/26, the season in progress.
         (date(2025, 9, 4), "2025/2026", "Corn", "MEXICO", 0, 45, 45, 5),
         # Not tracked.
-        (date(2025, 9, 4), "2025/2026", "Wheat", "MEXICO", 0, 999, 999, 5),
+        (date(2025, 9, 4), "2025/2026", "Sorghum", "MEXICO", 0, 999, 999, 5),
     ])
 
 
@@ -91,6 +91,27 @@ def test_marketing_year_weeks_line_up_across_years(conn, three_seasons) -> None:
         (date(2024, 9, 5), 1), (date(2024, 9, 12), 2),
         (date(2025, 9, 4), 1),
     }
+
+
+def test_wheat_season_starts_in_june_and_sums_classes(conn) -> None:
+    conn.executemany(
+        "INSERT INTO us_export_sales (week_ending, marketing_year, commodity, wheat_class, "
+        "country, accumulated_exports, outstanding_sales, total_commitments, net_sales, "
+        "weekly_exports, source) VALUES (?, ?, 'Wheat', ?, 'JAPAN', ?, ?, ?, 1, 1, "
+        "'usda_export_sales')",
+        [
+            (date(2025, 6, 5), "2025/2026", "HRW", 10, 20, 30),
+            (date(2025, 6, 5), "2025/2026", "White", 5, 5, 10),
+            (date(2025, 9, 4), "2025/2026", "HRW", 40, 0, 40),
+        ],
+    )
+    create_grain_export_pace(conn)
+    create_grain_export_destinations(conn)
+    rows = _rows(conn, "SELECT my_week, commitments_mt FROM grain_export_pace "
+                       "ORDER BY week_ending")
+    assert [(r["my_week"], r["commitments_mt"]) for r in rows] == [(1, 40), (14, 40)]
+    japan = _rows(conn, "SELECT * FROM grain_export_destinations WHERE my_week = 1")
+    assert [(r["country"], r["commitments_mt"]) for r in japan] == [("JAPAN", 40)]
 
 
 def test_destinations_share_and_prior_year(conn, three_seasons) -> None:

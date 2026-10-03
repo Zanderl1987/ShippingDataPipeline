@@ -10,7 +10,7 @@ Sections:
 - Port activity (``port_congestion_proxy`` + ``port_profiles``): a world map of
   the last 7 days' port calls against each port's 90-day average, and the
   biggest risers and fallers. This is activity, not waiting time.
-- Corn and soybean demand (``grain_export_pace``, ``grain_export_destinations``,
+- Corn, soybean and wheat demand (``grain_export_pace``, ``grain_export_destinations``,
   ``grain_trade_monthly``): this season's US export bookings against last
   season and the 5-year average, the biggest buyers, and the latest Census
   month with price per ton.
@@ -448,7 +448,7 @@ def _buyer_change(buyer: Row) -> str:
 
 
 def _grain_section(data: DashboardData) -> str:
-    title = "Corn and soybean demand"
+    title = "Corn, soybean and wheat demand"
     if not data.grain_now:
         return _card(title, "<p class='note'>No export sales data yet.</p>")
     rows = []
@@ -485,7 +485,8 @@ def _grain_section(data: DashboardData) -> str:
         f"<p class='note'>USDA weekly export sales to the week ending {as_of}. "
         "Committed = tons shipped this season plus tons sold but not yet shipped; "
         "buyers book ahead, so this leads shipments. Each season is compared at the "
-        "same week (seasons start September 1). Million metric tons unless noted.</p>"
+        "same week (seasons start September 1, wheat June 1). Million metric tons "
+        "unless noted.</p>"
         "<table><tr><th>Crop</th><th>Committed</th><th>vs last season</th>"
         "<th>vs 5-yr avg</th><th>Shipped</th><th>Sold, not shipped</th>"
         "<th>New sales, 4-wk avg (thousand t/wk)</th><th>USDA projection</th>"
@@ -496,10 +497,11 @@ def _grain_section(data: DashboardData) -> str:
         f"exports for the season in USDA's latest monthly WASDE report{usda_when}. "
         "Season forecast: total tons the export sales program will record this season "
         "(src/ml/grain_forecast). It starts from USDA's projection, corrected for USDA "
-        "counting exports 2-4% higher, and for soybeans moves it toward the pace of "
-        "sales since. In 2014-2025 it missed the final total by a median 5% in "
-        "September and October and 1-3% from April. Shown in brackets while it has not "
-        "yet beaten simply repeating last season's total.</p>"
+        "counting exports differently, and for soybeans and wheat moves it toward the "
+        "pace of sales since. In 2015-2025 it missed the final total by a median 6% "
+        "(soybeans), 15% (corn) and 10% (wheat) in a season's first two months, and "
+        "1-3% in its last five. Shown in brackets while it has not yet beaten simply "
+        "repeating last season's total.</p>"
     )
     charts = []
     for g in data.grain_now:

@@ -43,21 +43,21 @@ TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES} | {
         "weeks with is_complete_week = false are partial"
     ),
     "grain_export_pace": (
-        "Derived: corn and soybean export commitments per marketing-year week vs the "
+        "Derived: corn, soybean and wheat export commitments per marketing-year week vs the "
         "prior year and 5-year average, plus a pace-based season projection "
         "(unreliable before about week 13)"
     ),
     "grain_export_destinations": (
-        "Derived: corn and soybean export commitments per buying country per week, "
+        "Derived: corn, soybean and wheat export commitments per buying country per week, "
         "share of total and usual share (5-season average), vs a year earlier"
     ),
     "grain_export_forecast": (
-        "Derived: forecast of this season's total US corn and soybean exports at each "
+        "Derived: forecast of this season's total US corn, soybean and wheat exports at each "
         "week so far, anchored on USDA's WASDE projection, with a likely range "
         "(src/ml/grain_forecast)"
     ),
     "grain_trade_monthly": (
-        "Derived: monthly US corn, soybean, soybean meal and soybean oil exports and "
+        "Derived: monthly US corn, soybean, soybean meal, soybean oil and wheat exports and "
         "imports (Census): metric tons, USD, USD/ton, vs prior year and 5-year average"
     ),
     "port_congestion_proxy": "Derived: each port's latest 7-day vs 90-day average port calls",

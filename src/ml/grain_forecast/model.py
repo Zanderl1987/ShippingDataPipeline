@@ -23,6 +23,9 @@ for each crop, anchor and week of the season, on that week and the two
 either side, in seasons that had finished before the one being forecast.
 Richer models were tried and did worse out of sample (README.md).
 
+Soybeans and wheat use the fitted weight. For wheat, USDA's figure also counts
+flour and other products, so the fitted level runs 2-10% below it.
+
 Corn's weight is fixed (``FIXED_WEIGHTS``): USDA's projection alone, with
 the level correction; without USDA, pace alone. Fitted weights for corn did
 worse in both cases. Corn's season totals swing far more than soybeans'
@@ -64,18 +67,20 @@ FIXED_WEIGHTS = {("Corn", "usda"): 0.0, ("Corn", "last_season"): 1.0}
 FIT_LEVEL = {"usda": True, "last_season": False}
 #: First week of the season from which the forecast has beaten simply
 #: repeating last season's total in the backtest (README.md).
-RELIABLE_FROM_WEEK = {"Corn": 1, "Soybeans": 1}
+RELIABLE_FROM_WEEK = {"Corn": 1, "Soybeans": 1, "Wheat": 16}
 
 #: WASDE rows holding the US export projection, in million metric tons.
 _WASDE_SQL = """
-    SELECT CASE commodity WHEN 'Corn' THEN 'Corn' ELSE 'Soybeans' END AS commodity,
+    SELECT CASE commodity WHEN 'Oilseed, Soybean' THEN 'Soybeans' ELSE commodity END
+            AS commodity,
         CAST(left(market_year, 4) AS INTEGER) AS season,
         release_date, value * 1e6 AS usda_mt
     FROM usda_wasde
     WHERE region = 'United States' AND attribute = 'Exports' AND period = 'Annual'
       AND unit = 'Million Metric Tons' AND reliability_projection IS NULL
-      AND report_title IN ('World Corn Supply and Use', 'World Soybean Supply and Use')
-      AND commodity IN ('Corn', 'Oilseed, Soybean')
+      AND report_title IN ('World Corn Supply and Use', 'World Soybean Supply and Use',
+                           'World Wheat Supply and Use')
+      AND commodity IN ('Corn', 'Oilseed, Soybean', 'Wheat')
       AND value IS NOT NULL
 """
 

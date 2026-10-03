@@ -107,7 +107,7 @@ def test_grain_section_brackets_early_forecast_and_flags_new_buyers() -> None:
          "commitments_prior_year_mt": 2_290_000, "commitments_vs_prior_year_pct": -21.0},
     ]
     page = build_html(data)
-    assert "Corn and soybean demand" in page
+    assert "Corn, soybean and wheat demand" in page
     assert "21.20" in page and "+94%" in page and "1,637" in page
     assert "44.23" in page and "39.48 to 51.01" in page
     assert "45.86" in page and "released 2026-09-11" in page

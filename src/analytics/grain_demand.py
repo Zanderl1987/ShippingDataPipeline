@@ -1,4 +1,4 @@
-"""Corn and soybean demand: how fast the world is buying US grain this season.
+"""Corn, soybean and wheat demand: how fast the world is buying US grain this season.
 
 Three tables, rebuilt from scratch each run:
 
@@ -25,14 +25,15 @@ counts as 0). "UNKNOWN" is real sales to a buyer USDA has not named yet
 improve the season forecast (src/ml/grain_forecast/README.md).
 
 ``grain_trade_monthly`` -- monthly US exports and imports from the Census
-(``us_trade_products``) for corn, soybeans, soybean meal and soybean oil:
+(``us_trade_products``) for corn, soybeans, soybean meal, soybean oil and wheat:
 metric tons, dollars and dollars per ton. These are the official shipment
 counts, about five weeks behind the month. Exports are US-origin only
 (re-exports excluded), to match what USDA export sales track.
 
-Marketing years for corn and soybeans run September to August. A week's
-number in the marketing year counts 7-day blocks from September 1, so the
-same number lines up across years.
+Marketing years for corn and soybeans run September to August, for wheat
+June to May. A week's number in the marketing year counts 7-day blocks from
+the first of the starting month, so the same number lines up across years.
+Wheat is summed over its classes (HRW, HRS, SRW, White, Durum).
 """
 from __future__ import annotations
 
@@ -47,7 +48,7 @@ DESTINATIONS_TABLE = "grain_export_destinations"
 MONTHLY_TABLE = "grain_trade_monthly"
 
 # commodity -> first month of its US marketing year
-COMMODITIES = {"Corn": 9, "Soybeans": 9}
+COMMODITIES = {"Corn": 9, "Soybeans": 9, "Wheat": 6}
 
 # product -> 4-digit HS heading (every HS10 code under it is summed)
 CENSUS_PRODUCTS = {
@@ -55,6 +56,7 @@ CENSUS_PRODUCTS = {
     "soybeans": "1201",
     "soybean_meal": "2304",
     "soybean_oil": "1507",
+    "wheat": "1001",
 }
 
 BASELINE_YEARS = 5

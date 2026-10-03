@@ -1,7 +1,8 @@
-# Season export forecast: US corn and soybeans
+# Season export forecast: US corn, soybeans and wheat
 
-Forecasts the total tons of corn and soybeans the US will export over the
-current marketing year (September to August). The forecast updates every week
+Forecasts the total tons of corn, soybeans and wheat the US will export over
+the current marketing year (September to August for corn and soybeans, June to
+May for wheat). The forecast updates every week
 from USDA weekly export sales and USDA's monthly WASDE report. It is rebuilt
 in curation as `grain_export_forecast` and shown on the data dashboard next to
 USDA's own projection.
@@ -22,8 +23,9 @@ Three estimates are available at any week of the season:
 - **Last season:** the total shipped last season.
 
 The forecast starts from USDA's projection. It corrects for USDA counting
-exports 2-4% higher than the export sales program. For soybeans it then moves
-toward pace. How far it moves, and the size of the correction, are fit per
+exports 2-4% higher than the export sales program (for wheat 2-10%, since
+USDA's figure includes flour and other products). For soybeans and wheat it
+then moves toward pace. How far it moves, and the size of the correction, are fit per
 crop and per week of the season, only on seasons that finished before the one
 being forecast.
 
@@ -40,7 +42,8 @@ miss against the final total, in percent. "USDA" is USDA's projection with the
 same level correction, so the gap in how the two count exports does not count
 against it.
 
-Seasons 2015/16 to 2025/26 (11 per row):
+Seasons 2015/16 to 2025/26 (11 per row; 10 for wheat's first stage). Stages
+are in weeks of the marketing year, so the months differ for wheat:
 
 | Crop | Stage | Last season | Pace | USDA | Forecast | Final inside range |
 |---|---|---|---|---|---|---|
@@ -52,6 +55,10 @@ Seasons 2015/16 to 2025/26 (11 per row):
 | Corn | weeks 9-17 (Nov-Dec) | 16.8 | 16.9 | **9.5** | **9.5** | 74% |
 | Corn | weeks 18-30 (Jan-Mar) | 16.8 | 8.1 | **6.0** | **6.0** | 85% |
 | Corn | weeks 31-53 (Apr-Aug) | 16.8 | **1.7** | 3.1 | 3.1 | 78% |
+| Wheat | weeks 1-8 (Jun-Jul) | 8.7 | 7.7 | **7.6** | 9.9 | 80% |
+| Wheat | weeks 9-17 (Aug-Sep) | 9.9 | 8.2 | **7.9** | 8.7 | 77% |
+| Wheat | weeks 18-30 (Oct-Dec) | 9.9 | 6.1 | 6.3 | **4.3** | 73% |
+| Wheat | weeks 31-53 (Jan-May) | 9.9 | 1.9 | 2.9 | **1.8** | 69% |
 
 - **Soybeans:** the forecast beats USDA's projection in three of four stages.
   In Jan-Mar its median miss is 0.4 points worse (4.5 vs 4.1%), within noise
@@ -63,8 +70,16 @@ Seasons 2015/16 to 2025/26 (11 per row):
   soybeans' (+110% after the 2012 drought, -62% the next season). From April
   pace alone is better (1.7% vs 3.1%). Both are within about 3% by then, so
   the rule was not tuned further to these seasons.
+- **Wheat (added 2026-10-03):** the forecast beats USDA's projection from
+  October: average miss 5.8 vs 7.1% in Oct-Dec, 2.4 vs 4.2% in Jan-May. In
+  June to September it is worse (average 11.1 vs 9.3% in Jun-Jul). Over the
+  first 13 weeks it still beat USDA in 7 of 11 seasons, but missed badly in 2018 and 2023, when early
+  sales pace pointed the wrong way. Using USDA alone for the first weeks would
+  be a rule fit to these 11 seasons, so it was left untuned, as for corn after
+  April. Until week 16 (mid-September) the forecast does not beat repeating
+  last season's total either, and the dashboard shows it in brackets.
 - **Likely range:** it is cautious for soybeans, where the final total almost
-  always fell inside it. For corn it held the final total about 3 times in 4.
+  always fell inside it. For corn it held the final total about 3 times in 4, for wheat 7 in 10.
 
 ### Change of WASDE source (2026-10-01)
 
