@@ -63,12 +63,47 @@ def _collect(mock_fetch: MagicMock, *, bulk: bool) -> None:
 
 @patch("src.collectors.fred_oil.write_raw", return_value=3)
 @patch("src.collectors.fred_oil.fetch_prices_csv")
-def test_empty_table_backfills_full_history_in_ci(
+def test_ci_fetches_full_history_even_when_table_has_rows(
     mock_fetch: MagicMock, mock_write: MagicMock, mock_settings: None,
 ) -> None:
+    from src.collectors.fred_oil import parse_fred_csv
+    from src.storage.writer import init_db, write_raw
+
+    init_db()
+    write_raw("fred", parse_fred_csv(CSV), table_name="oil_prices")  # table already populated
     _collect(mock_fetch, bulk=True)
     assert mock_fetch.call_args.args[0] is None  # no start date: everything
     assert mock_write.call_args.args[1].height == 3
+
+
+@patch("src.collectors.fred_oil.get_with_retry")
+def test_fetch_sends_date_range_for_every_series(mock_get: MagicMock) -> None:
+    # fredgraph.csv takes one cosd/coed value per series; a single value
+    # limits only the first series and returns the others' full history.
+    from src.collectors.fred_oil import SERIES_TO_COLUMN, fetch_prices_csv
+
+    mock_get.return_value.text = CSV
+    fetch_prices_csv("2026-01-01", "2026-01-31")
+    params = mock_get.call_args.kwargs["params"]
+    n = len(SERIES_TO_COLUMN)
+    assert params["cosd"] == ",".join(["2026-01-01"] * n)
+    assert params["coed"] == ",".join(["2026-01-31"] * n)
+
+
+@patch("src.collectors.fred_oil.write_raw", return_value=1)
+@patch("src.collectors.fred_oil.fetch_prices_csv", return_value=CSV)
+def test_rows_before_start_date_are_not_written(
+    mock_fetch: MagicMock, mock_write: MagicMock, mock_settings: None,
+) -> None:
+    # Rows outside the requested window would overwrite stored history with
+    # whatever columns this response happens to carry.
+    from src.collectors.fred_oil import collect_oil_prices
+    from src.storage.writer import init_db
+
+    init_db()
+    collect_oil_prices(start_date="2026-01-06", bulk_backfill=False)
+    written = mock_write.call_args.args[1]
+    assert written["price_date"].to_list() == [date(2026, 1, 7)]
 
 
 @patch("src.collectors.fred_oil.write_raw", return_value=3)

@@ -8,9 +8,15 @@ price. Both series come back in one request, so each row already has both
 a key, and no ``FRED_API_KEY`` secret exists in CI, so this collector never
 ran there before 2026-09-25.
 
-The whole history (WTI from 1986, Brent from 1987) is ~230 KB. An empty table
-is filled with all of it when bulk backfill is allowed (CI); otherwise each
-run re-fetches the last ``LOOKBACK_DAYS``.
+The whole history (WTI from 1986, Brent from 1987) is ~230 KB, so CI (bulk
+backfill allowed) re-fetches all of it every run: rewriting every date picks up
+FRED revisions and repairs any gaps. Local runs re-fetch the last
+``LOOKBACK_DAYS``.
+
+fredgraph.csv takes date ranges per series (comma-separated ``cosd``/``coed``,
+one value per ``id``). A single value limits only the first series and returns
+the full history of the rest; until 2026-10-03 that made every 30-day run
+rewrite ~9,000 historical rows with Brent only, blanking their WTI.
 """
 from __future__ import annotations
 
@@ -18,13 +24,12 @@ import io
 import logging
 from datetime import date, timedelta
 
-import duckdb
 import polars as pl
 
 from src.collectors.http_utils import get_with_retry
 from src.config import settings
 from src.storage.tracker import SourceTracker, TimedCollector
-from src.storage.writer import get_connection, write_raw
+from src.storage.writer import write_raw
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +49,11 @@ SERIES_TO_COLUMN = {
 def fetch_prices_csv(start_date: str | None = None, end_date: str | None = None) -> str:
     """Download both series as one CSV; no dates means the full history."""
     params = {"id": ",".join(SERIES_TO_COLUMN)}
+    n = len(SERIES_TO_COLUMN)
     if start_date:
-        params["cosd"] = start_date
+        params["cosd"] = ",".join([start_date] * n)
     if end_date:
-        params["coed"] = end_date
+        params["coed"] = ",".join([end_date] * n)
     logger.info("Fetching FRED oil prices (%s to %s)", start_date or "start", end_date or "now")
     resp = get_with_retry(BASE_URL, params=params, timeout=60)
     return str(resp.text)
@@ -73,19 +79,6 @@ def parse_fred_csv(text: str) -> pl.DataFrame:
     )
 
 
-def _has_prices() -> bool:
-    conn = get_connection()
-    try:
-        row = conn.execute(
-            "SELECT count(*) FROM oil_prices WHERE source = ?", [SOURCE]
-        ).fetchone()
-    except duckdb.CatalogException:
-        return False
-    finally:
-        conn.close()
-    return bool(row and row[0])
-
-
 def collect_oil_prices(
     *,
     start_date: str | None = None,
@@ -103,11 +96,15 @@ def collect_oil_prices(
     if bulk_backfill is None:
         bulk_backfill = settings.allow_bulk_backfill
 
-    if start_date is None and not (bulk_backfill and not _has_prices()):
+    if start_date is None and not bulk_backfill:
         start_date = (date.today() - timedelta(days=LOOKBACK_DAYS)).isoformat()
 
     with TimedCollector(tracker, TRACKER_NAME) as tc:
         df = parse_fred_csv(fetch_prices_csv(start_date, end_date))
+        if start_date and df.height:
+            # Each write replaces whole rows, so a row outside the window
+            # would overwrite stored history with only the columns it carries.
+            df = df.filter(pl.col("price_date") >= date.fromisoformat(start_date))
         tc.rows_fetched = df.height
         if df.height == 0:
             logger.warning("No FRED oil price data returned since %s", start_date)
