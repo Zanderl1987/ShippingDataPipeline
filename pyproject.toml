@@ -32,6 +32,19 @@ ml = [
     "numpy>=2.0",
 ]
 
+# Local-only tools for notebooks/. A dependency group rather than an extra so
+# CI's `uv sync --all-extras` doesn't install Jupyter.
+# Install with: uv sync --all-extras --group notebook
+[dependency-groups]
+notebook = [
+    "ipykernel>=6.29",
+    "ipywidgets>=8.1",
+    "jupyterlab>=4.2",
+    "matplotlib>=3.9",
+    "pandas>=2.2",
+    "seaborn>=0.13",
+]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100
