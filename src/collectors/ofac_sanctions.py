@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import re
 from datetime import date
 from typing import Any
 
@@ -52,6 +53,29 @@ def _clean(value: str | None) -> str | None:
     return value
 
 
+# sdn.csv has no IMO column; a vessel's IMO is in its remarks. Companies carry
+# "Identification Number IMO ..." (an IMO company number), so match only the
+# vessel label. OFAC sometimes puts two spaces before the number.
+_VESSEL_IMO = re.compile(r"Vessel Registration Identification IMO\s+(\d{7})\b")
+
+
+def _extract_vessel_imo(remarks: str | None) -> str | None:
+    """Return the vessel IMO number named in ``remarks``, if it passes the check digit."""
+    if not remarks:
+        return None
+    match = _VESSEL_IMO.search(remarks)
+    if not match:
+        return None
+    imo = match.group(1)
+    # IMO check digit: the first six digits weighted 7..2, summed, last digit.
+    # About 10 company entries put their IMO company number under the vessel
+    # label; those numbers fail this check.
+    if sum(int(d) * w for d, w in zip(imo[:6], range(7, 1, -1))) % 10 != int(imo[6]):
+        logger.debug("OFAC remarks name IMO %s, which fails the check digit", imo)
+        return None
+    return imo
+
+
 def parse_sdn_csv(content: str | None) -> pl.DataFrame:
     """Parse the SDN CSV into a structured DataFrame."""
     if not content:
@@ -81,6 +105,7 @@ def parse_sdn_csv(content: str | None) -> pl.DataFrame:
             "vessel_flag": _clean(rec["vessel_flag"]),
             "country": _clean(rec["vessel_owner"]),
             "remarks": _clean(rec["remarks"]),
+            "imo_number": _extract_vessel_imo(_clean(rec["remarks"])),
             "aliases": None,
         })
 

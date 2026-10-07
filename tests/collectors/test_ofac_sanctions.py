@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.collectors.ofac_sanctions import _clean, parse_sdn_csv
+from src.collectors.ofac_sanctions import _clean, _extract_vessel_imo, parse_sdn_csv
 
 
 @pytest.fixture
@@ -47,6 +47,34 @@ def test_parse_sdn_csv() -> None:
     assert df[0, "country"] is None
     assert df[1, "entity_type"] == "individual"
     assert df[1, "remarks"] is None
+
+
+VESSEL_ID = "Vessel Registration Identification"
+
+
+def test_extract_vessel_imo() -> None:
+    remarks = f"Secondary sanctions risk: see EO 13846; {VESSEL_ID} IMO 9113379; MMSI 668116259"
+    assert _extract_vessel_imo(remarks) == "9113379"
+    # OFAC sometimes puts two spaces before the number.
+    assert _extract_vessel_imo(f"{VESSEL_ID} IMO  8730455; Linked To: X.") == "8730455"
+    # A company's IMO number is not a vessel's.
+    assert _extract_vessel_imo("Identification Number IMO 5422497; Linked To: Y.") is None
+    # National registrations and unlabeled numbers are not IMO numbers.
+    assert _extract_vessel_imo(f"{VESSEL_ID} RS 150443 (Russia); MMSI 273385420") is None
+    assert _extract_vessel_imo(f"{VESSEL_ID} 9894387; Linked To: Z.") is None
+    # Fails the IMO check digit, so it's a typo, not an IMO number.
+    assert _extract_vessel_imo(f"{VESSEL_ID} IMO 9113378") is None
+    assert _extract_vessel_imo(None) is None
+
+
+def test_parse_sdn_csv_fills_imo_number() -> None:
+    csv_text = (
+        "1,LUCKY STAR,vessel,IRAN-EO13902,,,Crude Oil Tanker,,,Panama,,"
+        '"Vessel Registration Identification IMO 9113379; MMSI 668116259."\n'
+        '2,SOME SHIPPING CO,-0-,IRAN,,,,,,,,"Identification Number IMO 5422497."\n'
+    )
+    df = parse_sdn_csv(csv_text)
+    assert df["imo_number"].to_list() == ["9113379", None]
 
 
 def test_parse_sdn_csv_empty() -> None:
