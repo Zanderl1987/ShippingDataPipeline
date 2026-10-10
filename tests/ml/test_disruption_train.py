@@ -80,3 +80,29 @@ def test_train_and_backtest_scores_every_eval_row(tmp_path) -> None:  # noqa: AN
     state = json.loads((tmp_path / "progress.json").read_text(encoding="utf-8"))
     assert state["status"] == "done" and len(state["folds"]) == state["n_folds"] == 4
     assert state["scores"]["all"][0]["n"] == out.height
+
+
+def test_fit_model_keeps_at_least_min_rounds() -> None:
+    pytest.importorskip("lightgbm")
+    from src.ml.disruption_warning.train import fit_model
+
+    ports = {f"p{k}": float(k) * 0.5 for k in range(6)}
+    weekly = pl.concat(
+        [_weekly(200, lambda i, k=k: 5 if (i + 7 * k) % 23 == 0 else 50 + (i % 3), p)
+         for k, p in enumerate(ports)]
+    )
+    no_events = pl.DataFrame([{"event_id": "e", "event_type": "TC", "alert_level": "Orange",
+                               "from_date": datetime(2000, 1, 3), "latitude": 0.0,
+                               "longitude": 0.0, "affected_ports": None}])
+    fx = build_features(weekly, no_events, _profiles(ports), _daily(1500, lambda i: 10),
+                        [_week(w) for w in range(70, 197)])
+
+    def rounds(floor: int, total: int = 200) -> int:
+        config = TrainConfig(valid_weeks=20, num_boost_round=total, early_stopping_rounds=5,
+                             min_rounds=floor)
+        config.params.update(min_data_in_leaf=5)
+        return fit_model(fx, _week(196), config).rounds
+
+    picked = rounds(0)
+    assert rounds(60) == max(picked, 60)
+    assert rounds(60, total=40) == 40  # the floor never goes past num_boost_round

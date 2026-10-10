@@ -66,6 +66,12 @@ class TrainConfig:
     valid_weeks: int = 26
     num_boost_round: int = 2000
     early_stopping_rounds: int = 150
+    #: Fewest rounds kept, whatever early stopping picks. Weekly picks swing from
+    #: ~40 to ~520 as weeks enter and leave the validation window, and on
+    #: 2026-10-06 one fell to 7, a barely trained model. Replaying 25 weekly
+    #: retrains, a floor of 100 changed no alert hits, so it only guards
+    #: against such picks (TASKS N3).
+    min_rounds: int = 100
     #: Weight training rows by recency: a row this many weeks older than the
     #: cutoff counts half. None weighs all rows the same.
     half_life_weeks: float | None = None
@@ -215,10 +221,11 @@ def fit_model(
             *(callbacks or []),
         ],
     )
-    rounds = max(1, picked.best_iteration)
+    rounds = min(max(1, picked.best_iteration, config.min_rounds), config.num_boost_round)
     platt = (1.0, 0.0)
     if config.calibrate is not None:
-        platt = fit_platt(picked.predict(_to_numpy(va), num_iteration=rounds), va["y"].to_numpy())
+        scored = min(rounds, picked.current_iteration())
+        platt = fit_platt(picked.predict(_to_numpy(va), num_iteration=scored), va["y"].to_numpy())
     booster = lgb.train(config.params, dataset(known), num_boost_round=rounds)
     return Fitted(booster, rounds, platt, va.height)
 
