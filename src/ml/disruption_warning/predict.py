@@ -130,6 +130,26 @@ class Forecast:
     nearby_events: pl.DataFrame = field(default_factory=pl.DataFrame)
 
 
+#: A release older than this means this week's data hasn't been published yet.
+MAX_RELEASE_AGE_DAYS = 7
+
+
+def check_fresh(release: date, today: date) -> None:
+    """Fail if the newest data is last week's release, not this week's.
+
+    The job runs on Wednesday, after the daily collect run has picked up
+    Tuesday's PortWatch release. If that run is late or failed, the newest
+    origin is a week old and its warnings were already published.
+    """
+    age = (today - release).days
+    if age > MAX_RELEASE_AGE_DAYS:
+        raise SystemExit(
+            f"newest port data is from the {release} release, {age} days ago; "
+            "this week's release isn't on HF yet (rerun after Collect Data, "
+            "or pass --allow-stale)"
+        )
+
+
 def live_origin(labels: pl.DataFrame) -> date:
     """The newest week with a published label: the release's last full week."""
     last = labels.filter(pl.col("is_disruption").is_not_null())["week_start"].max()
@@ -400,6 +420,8 @@ def main(argv: list[str] | None = None) -> None:
                         help="append this week's warnings to the HF history")
     parser.add_argument("--space", action="store_true",
                         help="also upload the page to the HF Space (needs --site)")
+    parser.add_argument("--allow-stale", action="store_true",
+                        help="run even if this week's PortWatch release isn't published yet")
     parser.add_argument("--seed-history",
                         help="start the HF history from this backtest parquet, then exit")
     args = parser.parse_args(argv)
@@ -419,6 +441,8 @@ def main(argv: list[str] | None = None) -> None:
     fc = forecast(weekly, events, profiles, chokepoints, history=old)
     print(f"origin {fc.origin} (release {fc.release}); {fc.rounds} rounds on "
           f"{fc.trained_rows:,} rows; {int(fc.warnings['flagged'].sum())} ports flagged")
+    if not args.allow_stale:
+        check_fresh(fc.release, datetime.now(UTC).date())
     history = merge_history(old, to_history(fc.warnings, "live"))
     if args.publish:
         write_history(history, f"Warnings for {fc.origin}")

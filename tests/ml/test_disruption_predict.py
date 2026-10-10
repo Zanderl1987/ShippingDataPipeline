@@ -14,6 +14,7 @@ from src.ml.disruption_warning.predict import (
     DRIVER_GROUPS,
     REASONS,
     Forecast,
+    check_fresh,
     flag_top,
     forecast,
     merge_history,
@@ -169,3 +170,11 @@ def test_port_details_line_up_weeks_and_count_the_record() -> None:
     assert p1["calls"] == [None, 7.0] and p1["marks"] == ".."
     assert p0["past_n"] == 1 and p0["past"] == [["2026-01-12", 0.8]]
     assert p0["record"] == [2, 2, 1, 1]  # 2 alerts, both right; 1 disruption week, caught
+
+
+def test_check_fresh_rejects_last_weeks_release():
+    # Wednesday after a Tuesday release: fresh.
+    check_fresh(date(2026, 10, 6), today=date(2026, 10, 7))
+    # Collect Data hadn't published the 10-06 release yet, so the newest is 09-29's.
+    with pytest.raises(SystemExit, match="2026-09-29 release, 8 days ago"):
+        check_fresh(date(2026, 9, 29), today=date(2026, 10, 7))
