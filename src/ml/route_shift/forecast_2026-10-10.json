@@ -1,0 +1,309 @@
+{
+ "frozen_on": "2026-10-10",
+ "code": "bf07134",
+ "data_through": "2026-09-28",
+ "return_start": "2026-08-24",
+ "share": 0.321,
+ "share_parts": {
+  "suez": 0.28,
+  "cape": 0.362
+ },
+ "gain": {
+  "container": 12.0,
+  "tanker": 10.31,
+  "dry_bulk": 8.14
+ },
+ "cape_change_so_far": {
+  "container": -4.35,
+  "tanker": -0.64,
+  "dry_bulk": 0.42
+ },
+ "seasonal": {
+  "container": true,
+  "tanker": false,
+  "dry_bulk": true
+ },
+ "curve": {
+  "container": [
+   0.554,
+   0.754,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "tanker": [
+   0.033,
+   0.185,
+   0.264,
+   0.467,
+   0.555,
+   0.721,
+   0.841,
+   0.934,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dry_bulk": [
+   0.0,
+   0.114,
+   0.196,
+   0.36,
+   0.436,
+   0.646,
+   0.646,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "forecast": [
+  {
+   "week_start": "2026-10-05",
+   "ship_type": "container",
+   "weeks_since_return": 6,
+   "no_change": 14.76,
+   "model": 14.76,
+   "all_back": 7.11
+  },
+  {
+   "week_start": "2026-10-12",
+   "ship_type": "container",
+   "weeks_since_return": 7,
+   "no_change": 14.76,
+   "model": 14.76,
+   "all_back": 7.11
+  },
+  {
+   "week_start": "2026-10-19",
+   "ship_type": "container",
+   "weeks_since_return": 8,
+   "no_change": 14.82,
+   "model": 14.82,
+   "all_back": 7.16
+  },
+  {
+   "week_start": "2026-10-26",
+   "ship_type": "container",
+   "weeks_since_return": 9,
+   "no_change": 15.56,
+   "model": 15.56,
+   "all_back": 7.91
+  },
+  {
+   "week_start": "2026-11-02",
+   "ship_type": "container",
+   "weeks_since_return": 10,
+   "no_change": 14.08,
+   "model": 14.08,
+   "all_back": 6.42
+  },
+  {
+   "week_start": "2026-11-09",
+   "ship_type": "container",
+   "weeks_since_return": 11,
+   "no_change": 14.79,
+   "model": 14.79,
+   "all_back": 7.14
+  },
+  {
+   "week_start": "2026-11-16",
+   "ship_type": "container",
+   "weeks_since_return": 12,
+   "no_change": 14.93,
+   "model": 14.93,
+   "all_back": 7.28
+  },
+  {
+   "week_start": "2026-11-23",
+   "ship_type": "container",
+   "weeks_since_return": 13,
+   "no_change": 14.9,
+   "model": 14.9,
+   "all_back": 7.25
+  },
+  {
+   "week_start": "2026-10-05",
+   "ship_type": "tanker",
+   "weeks_since_return": 6,
+   "no_change": 18.24,
+   "model": 16.09,
+   "all_back": 8.57
+  },
+  {
+   "week_start": "2026-10-12",
+   "ship_type": "tanker",
+   "weeks_since_return": 7,
+   "no_change": 18.24,
+   "model": 15.78,
+   "all_back": 8.57
+  },
+  {
+   "week_start": "2026-10-19",
+   "ship_type": "tanker",
+   "weeks_since_return": 8,
+   "no_change": 18.24,
+   "model": 15.56,
+   "all_back": 8.57
+  },
+  {
+   "week_start": "2026-10-26",
+   "ship_type": "tanker",
+   "weeks_since_return": 9,
+   "no_change": 18.24,
+   "model": 15.56,
+   "all_back": 8.57
+  },
+  {
+   "week_start": "2026-11-02",
+   "ship_type": "tanker",
+   "weeks_since_return": 10,
+   "no_change": 18.24,
+   "model": 15.56,
+   "all_back": 8.57
+  },
+  {
+   "week_start": "2026-11-09",
+   "ship_type": "tanker",
+   "weeks_since_return": 11,
+   "no_change": 18.24,
+   "model": 15.56,
+   "all_back": 8.57
+  },
+  {
+   "week_start": "2026-11-16",
+   "ship_type": "tanker",
+   "weeks_since_return": 12,
+   "no_change": 18.24,
+   "model": 15.56,
+   "all_back": 8.57
+  },
+  {
+   "week_start": "2026-11-23",
+   "ship_type": "tanker",
+   "weeks_since_return": 13,
+   "no_change": 18.24,
+   "model": 15.56,
+   "all_back": 8.57
+  },
+  {
+   "week_start": "2026-10-05",
+   "ship_type": "dry_bulk",
+   "weeks_since_return": 6,
+   "no_change": 45.0,
+   "model": 42.89,
+   "all_back": 36.44
+  },
+  {
+   "week_start": "2026-10-12",
+   "ship_type": "dry_bulk",
+   "weeks_since_return": 7,
+   "no_change": 41.83,
+   "model": 38.8,
+   "all_back": 33.27
+  },
+  {
+   "week_start": "2026-10-19",
+   "ship_type": "dry_bulk",
+   "weeks_since_return": 8,
+   "no_change": 42.89,
+   "model": 39.85,
+   "all_back": 34.33
+  },
+  {
+   "week_start": "2026-10-26",
+   "ship_type": "dry_bulk",
+   "weeks_since_return": 9,
+   "no_change": 41.8,
+   "model": 38.77,
+   "all_back": 33.24
+  },
+  {
+   "week_start": "2026-11-02",
+   "ship_type": "dry_bulk",
+   "weeks_since_return": 10,
+   "no_change": 42.71,
+   "model": 39.68,
+   "all_back": 34.15
+  },
+  {
+   "week_start": "2026-11-09",
+   "ship_type": "dry_bulk",
+   "weeks_since_return": 11,
+   "no_change": 41.34,
+   "model": 38.31,
+   "all_back": 32.78
+  },
+  {
+   "week_start": "2026-11-16",
+   "ship_type": "dry_bulk",
+   "weeks_since_return": 12,
+   "no_change": 42.0,
+   "model": 38.97,
+   "all_back": 33.44
+  },
+  {
+   "week_start": "2026-11-23",
+   "ship_type": "dry_bulk",
+   "weeks_since_return": 13,
+   "no_change": 39.37,
+   "model": 36.34,
+   "all_back": 30.81
+  }
+ ]
+}
