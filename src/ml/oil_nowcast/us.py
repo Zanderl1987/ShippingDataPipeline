@@ -51,21 +51,24 @@ _COAST_SQL = """CASE
 # ── Data ──────────────────────────────────────────────────────────────────
 
 
-def load_census() -> pl.DataFrame:
-    """Monthly tonnes shipped by sea per series: ``month, series, tonnes``."""
-    from src.ml.port_forecast.backtest import hf_connection, hf_table
-
-    conn = hf_connection()
-    raw = conn.execute(
-        f"""SELECT period_date AS month, flow_code, left(commodity_code, 4) AS hs4,
+def census_sql(trade: str) -> str:
+    """Census oil rows summed per month, flow and HS4; ``trade`` is a table or ``read_parquet``."""
+    return f"""SELECT period_date AS month, flow_code, left(commodity_code, 4) AS hs4,
                    sum(vessel_weight_kg) / 1000 AS tonnes
-            FROM (SELECT * FROM read_parquet({hf_table('us_trade_products')})
+            FROM (SELECT * FROM {trade}
                   WHERE left(commodity_code, 4) IN ('2709', '2710', '2711')
                   QUALIFY row_number() OVER (
                       PARTITION BY period_date, flow_code, commodity_code, export_origin
                       ORDER BY ingested_at DESC) = 1)
             GROUP BY ALL"""
-    ).pl()
+
+
+def load_census() -> pl.DataFrame:
+    """Monthly tonnes shipped by sea per series, from HF: ``month, series, tonnes``."""
+    from src.ml.port_forecast.backtest import hf_connection, hf_table
+
+    raw = hf_connection().execute(
+        census_sql(f"read_parquet({hf_table('us_trade_products')})")).pl()
     return census_series(raw)
 
 
@@ -80,24 +83,29 @@ def census_series(raw: pl.DataFrame) -> pl.DataFrame:
 
 
 def load_portwatch() -> pl.DataFrame:
-    """Monthly tanker tonnes per coast and direction, complete months only.
-
-    ``month, coast, flow ("X"/"M"), tonnes``.
-    """
+    """Monthly tanker tonnes per coast and direction, from HF (see ``portwatch_sql``)."""
     from src.ml.port_forecast.backtest import hf_connection, hf_table
 
-    conn = hf_connection()
+    return hf_connection().execute(portwatch_sql(
+        f"read_parquet({hf_table('port_activity')})",
+        f"read_parquet({hf_table('port_profiles')})")).pl()
+
+
+def portwatch_sql(activity: str, profiles: str) -> str:
+    """Monthly tanker tonnes per coast and direction, complete months only.
+
+    ``month, coast, flow ("X"/"M"), tonnes``. Arguments are tables or ``read_parquet``.
+    """
     isos = ", ".join(f"'{c}'" for c in TERRITORIES)
-    return conn.execute(
-        f"""WITH p AS (
+    return f"""WITH p AS (
                 SELECT port_id, arg_max(latitude, ingested_at) AS lat,
                        arg_max(longitude, ingested_at) AS lon
-                FROM read_parquet({hf_table('port_profiles')}) GROUP BY port_id),
+                FROM {profiles} GROUP BY port_id),
             d AS (
                 SELECT date_trunc('month', a.activity_date)::DATE AS month, a.activity_date,
                        {_COAST_SQL.replace('p.iso3', 'a.iso3')} AS coast,
                        a.export_tanker, a.import_tanker
-                FROM read_parquet({hf_table('port_activity')}) a LEFT JOIN p USING (port_id)
+                FROM {activity} a LEFT JOIN p USING (port_id)
                 WHERE a.iso3 IN ({isos})),
             m AS (
                 SELECT month, coast, count(DISTINCT activity_date) AS days,
@@ -108,7 +116,6 @@ def load_portwatch() -> pl.DataFrame:
             UNION ALL
             SELECT month, coast, 'M', i FROM m WHERE days = day(last_day(month))
             ORDER BY 1, 2, 3"""
-    ).pl()
 
 
 # ── Panel ─────────────────────────────────────────────────────────────────

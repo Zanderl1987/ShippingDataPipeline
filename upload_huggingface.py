@@ -60,6 +60,11 @@ TABLE_DESCRIPTIONS = {t.name: t.description for t in ALL_TABLES} | {
         "Derived: monthly US corn, soybean, soybean meal, soybean oil and wheat exports and "
         "imports (Census): metric tons, USD, USD/ton, vs prior year and 5-year average"
     ),
+    "oil_trade_nowcast": (
+        "Derived: US seaborne oil exports (HS 2709-2711, Census vessel weight) nowcast from "
+        "PortWatch tanker tonnes about 4 weeks before Census; is_live rows have no Census "
+        "figure yet; past months are walk-forward nowcasts (src/ml/oil_nowcast)"
+    ),
     "port_congestion_proxy": "Derived: each port's latest 7-day vs 90-day average port calls",
     "curated_ais_positions": "Derived: ais_positions joined with vessel and port details",
     "curated_vessels": "Derived: vessels with vessel age added",

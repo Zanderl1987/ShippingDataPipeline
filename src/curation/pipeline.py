@@ -162,6 +162,14 @@ def run_enrichment(
             if errors is not None:
                 errors.append(f"Enrichment grain_export_forecast failed: {e}")
 
+    try:
+        from src.ml.oil_nowcast.live import create_oil_trade_nowcast
+        results["oil_trade_nowcast"] = create_oil_trade_nowcast(conn)
+    except Exception as e:
+        logger.error("Enrichment oil_trade_nowcast failed: %s", e)
+        if errors is not None:
+            errors.append(f"Enrichment oil_trade_nowcast failed: {e}")
+
     return results
 
 
