@@ -153,3 +153,30 @@ class TestCollectErddapMarine:
         collect_erddap_marine()
         assert "403" in caplog.text
         assert "example 403 body" in caplog.text
+
+    @patch("src.collectors.erddap_marine.write_raw")
+    @patch("src.collectors.erddap_marine.get_with_retry")
+    def test_blacklist_stops_after_first_location(self, mock_get, mock_write, caplog):
+        # The real body seen in CI on 2026-10-05. Every location would get it.
+        resp = requests.Response()
+        resp.status_code = 403
+        resp._content = (b'Error {\n    code=403;\n    message="Forbidden: Access Forbidden -- '
+                         b"Your IP address is on this ERDDAP's request blacklist.")
+        mock_get.side_effect = requests.HTTPError("403 Client Error", response=resp)
+
+        assert collect_erddap_marine() == 0
+        assert mock_get.call_count == 1
+        assert f"skipping the remaining {len(ALL_LOCATIONS)} locations" in caplog.text
+
+    @patch("src.collectors.erddap_marine.write_raw")
+    @patch("src.collectors.erddap_marine.get_with_retry")
+    def test_connection_error_keeps_rows_already_fetched(self, mock_get, mock_write):
+        # 2026-10-07: CoastWatch stopped answering and the run spent 17 minutes
+        # retrying each location in turn.
+        ok = _resp(HEADER + "2026-09-22T09:00:00Z,26.25,56.0,31.948\n")
+        mock_get.side_effect = [ok, requests.ConnectionError("timed out")]
+        mock_write.return_value = 1
+
+        assert collect_erddap_marine() == 1
+        assert mock_get.call_count == 2
+        assert mock_write.call_args[0][1].height == 1

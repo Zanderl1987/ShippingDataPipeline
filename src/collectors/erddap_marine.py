@@ -7,8 +7,11 @@ No authentication required.
 
 Each run asks for the last LOOKBACK_DAYS days at each location and stamps rows
 with the observation time, so the table's dedup keys collapse re-fetched days
-and a day missed by one run (CoastWatch intermittently returns 403 to GitHub
-Actions runners) is filled in by the next. MUR masks land and lakes as NaN, so
+and a day missed by one run is filled in by the next. CoastWatch sometimes
+blacklists GitHub Actions runners' shared IPs (HTTP 403, "Your IP address is on
+this ERDDAP's request blacklist") or doesn't answer at all; either way the
+other locations would fail too, so the run stops after the first such error
+instead of spending ~100 s of retries on each. MUR masks land and lakes as NaN, so
 every location must be an open-water grid cell; each was checked live.
 """
 from __future__ import annotations
@@ -107,8 +110,15 @@ def _parse_sst_rows(csv_text: str) -> list[tuple[datetime, float]]:
     return rows
 
 
+class ErddapUnavailableError(Exception):
+    """CoastWatch refuses or can't be reached; other locations would fail too."""
+
+
 def _fetch_sst(lat: float, lon: float, start: date) -> list[tuple[datetime, float]] | None:
-    """Fetch SST rows for one location; None if the request failed."""
+    """Fetch SST rows for one location; None if the request failed.
+
+    Raises ErddapUnavailableError for a blacklist 403 or a connection failure.
+    """
     url = _build_query_url(lat, lon, start)
     try:
         resp = get_with_retry(url, timeout=30, source=SOURCE)
@@ -119,7 +129,11 @@ def _fetch_sst(lat: float, lon: float, start: date) -> list[tuple[datetime, floa
         logger.warning(
             "ERDDAP HTTP %s for (%s, %s): %s", status, lat, lon, body.strip() or "<empty body>"
         )
+        if status == 403 and "blacklist" in body:
+            raise ErddapUnavailableError("this IP is on ERDDAP's request blacklist") from e
         return None
+    except (requests.ConnectionError, requests.Timeout) as e:
+        raise ErddapUnavailableError(f"can't reach CoastWatch: {e}") from e
     except Exception:
         logger.warning("ERDDAP request failed for (%s, %s)", lat, lon, exc_info=True)
         return None
@@ -140,8 +154,18 @@ def collect_erddap_marine(tracker: SourceTracker | None = None) -> int:
         start = today - timedelta(days=LOOKBACK_DAYS)
         failed = 0
 
-        for name, (lat, lon) in ALL_LOCATIONS.items():
-            rows = _fetch_sst(lat, lon, start)
+        for i, (name, (lat, lon)) in enumerate(ALL_LOCATIONS.items()):
+            try:
+                rows = _fetch_sst(lat, lon, start)
+            except ErddapUnavailableError as e:
+                skipped = len(ALL_LOCATIONS) - i
+                logger.warning(
+                    "ERDDAP: %s; skipping the remaining %d locations "
+                    "(the next run backfills %d days)",
+                    e, skipped, LOOKBACK_DAYS,
+                )
+                failed += skipped
+                break
             if rows is None:
                 failed += 1
                 continue
