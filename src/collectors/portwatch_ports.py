@@ -14,6 +14,7 @@ import json
 import logging
 import re
 import tempfile
+import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -200,16 +201,38 @@ def query_all(
         }
         if return_centroid:
             params["returnCentroid"] = "true"
-        data = get_with_retry(url, params=params, timeout=90, source=source).json()
-        # ArcGIS reports query errors as HTTP 200 with an "error" body.
-        if "error" in data:
-            raise RuntimeError(f"ArcGIS query failed for {url}: {data['error']}")
+        data = _get_page(url, params, source)
         page = data.get("features", [])
         features.extend(page)
         if not page or not data.get("exceededTransferLimit"):
             break
         offset += len(page)
     return features
+
+
+# ArcGIS Online caps each organisation at 6,000 request units a minute, shared by
+# all of PortWatch's layers, and says "Retry after 60 sec." when it's exceeded.
+QUOTA_WAIT_SECONDS = 61
+QUOTA_RETRIES = 3
+
+
+def _get_page(url: str, params: dict[str, Any], source: str) -> dict[str, Any]:
+    """Fetch one query page, waiting out ArcGIS's per-minute quota if it's hit."""
+    for attempt in range(QUOTA_RETRIES + 1):
+        data: dict[str, Any] = get_with_retry(url, params=params, timeout=90, source=source).json()
+        # ArcGIS reports query errors, the quota included, as HTTP 200 with an
+        # "error" body, so get_with_retry doesn't retry them.
+        error = data.get("error")
+        if not error:
+            return data
+        if error.get("code") != 429 or attempt == QUOTA_RETRIES:
+            raise RuntimeError(f"ArcGIS query failed for {url}: {error}")
+        logger.warning(
+            "ArcGIS quota exceeded for %s; waiting %d s (retry %d of %d)",
+            url, QUOTA_WAIT_SECONDS, attempt + 1, QUOTA_RETRIES,
+        )
+        time.sleep(QUOTA_WAIT_SECONDS)
+    raise AssertionError("unreachable")
 
 
 def _to_date(value: Any) -> date | None:

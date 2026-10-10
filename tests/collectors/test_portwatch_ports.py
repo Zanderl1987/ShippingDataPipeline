@@ -73,6 +73,29 @@ class TestQueryAll:
             with pytest.raises(RuntimeError, match="Invalid query"):
                 pw.query_all(pw.DAILY_PORTS_URL, where="bogus")
 
+    def test_quota_error_waits_and_retries(self):
+        quota = MagicMock()
+        quota.json.return_value = {"error": {"code": 429, "message": "Too many requests."}}
+        pages = [quota, _response([_activity_feature("2026-09-18")])]
+        with (
+            patch.object(pw, "get_with_retry", side_effect=pages),
+            patch.object(pw.time, "sleep") as sleep,
+        ):
+            features = pw.query_all(pw.DAILY_PORTS_URL)
+        assert len(features) == 1
+        sleep.assert_called_once_with(pw.QUOTA_WAIT_SECONDS)
+
+    def test_quota_error_raises_after_retries(self):
+        quota = MagicMock()
+        quota.json.return_value = {"error": {"code": 429, "message": "Too many requests."}}
+        with (
+            patch.object(pw, "get_with_retry", return_value=quota),
+            patch.object(pw.time, "sleep") as sleep,
+            pytest.raises(RuntimeError, match="Too many requests"),
+        ):
+            pw.query_all(pw.DAILY_PORTS_URL)
+        assert sleep.call_count == pw.QUOTA_RETRIES
+
 
 class TestDateParsing:
     def test_date_formats(self):
