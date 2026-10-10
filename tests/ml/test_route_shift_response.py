@@ -88,3 +88,19 @@ def test_freeze_and_score_round_trip(weekly: pl.DataFrame, tmp_path) -> None:  #
               .with_columns(pl.lit(CAPE).alias("chokepoint")))
     s = score(frozen, actual).filter(pl.col("ship_type") == "all").row(0, named=True)
     assert s["weeks"] == 6 and s["model"] < 1e-9 and s["no_change"] > 0
+
+
+def test_panel_lines_up_actual_and_forecast_weeks(weekly: pl.DataFrame, tmp_path) -> None:  # noqa: ANN001
+    from src.ml.route_shift.panel import panel
+
+    path = tmp_path / "fc.json"
+    freeze(weekly, path)
+    out = panel(weekly, path)
+    n = len(out["weeks"])
+    assert out["first"] == "2026-10-05" and out["horizon"] == 8
+    for d in out["types"].values():
+        assert all(len(v) == n for v in d.values())
+        assert d["actual"][-1] is None and d["model"][0] is None  # future / before the test
+    # Nothing scored yet: only the empty "all" row, with no errors.
+    assert out["scores"] == [{"ship_type": "all", "weeks": 0, "model": None,
+                              "no_change": None, "all_back": None}]

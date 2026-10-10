@@ -130,6 +130,11 @@ def test_forecast_scores_the_newest_week_and_renders(tmp_path) -> None:  # noqa:
     assert blob is not None and "detail" not in json.loads(blob.group(1))
     details = json.loads((site.parent / dashboard.DETAILS_FILE).read_text(encoding="utf-8"))
     assert details == detail
+    # The Suez-return card's data rides along only when given.
+    page = dashboard.render(fc, pl.DataFrame(), history, route={"weeks": []})
+    blob = re.search(r'<script id="data" type="application/json">(.*?)</script>', page, re.S)
+    assert blob is not None and json.loads(blob.group(1))["route"] == {"weeks": []}
+    assert "route" not in data
 
 
 def test_nearby_events_keeps_recent_close_or_listed_events() -> None:

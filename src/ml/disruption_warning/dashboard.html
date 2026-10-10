@@ -153,6 +153,17 @@ a{color:var(--accent)}
 </div>
 </section>
 
+<section class="card" id="routeCard" hidden>
+<h2>Ships returning to Suez: a forecast test</h2>
+<p class="note" id="routeNote"></p>
+<div class="wrap"><table id="routeScore"></table></div>
+<div class="dgrid" id="routeCharts"></div>
+<div class="legend"><span><i style="background:var(--accent)"></i>what happened</span>
+<span><i style="background:var(--c2)"></i>model: tankers and bulk follow</span>
+<span><i style="background:var(--muted)"></i>no change (dashed)</span>
+<span><i style="background:var(--c5)"></i>all back at once (dotted)</span><span>Shaded: the 8 weeks being scored</span></div>
+</section>
+
 <section class="card">
 <h2>How this works</h2>
 <p class="note" style="margin:0">A <b>disruption</b> is a week when a port's ship calls fall at least 30% below its usual level (the median of the 13 weeks before) and far enough to stand out from its normal week-to-week swings, and the port didn't drop the same way a year earlier (so regular holiday dips don't count).
@@ -406,7 +417,45 @@ function record(){
  R.calibration.map(r=>`<tr><td>${esc(r.bin)}</td><td class="n">${r.n.toLocaleString()}</td><td class="n">${pct(r.happened,1)}</td></tr>`).join('')+'</tbody>';
 }
 
+// --- Suez-return forecast test (ML3) ----------------------------------------
+const RT={container:'Container ships',tanker:'Tankers',dry_bulk:'Bulk carriers',all:'All three'};
+const RF=[['model','Model','--c2',''],['no_change','No change','--muted','5 4'],['all_back','All back at once','--c5','2 3']];
+const RDRAW=['all_back','model','no_change'];  // dashed "no change" on top, so it shows where the model matches it
+function routeChart(R,st){
+ const d=R.types[st],W=R.weeks,n=W.length,w=360,h=170,l=30,r=6,t=10,b=22,cw=(w-l-r)/n;
+ const vals=[d.actual,...RF.map(f=>d[f[0]])].flat().filter(v=>v!=null);
+ const lo=Math.max(0,Math.min(...vals)*0.9),hi=Math.max(...vals)*1.05;
+ const X=i=>l+cw*(i+.5),Y=v=>t+(h-t-b)*(1-(v-lo)/(hi-lo||1));
+ const line=a=>{let s='',pen=false;a.forEach((v,i)=>{if(v==null){pen=false;return}s+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);pen=true});return s};
+ const f0=W.indexOf(R.first);
+ let g=`<rect x="${X(f0)-cw/2}" y="${t}" width="${cw*R.horizon}" height="${h-t-b}" fill="var(--sea)"/>`;
+ g+=`<text x="${l-4}" y="${t+8}" font-size="10" text-anchor="end" fill="var(--muted)">${Math.round(hi)}</text><text x="${l-4}" y="${h-b}" font-size="10" text-anchor="end" fill="var(--muted)">${Math.round(lo)}</text>`;
+ RDRAW.map(k=>RF.find(f=>f[0]===k)).forEach(([k,,c,dash])=>{g+=`<path d="${line(d[k])}" fill="none" stroke="var(${c})" stroke-width="1.6"${dash?` stroke-dasharray="${dash}"`:''}/>`});
+ g+=`<path d="${line(d.actual)}" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+ W.forEach((s,i)=>{const v=d.actual[i];
+  if(v!=null)g+=`<circle cx="${X(i)}" cy="${Y(v)}" r="2" fill="var(--accent)"/>`;
+  g+=`<rect x="${X(i)-cw/2}" y="${t}" width="${cw}" height="${h-t-b}" fill="transparent"><title>${wk(s)}: ${v==null?'not out yet':v.toFixed(1)+' a day'}${d.model[i]!=null?` · model ${d.model[i].toFixed(1)}, no change ${d.no_change[i].toFixed(1)}, all back ${d.all_back[i].toFixed(1)}`:''}</title></rect>`;
+  if(i===0||s.slice(5,7)!==W[i-1].slice(5,7))g+=`<text x="${X(i)}" y="${h-6}" font-size="10" text-anchor="middle" fill="var(--muted)">${new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{month:'short',timeZone:'UTC'})}</text>`});
+ return `<div><h4>${RT[st]} past the Cape, a day</h4><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${RT[st]} passing the Cape of Good Hope each day, with the three forecasts">${g}</svg></div>`;
+}
+function route(){
+ const R=D.route;if(!R)return;$('routeCard').hidden=false;
+ const all=R.scores.find(s=>s.ship_type==='all'),done=all&&all.weeks?all.weeks/3:0;
+ let verdict;
+ if(!done)verdict=`The first week is scored after the next PortWatch release.`;
+ else{const best=RF.slice().sort((a,b)=>all[a[0]]-all[b[0]])[0];
+  verdict=`${done} of ${R.horizon} weeks in, the ${best[0]==='model'?'model':`"${best[1].toLowerCase()}" forecast`} is closest (average miss ${all[best[0]].toFixed(1)} ships a day).`+
+  (done<R.horizon?' Too early to call.':all.model<Math.min(all.no_change,all.all_back)?' The model passed.':' The model failed.')}
+ $('routeNote').textContent=`Since December 2023 most ships between Asia and Europe have gone round Africa instead of through the Red Sea. Container ships have started coming back to Suez (about ${pct(R.share)} of those that went round Africa). In 2023 tankers and bulk carriers followed the container ships away a few weeks later. On ${fmtDate(R.frozen_on)} three forecasts of ships passing the Cape of Good Hope were frozen for the ${R.horizon} weeks from ${fmtDate(R.first)}: the model (tankers and bulk carriers follow the container ships back the same way), no change, and every diverted ship back at once. For container ships the model is the same as no change: how many more lines return is politics, not something the data can say. The model passes if it misses by less, on average, than both of the others. ${verdict}`;
+ const head='<thead><tr><th>Average miss, ships a day</th><th class="n">Weeks scored</th>'+RF.map(f=>`<th class="n">${f[1]}</th>`).join('')+'</tr></thead>';
+ $('routeScore').hidden=!done;
+ $('routeScore').innerHTML=head+'<tbody>'+(R.scores.filter(s=>s.weeks).sort((a,b)=>Object.keys(RT).indexOf(a.ship_type)-Object.keys(RT).indexOf(b.ship_type)).map(s=>{const m=Math.min(...RF.map(f=>s[f[0]]));
+  return `<tr><td>${RT[s.ship_type]||esc(s.ship_type)}</td><td class="n">${s.ship_type==='all'?s.weeks/3:s.weeks}</td>`+RF.map(f=>`<td class="n">${s[f[0]]===m?'<b>':''}${s[f[0]].toFixed(1)}${s[f[0]]===m?'</b>':''}</td>`).join('')+'</tr>'}).join('')||
+  `<tr><td colspan="5" class="sub">No weeks scored yet.</td></tr>`)+'</tbody>';
+ $('routeCharts').innerHTML=Object.keys(R.types).map(st=>routeChart(R,st)).join('');
+}
+
 function draw(){for(const b of tabs.children)b.setAttribute('aria-selected',b.dataset.h===H);alerts();map();regions();if(SEL)detail();}
-draw();record();
+draw();record();route();
 {const m=/port=([^&]+)/.exec(location.hash);if(m)select(decodeURIComponent(m[1]),true);}
 </script></body></html>

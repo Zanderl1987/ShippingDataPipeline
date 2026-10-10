@@ -450,12 +450,24 @@ def main(argv: list[str] | None = None) -> None:
     if args.site:
         labels = label_drops(weekly_grid(weekly))
         out = Path(args.site)
-        page = dashboard.write_site(out, fc, track_record(history, labels), history)
+        page = dashboard.write_site(out, fc, track_record(history, labels), history,
+                                    route=route_panel())
         details = out / dashboard.DETAILS_FILE
         print(f"wrote {page} ({page.stat().st_size / 1024:.0f} KB) and {details.name} "
               f"({details.stat().st_size / 1024:.0f} KB)")
         if args.space:
             publish_space(out, f"Warnings for {fc.origin}")
+
+
+def route_panel() -> dict[str, Any] | None:
+    """The Suez-return forecast card (ML3); a failure only leaves the card out."""
+    try:
+        from src.ml.route_shift.panel import load_panel
+
+        return load_panel()
+    except Exception as e:  # noqa: BLE001 - the warnings page must still go out
+        print(f"route panel skipped: {e!r}")
+        return None
 
 
 if __name__ == "__main__":

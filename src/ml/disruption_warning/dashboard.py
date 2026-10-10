@@ -233,11 +233,17 @@ def _json(obj: Any) -> str:
 
 
 def render(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame,
-           inline_details: bool = True) -> str:
-    """The page. Without ``inline_details`` it fetches ``DETAILS_FILE`` instead."""
+           inline_details: bool = True, route: dict[str, Any] | None = None) -> str:
+    """The page. Without ``inline_details`` it fetches ``DETAILS_FILE`` instead.
+
+    ``route`` is the Suez-return forecast panel (``src.ml.route_shift.panel``); the
+    page leaves that card out without it.
+    """
     data_obj = payload(fc, record, history)
     if not inline_details:
         del data_obj["detail"]
+    if route is not None:
+        data_obj["route"] = route
     data = _json(data_obj)
     # A "</" inside the JSON would end the script block early.
     data = data.replace("</", "<\\/")
@@ -247,12 +253,14 @@ def render(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame,
             .replace("__DATA__", data))
 
 
-def write_site(out: Path, fc: Forecast, record: pl.DataFrame, history: pl.DataFrame) -> Path:
+def write_site(out: Path, fc: Forecast, record: pl.DataFrame, history: pl.DataFrame,
+               route: dict[str, Any] | None = None) -> Path:
     """Write ``index.html`` and ``DETAILS_FILE`` into ``out``; returns the page's path."""
     out.mkdir(parents=True, exist_ok=True)
     (out / DETAILS_FILE).write_text(_json(port_details(fc, record)), encoding="utf-8")
     page = out / "index.html"
-    page.write_text(render(fc, record, history, inline_details=False), encoding="utf-8")
+    page.write_text(render(fc, record, history, inline_details=False, route=route),
+                    encoding="utf-8")
     return page
 
 
