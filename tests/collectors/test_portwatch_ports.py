@@ -274,6 +274,7 @@ class TestDisruptionEvents:
         }])
         row = df.row(0, named=True)
         assert row["episode_id"] == "11"
+        assert row["alert_level"] == "ORANGE"  # same case as the disruptions layer
         assert row["severity_text"] == "Tropical Storm"
         assert row["is_current"] is False
         assert (row["latitude"], row["longitude"]) == (23.5, 67.0)

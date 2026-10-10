@@ -574,6 +574,8 @@ def _finish_events(rows: list[dict[str, Any]], source: str) -> pl.DataFrame:
     if not rows:
         return pl.DataFrame()
     return _frame(rows, _EVENT_SCHEMA).with_columns(
+        # The disruptions layer says "RED", GeoPulse says "Red".
+        pl.col("alert_level").str.to_uppercase(),
         pl.lit(source).alias("source"),
         pl.lit(date.today()).alias("partition_date"),
     )
