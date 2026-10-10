@@ -111,15 +111,25 @@ def test_forecast_scores_the_newest_week_and_renders(tmp_path) -> None:  # noqa:
     blob = re.search(r'<script id="data" type="application/json">(.*?)</script>', page, re.S)
     assert blob is not None
     data = json.loads(blob.group(1))
-    assert data["origin"] == _week(199).isoformat() and len(data["ports"]) == len(ports)
+    assert data["origin"] == _week(199).isoformat() and len(data["ports"]["v"]) == len(ports)
     assert data["record"]["summary"] is None
     # Drill-down: every group's push, a year of calls per port, the coastline.
-    assert all(len(r["drivers"]) == len(DRIVER_GROUPS) for r in data["chances"]["2"])
+    chances = data["chances"]["2"]
+    i = chances["k"].index("drivers")
+    assert all(len(r[i]) == len(DRIVER_GROUPS) for r in chances["v"])
     detail = data["detail"]
     assert set(detail["ports"]) == set(ports)
     one = detail["ports"]["p0"]
     assert len(one["calls"]) == len(one["usual"]) == len(one["marks"]) == len(detail["weeks"])
     assert "__LAND__" not in page and 'class="land" d="M' in page
+
+    # The site keeps the drill-down in its own file, fetched after a click.
+    site = dashboard.write_site(tmp_path / "site", fc, pl.DataFrame(), history)
+    blob = re.search(r'<script id="data" type="application/json">(.*?)</script>',
+                     site.read_text(encoding="utf-8"), re.S)
+    assert blob is not None and "detail" not in json.loads(blob.group(1))
+    details = json.loads((site.parent / dashboard.DETAILS_FILE).read_text(encoding="utf-8"))
+    assert details == detail
 
 
 def test_nearby_events_keeps_recent_close_or_listed_events() -> None:

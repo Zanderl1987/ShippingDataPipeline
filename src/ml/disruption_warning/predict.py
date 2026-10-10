@@ -13,7 +13,8 @@ the model said and what then happened. The history is seeded once from the
 backtest's out-of-sample rows (``--seed-history``), never from a model that
 had seen those weeks.
 
-``--site DIR`` writes the dashboard (``dashboard.py``) to ``DIR/index.html``;
+``--site DIR`` writes the dashboard (``dashboard.py``) to ``DIR/index.html``,
+with the per-port drill-down in ``DIR/details.json``;
 ``--space`` also uploads it to the HF Space ``SPACE_REPO``. CI deploys the
 same folder to GitHub Pages (``.github/workflows/warning.yml``).
 """
@@ -449,10 +450,10 @@ def main(argv: list[str] | None = None) -> None:
     if args.site:
         labels = label_drops(weekly_grid(weekly))
         out = Path(args.site)
-        out.mkdir(parents=True, exist_ok=True)
-        page = dashboard.render(fc, track_record(history, labels), history)
-        (out / "index.html").write_text(page, encoding="utf-8")
-        print(f"wrote {out / 'index.html'} ({len(page) / 1024:.0f} KB)")
+        page = dashboard.write_site(out, fc, track_record(history, labels), history)
+        details = out / dashboard.DETAILS_FILE
+        print(f"wrote {page} ({page.stat().st_size / 1024:.0f} KB) and {details.name} "
+              f"({details.stat().st_size / 1024:.0f} KB)")
         if args.space:
             publish_space(out, f"Warnings for {fc.origin}")
 

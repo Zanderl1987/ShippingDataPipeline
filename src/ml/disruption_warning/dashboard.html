@@ -21,7 +21,7 @@ main{padding:18px 16px 40px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px}
 h2{font-size:1.1rem;margin-bottom:4px}
 .note{color:var(--muted);font-size:.85rem;margin-bottom:12px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:12px;margin-bottom:18px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
 .kpi b{display:block;font-size:1.6rem;font-variant-numeric:tabular-nums}
 .kpi span{color:var(--muted);font-size:.82rem}
@@ -30,6 +30,8 @@ h2{font-size:1.1rem;margin-bottom:4px}
 padding:6px 14px;font:inherit;font-size:.88rem;cursor:pointer}
 .tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
 .wrap{overflow-x:auto}
+/* On a phone, scroll these sideways rather than squeeze them into tall rows and tiny text. */
+#alerts{min-width:760px}.chartwrap svg{min-width:520px}
 table{width:100%;border-collapse:collapse;font-size:.88rem}
 th{text-align:left;color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase;
 letter-spacing:.03em;padding:6px 8px;border-bottom:2px solid var(--line)}
@@ -40,7 +42,7 @@ th.n{text-align:right}td.n{text-align:right;font-variant-numeric:tabular-nums;wh
 background:var(--bg);border:1px solid var(--line)}
 .hi{color:var(--hi);font-weight:650}
 .yes{background:var(--hi-bg);color:var(--hi)}.no{background:var(--ok-bg);color:var(--ok)}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:18px}
 svg{display:block;width:100%;height:auto}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.8rem;color:var(--muted);margin:6px 0}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
@@ -71,7 +73,7 @@ text-align:left;text-decoration:underline dotted var(--muted);text-underline-off
 .detail{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:16px;background:var(--bg)}
 .detail h3{font-size:1.15rem}
 .dhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
-.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:10px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:16px;margin-top:10px}
 .dgrid h4{font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px}
 .hz{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .hz div{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
@@ -147,7 +149,7 @@ a{color:var(--accent)}
 <div class="wrap"><table id="recent"></table></div></div>
 <div><h3 style="font-size:.95rem;margin-bottom:6px">Are the chances honest?</h3>
 <p class="note">When the model said a chance in this range, how often a disruption followed.</p>
-<table id="calib"></table></div>
+<div class="wrap"><table id="calib"></table></div></div>
 </div>
 </section>
 
@@ -165,6 +167,12 @@ Known gap: typhoons often reach ports before GDACS lists them, so typhoon disrup
 <script id="data" type="application/json">__DATA__</script>
 <script>
 const D=JSON.parse(document.getElementById('data').textContent);
+// Tables come packed as {k:[keys],v:[[values]]}; unpack them to row objects.
+const unpack=t=>t.v.map(r=>Object.fromEntries(t.k.map((k,i)=>[k,r[i]])));
+D.ports=unpack(D.ports);for(const h in D.chances)D.chances[h]=unpack(D.chances[h]);
+// The drill-down is inline, or in details.json, fetched on the first click.
+let DET=D.detail||null,detLoad=null;
+const loadDetail=()=>detLoad||(detLoad=fetch('details.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(j=>DET=j).catch(e=>{detLoad=null;throw e}));
 const WATCH=0.05;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -310,7 +318,7 @@ function select(id,zoom){
  detail();
 }
 function callsChart(d){
- const W=D.detail.weeks;if(!d||!d.calls||!W.length)return'<p class="sub">No weekly calls on record.</p>';
+ const W=DET.weeks;if(!d||!d.calls||!W.length)return'<p class="sub">No weekly calls on record.</p>';
  const n=W.length,extra=3,w=640,h=170,l=34,r=8,t=10,b=22,cw=(w-l-r)/(n+extra);
  const vals=[...d.calls,...d.usual].filter(v=>v!=null),max=Math.max(...vals,1)*1.1;
  const X=i=>l+cw*(i+.5),Y=v=>t+(h-t-b)*(1-v/max);
@@ -327,7 +335,7 @@ function callsChart(d){
   g+=`<rect x="${X(i)-cw/2}" y="${t}" width="${cw}" height="${h-t-b}" fill="transparent"><title>${wk(W[i])}: ${v} calls, usual ${d.usual[i]??'-'}${m==='D'?' · disruption':m==='S'?' · seasonal drop (same as last year)':''}</title></rect>`});
  W.forEach((s,i)=>{if(s.slice(8,10)<='07'&&(i===0||s.slice(5,7)!==W[i-1].slice(5,7))&&['01','04','07','10'].includes(s.slice(5,7)))
   g+=`<text x="${X(i)}" y="${h-6}" font-size="10" text-anchor="middle" fill="var(--muted)">${new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{month:'short',year:'2-digit',timeZone:'UTC'})}</text>`});
- return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Ship calls per week at this port over the last year">${g}</svg>
+ return `<div class="wrap chartwrap"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Ship calls per week at this port over the last year">${g}</svg></div>
  <div class="legend"><span><i style="background:var(--accent)"></i>calls a week</span><span><i style="background:var(--muted)"></i>usual (dashed)</span><span><i style="background:var(--hi)"></i>disruption</span><span><i style="background:var(--watch)"></i>seasonal drop</span><span>Shaded: last, this and next week (red = alert)</span></div>`;
 }
 function drivers(){
@@ -340,7 +348,9 @@ function drivers(){
 const share=x=>x==null?'-':(x<1?x.toFixed(1):x.toFixed(0))+'%'; // PortWatch gives percents
 function detail(){
  const el=$('detail'),p=P[SEL];if(!p){el.hidden=true;return}
- const d=D.detail.ports[SEL]||{};
+ if(!DET){el.innerHTML=`<p class="sub">Loading details for ${esc(p.port_name)}…</p>`;el.hidden=false;
+  loadDetail().then(()=>{if(SEL)detail()},()=>{el.innerHTML='<p class="sub">Could not load the port details. Reload the page to try again.</p>'});return}
+ const d=DET.ports[SEL]||{};
  const hz=['1','2','3'].map(h=>{const c=chanceOf(SEL,h);return `<div class="${h===H?'on':''}"><span>${esc(D.horizons[h].name)}</span><b class="${c&&c.flagged?'hi':''}">${c?pct(c.chance,1):'-'}</b><span>${c&&c.lift!=null?c.lift.toFixed(1)+'x its normal':''}${c&&c.flagged?' · <span class="hi">alert</span>':''}</span></div>`}).join('');
  const r=chanceOf(SEL);
  const alts=(r&&r.alternatives||[]).map(a=>`${esc(a.name)} <span class="sub">${a.km.toFixed(0)} km</span>`).join(', ');
@@ -356,7 +366,7 @@ function detail(){
  <div class="hz">${hz}</div>
  ${r&&r.reasons&&r.reasons.length?`<p style="margin-top:8px;font-size:.86rem">Why: ${r.reasons.map(x=>`<span class="pill">${esc(x)}</span>`).join('')}</p>`:''}
  ${alts?`<p class="sub" style="margin-top:4px">Nearby ports not flagged: ${alts}</p>`:''}
- <div style="margin-top:12px"><h4 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:4px">Ship calls, last ${D.detail.weeks.length} weeks</h4>${callsChart(d)}</div>
+ <div style="margin-top:12px"><h4 style="font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:4px">Ship calls, last ${DET.weeks.length} weeks</h4>${callsChart(d)}</div>
  <div class="dgrid">
  <div>${drivers()}</div>
  <div><h4>Port</h4><dl class="kv"><dt>Usual calls/week</dt><dd>${p.normal_calls==null?'-':p.normal_calls.toFixed(0)}</dd>
@@ -364,7 +374,7 @@ function detail(){
  ${p.share_country_maritime_import!=null?`<dt>Share of ${esc(p.country)}'s sea trade</dt><dd>${share(p.share_country_maritime_import)} of imports, ${share(p.share_country_maritime_export)} of exports</dd>`:''}
  ${inds?`<dt>Main cargo</dt><dd>${inds}</dd>`:''}</dl>
  <h4 style="margin-top:10px">Ship types calling</h4>${mix}</div>
- <div><h4>Track record here</h4>${rec?`<p style="font-size:.86rem">Since ${fmtDate(D.detail.record_first)}: ${rec[0]} alerts, ${rec[1]} followed by a disruption. ${rec[2]} disruption week${rec[2]===1?'':'s'}, ${rec[3]} caught by an alert.</p>`:'<p class="sub">No past warnings for this port.</p>'}
+ <div><h4>Track record here</h4>${rec?`<p style="font-size:.86rem">Since ${fmtDate(DET.record_first)}: ${rec[0]} alerts, ${rec[1]} followed by a disruption. ${rec[2]} disruption week${rec[2]===1?'':'s'}, ${rec[3]} caught by an alert.</p>`:'<p class="sub">No past warnings for this port.</p>'}
  <h4 style="margin-top:10px">Past disruptions${d.past_n?` (${d.past_n} in all PortWatch data)`:""}</h4>${past?`<ul class="plain">${past}</ul>`:'<p class="sub">None in the data.</p>'}</div>
  <div><h4>Storm and disaster alerts nearby</h4><p class="sub" style="margin-bottom:4px">GDACS events from the ${D.event_days} days before release, within 800 km or naming the port.</p>${ev?`<ul class="plain">${ev}</ul>`:'<p class="sub">None.</p>'}</div>
  </div>`;

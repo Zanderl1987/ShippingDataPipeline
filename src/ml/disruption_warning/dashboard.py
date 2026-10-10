@@ -1,8 +1,13 @@
-"""The public warning dashboard: one self-contained HTML page.
+"""The public warning dashboard: an HTML page plus the per-port drill-down.
 
-Built each week by ``predict.py --site``. Everything the page shows is in a
-JSON block inside it; a little plain JavaScript draws the tables, map and
-charts, so the page needs no server and no outside scripts.
+Built each week by ``predict.py --site`` (``write_site``). What the page shows
+first is in a JSON block inside it; a little plain JavaScript draws the
+tables, map and charts, with no outside scripts. The drill-down for every
+port (a year of calls, past disruptions, nearby alerts) is a third of the
+data and only needed after a click, so the site keeps it in ``DETAILS_FILE``
+and the page fetches it then. The HF Space serves files uncompressed, so this
+roughly halves what a visitor downloads up front. ``render`` alone still
+gives one self-contained page, with the drill-down inline.
 """
 from __future__ import annotations
 
@@ -39,8 +44,22 @@ HORIZON_NAMES = {1: "Last week", 2: "This week", 3: "Next week"}
 PAST_SHOWN = 6
 
 
+DETAILS_FILE = "details.json"
+
+
 def _num(v: Any, digits: int = 1) -> Any:
-    return None if v is None or v != v else round(float(v), digits)
+    if v is None or v != v:
+        return None
+    return round(float(v)) if digits == 0 else round(float(v), digits)
+
+
+def _table(frame: pl.DataFrame) -> dict[str, Any]:
+    """Rows as ``{"k": [column names], "v": [[values], ...]}``.
+
+    The same as a list of row objects (the page unpacks it), without
+    repeating every key on every row, which is about half the bytes."""
+    rows = rows_json(frame)
+    return {"k": frame.columns, "v": [[r[c] for c in frame.columns] for r in rows]}
 
 
 def port_details(fc: Forecast, record: pl.DataFrame) -> dict[str, Any]:
@@ -188,9 +207,9 @@ def payload(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame) -> dict[s
                      "week": (fc.origin + timedelta(weeks=h)).isoformat()}
             for h in (1, 2, 3)
         },
-        "ports": rows_json(ports),
+        "ports": _table(ports),
         "chances": {
-            str(h): rows_json(
+            str(h): _table(
                 w.filter(pl.col("horizon") == h).select(
                     "port_id", pl.col("chance").round(4), pl.col("lift").round(1), "flagged",
                     "reasons", "alternatives",
@@ -209,14 +228,32 @@ def payload(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame) -> dict[s
     }
 
 
-def render(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame) -> str:
-    data = json.dumps(payload(fc, record, history), separators=(",", ":"), default=str)
+def _json(obj: Any) -> str:
+    return json.dumps(obj, separators=(",", ":"), default=str)
+
+
+def render(fc: Forecast, record: pl.DataFrame, history: pl.DataFrame,
+           inline_details: bool = True) -> str:
+    """The page. Without ``inline_details`` it fetches ``DETAILS_FILE`` instead."""
+    data_obj = payload(fc, record, history)
+    if not inline_details:
+        del data_obj["detail"]
+    data = _json(data_obj)
     # A "</" inside the JSON would end the script block early.
     data = data.replace("</", "<\\/")
     page = PAGE.read_text(encoding="utf-8")
     land = LAND.read_text(encoding="utf-8").strip() if LAND.exists() else ""
     return (page.replace("__TITLE__", html.escape(TITLE)).replace("__LAND__", land)
             .replace("__DATA__", data))
+
+
+def write_site(out: Path, fc: Forecast, record: pl.DataFrame, history: pl.DataFrame) -> Path:
+    """Write ``index.html`` and ``DETAILS_FILE`` into ``out``; returns the page's path."""
+    out.mkdir(parents=True, exist_ok=True)
+    (out / DETAILS_FILE).write_text(_json(port_details(fc, record)), encoding="utf-8")
+    page = out / "index.html"
+    page.write_text(render(fc, record, history, inline_details=False), encoding="utf-8")
+    return page
 
 
 TITLE = "Port Disruption Watch"
